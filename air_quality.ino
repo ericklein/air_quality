@@ -8,54 +8,59 @@
 
 // Conditional compile flags
 #define DEBUG       // Output to the serial port
+// #define SDLOG       // output sensor data to SD Card
+//#define SCREEN      // output sensor data to screen
+//#define CLOUDLOG    // output sensor data to cloud service
+#define RJ45        // use Ethernet to send data to cloud service
 
-// DHT sensor setup
+// DHT (digital humidity and temperature) sensor
 #include "DHT.h"
-#define DHTPIN 2     // Digital pin connected to the DHT sensor
-#define DHTTYPE DHT22   // DHT 22  (AM2302), AM2321
+#define DHTPIN 10          // Digital pin connected to DHT sensor
+#define DHTTYPE DHT22     // DHT 22  (AM2302), AM2321
 DHT dht(DHTPIN, DHTTYPE);
 
-// SGP30 sensor (eCO2)
+// SGP30 (eCO2) sensor
 #include <Wire.h>
 #include "Adafruit_SGP30.h"
 Adafruit_SGP30 sgp;
-uint32_t getAbsoluteHumidity(float temperature, float humidity) {
-    // approximation formula from Sensirion SGP30 Driver Integration chapter 3.15
-    const float absoluteHumidity = 216.7f * ((humidity / 100.0f) * 6.112f * exp((17.62f * temperature) / (243.12f + temperature)) / (273.15f + temperature)); // [g/m^3]
-    const uint32_t absoluteHumidityScaled = static_cast<uint32_t>(1000.0f * absoluteHumidity); // [mg/m^3]
-    return absoluteHumidityScaled;
-}
 
-// SD card
-#include <SPI.h>
-#include <SD.h>
-#define SDPIN 4
-File logfile;
+#define LOG_INTERVAL  60000   // milliseconds between sensor reads
+#define SYNC_INTERVAL 600000  // milliseconds before flush(); needed for CLOUDLOG?
+uint32_t syncTime = 0;        // time of last write to SD or cloud
 
-// how many milliseconds between grabbing data and logging it. 1000 ms is once a second
-#define LOG_INTERVAL  60000 // mills between entries (reduce to take more/faster data)
+#ifdef SDLOG
+  #include <SPI.h>
+  #include <SD.h>
+  #define SDPIN 4
+  File logfile;
+#endif
 
-//h ow many milliseconds before writing the logged data permanently to disk
-// set it to the LOG_INTERVAL to write each time (safest)
-// set it to 10*LOG_INTERVAL to write all data every 10 datareads, you could lose up to 
-// the last 10 reads if power is lost but it uses less power and is much faster!
-#define SYNC_INTERVAL 180000 // mills between calls to flush() - to write data to the card
-uint32_t syncTime = 0; // time of last sync()
+#ifdef RJ45
+  #include <SPI.h>
+  #include <Ethernet.h>
+  #include <EthernetUdp.h>
+  // Enter a MAC address. If unknown, be careful for duplicate addresses across projects.
+  byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
+  EthernetUDP Udp;
+  unsigned int localPort = 8888;       // local port to listen for UDP packets
+#endif
 
-// // Ethernet
-// #include <Ethernet.h>
-// #include <EthernetUdp.h>
-// // Enter a MAC address for your controller below.
-// // Newer Ethernet shields have a MAC address printed on a sticker on the shield
-// byte mac[] = {0x90, 0xA2, 0xDA, 0x0F, 0x30, 0x97};
-// unsigned int localPort = 8888;       // local port to listen for UDP packets
-// const char timeServer[] = "time.nist.gov"; // time.nist.gov NTP server
-// const int NTP_PACKET_SIZE = 48; // NTP time stamp is in the first 48 bytes of the message
-// byte packetBuffer[NTP_PACKET_SIZE]; //buffer to hold incoming and outgoing packets
-// // A UDP instance to let us send and receive packets over UDP
-// EthernetUDP Udp;
+// Time (and time related networking)
+#include <TimeLib.h>
+// NTP Servers
+//IPAddress timeServer(132, 163, 4, 101); // time-a.timefreq.bldrdoc.gov
+// IPAddress timeServer(132, 163, 4, 102); // time-b.timefreq.bldrdoc.gov
+// IPAddress timeServer(132, 163, 4, 103); // time-c.timefreq.bldrdoc.gov
+IPAddress timeServer(132,163,97,6); // time.nist.gov
 
-#include "TimeLib.h"
+// Time Zone support
+//const int timeZone = 1;     // Central European Time
+//const int timeZone = -5;  // Eastern Standard Time (USA)
+//const int timeZone = -4;  // Eastern Daylight Time (USA)
+//const int timeZone = -8;  // Pacific Standard Time (USA)
+const int timeZone = -7;  // Pacific Daylight Time (USA)
+const int NTP_PACKET_SIZE = 48; // NTP time is in the first 48 bytes of message
+byte packetBuffer[NTP_PACKET_SIZE]; //buffer to hold incoming & outgoing packets
 
 void setup() 
 {
@@ -65,92 +70,124 @@ void setup()
       {
         delay(1);
       }
-      Serial.println("Air Quality started");
+    Serial.println("Indoor Air Quality started");
   #endif
 
   dht.begin();
 
-    if (! sgp.begin()){
-    Serial.println("Sensor not found :(");
+  if (! sgp.begin())
+  {
+    #ifdef DEBUG
+      Serial.println("SGP30 sensor not found");
+    #endif
     while (1);
   }
-  Serial.print("Found SGP30 serial #");
-  Serial.print(sgp.serialnumber[0], HEX);
-  Serial.print(sgp.serialnumber[1], HEX);
-  Serial.println(sgp.serialnumber[2], HEX);
+
+  #ifdef DEBUG
+    Serial.println("DHT22 and SGP30 sensors ready");
+  #endif
 
   // If you have a baseline measurement from before you can assign it to start, to 'self-calibrate'
   //sgp.setIAQBaseline(0x8E68, 0x8F41);  // Will vary for each sensor!
 
-  // initialize SD card
-  if (!SD.begin(SDPIN)) 
-  {
-    #ifdef DEBUG
-      Serial.println("Card failed, or not present");
-    #endif
-    while (1);
-  }
-  
-  // create a new file on SD card
-  char filename[] = "LOGGER00.CSV";
-  for (uint8_t i = 0; i < 100; i++) 
-  {
-    filename[6] = i/10 + '0';
-    filename[7] = i%10 + '0';
-    if (! SD.exists(filename)) 
+  #ifdef SDLOG
+    // initialize SD card
+    if (!SD.begin(SDPIN)) 
     {
-      // only open a new file if it doesn't exist
-      logfile = SD.open(filename, FILE_WRITE); 
-      break;  // leave the loop!
+      #ifdef DEBUG
+        Serial.println("Card failed, or not present");
+      #endif
+      while (1);
     }
-  }
   
-  if (! logfile) 
-  {
-    Serial.println("Couldn't create log file");
-    while (1);
-  }
+    // create a new file on SD card
+    char filename[] = "LOGGER00.CSV";
+    for (uint8_t i = 0; i < 100; i++) 
+    {
+      filename[6] = i/10 + '0';
+      filename[7] = i%10 + '0';
+      if (! SD.exists(filename)) 
+      {
+        // only open a new file if it doesn't exist
+        logfile = SD.open(filename, FILE_WRITE); 
+        break;  // leave the loop!
+      }
+    }
   
-  #ifdef DEBUG
-    Serial.print("Logging to: ");
-    Serial.println(filename);
+    if (! logfile) 
+    {
+      #ifdef DEBUG
+        Serial.println("Couldn't create log file");
+      #endif
+      while (1);
+    }
+  
+    #ifdef DEBUG
+      Serial.print("Logging to: ");
+      Serial.println(filename);
+    #endif
+
+    // Log output headers
+      logfile.println("time,humidity,temp,heat_index,eCO2");    
   #endif
 
-  // Log output headers
-    logfile.println("time,humidity,temp,heat_index,eCO2");    
+  #ifdef RJ45
+    // Configure Ethernet CS pin, not needed if using default D10
+    //Ethernet.init(10);  // Most Arduino shields
+    //Ethernet.init(5);   // MKR ETH shield
+    //Ethernet.init(0);   // Teensy 2.0
+    //Ethernet.init(20);  // Teensy++ 2.0
+    //Ethernet.init(15);  // ESP8266 with Adafruit Featherwing Ethernet
+    //Ethernet.init(33);  // ESP32 with Adafruit Featherwing Ethernet
+
+    // Initialize Ethernet and UDP
+    if (Ethernet.begin(mac) == 0)
+    {
+      #ifdef DEBUG
+        Serial.println("Failed to configure Ethernet using DHCP");
+      #endif
+      // Check for Ethernet hardware present
+      if (Ethernet.hardwareStatus() == EthernetNoHardware)
+      {
+        #ifdef DEBUG
+          Serial.println("Ethernet hardware not found");
+        #endif
+      } 
+      else if (Ethernet.linkStatus() == LinkOFF) 
+      {
+        #ifdef DEBUG
+          Serial.println("Ethernet cable is not connected.");
+        #endif
+      }
+      while (1);
+    }
+    // Get time from NTP
+    #ifdef DEBUG
+      Serial.print("IP number assigned by DHCP is ");
+      Serial.println(Ethernet.localIP());
+    #endif
+    Udp.begin(localPort);
+    #ifdef DEBUG
+      Serial.println("waiting for NTP time sync");
+    #endif
+    setSyncInterval(15); // sync every 15 seconds
+    setSyncProvider(getNtpTime);
+
+    while(timeStatus()== timeNotSet)
+      ; // wait until the time is set by the sync provider
+
+    Serial.println("Sync successfully");
+  #endif
+
+  // serial output data headers
   #ifdef DEBUG
     Serial.println("time,humidity,temp,heat_index,eC02");
   #endif
-
-  // // Ethernet
-  // // You can use Ethernet.init(pin) to configure the CS pin
-  // Ethernet.init(10);  // Most Arduino shields
-  // //Ethernet.init(5);   // MKR ETH shield
-  // //Ethernet.init(0);   // Teensy 2.0
-  // //Ethernet.init(20);  // Teensy++ 2.0
-  // //Ethernet.init(15);  // ESP8266 with Adafruit Featherwing Ethernet
-  // //Ethernet.init(33);  // ESP32 with Adafruit Featherwing Ethernet
-  // // start Ethernet and UDP
-  // if (Ethernet.begin(mac) == 0) {
-  //   Serial.println("Failed to configure Ethernet using DHCP");
-  //   // Check for Ethernet hardware present
-  //   if (Ethernet.hardwareStatus() == EthernetNoHardware) {
-  //     Serial.println("Ethernet shield was not found.  Sorry, can't run without hardware. :(");
-  //   } else if (Ethernet.linkStatus() == LinkOFF) {
-  //     Serial.println("Ethernet cable is not connected.");
-  //   }
-  //   // no point in carrying on, so do nothing forevermore:
-  //   while (true) {
-  //     delay(1);
-  //   }
-  // }
-  // Udp.begin(localPort);
-  // setTimeFromNTPServer();
 }
 
 void loop() 
 {
-  // delay for the amount of time we want between readings
+  // delay between sensor readings
   delay(LOG_INTERVAL);
 
   // Reading temperature or humidity takes about 250 milliseconds!
@@ -165,7 +202,7 @@ void loop()
   // set the absolute humidity to enable the humditiy compensation for the SGP30 air quality signals
   sgp.setHumidity(getAbsoluteHumidity(temperature_fahr, humidity));
 
-    // Check if any reads failed and exit early (to try again).
+  // Check if any reads failed and exit early (to try again).
   if (isnan(humidity) || isnan(temperature_fahr))
   //if (isnan(humidity) || isnan(t) || isnan(temperature_fahr))
   {
@@ -187,8 +224,18 @@ void loop()
   //float hic = dht.computeHeatIndex(t, h, false);
 
   String logString = "";
-  // Add timestamp (from NTP server) here
-  logString += "MM/DD/YY HH:MM,";
+  logString = year();
+  logString += "/";
+  logString += month();
+  logString += "/";
+  logString += day();
+  logString += " ";
+  logString += hour();
+  logString += ":";
+  logString += minute();
+  logString += ":";
+  logString += second();
+  logString += ",";
   //logString += "Humidity: ";
   logString += humidity;
   logString += ",";
@@ -205,94 +252,72 @@ void loop()
     logString += ",";
   logString += sgp.eCO2;
 
-
   #ifdef DEBUG
     Serial.println(logString);
   #endif
 
-  // write to SD. Don't sync too often - requires 2048 bytes of I/O to SD card
-  // which uses a bunch of power and takes time
-  if ((millis() - syncTime) < SYNC_INTERVAL) return;
-  syncTime = millis();
-  logfile.flush();
-  #ifdef DEBUG
-    Serial.println("file saved");
+  #ifdef SDLOG
+    // writes to SD requires 2048 bytes of I/O to SD card which uses a bunch of power/time
+    if ((millis() - syncTime) < SYNC_INTERVAL) return;
+    syncTime = millis();
+    logfile.flush();
+    #ifdef DEBUG
+      Serial.println("Log data written to SD card");
+    #endif
   #endif
-
-  //Ethernet.maintain();
 }
 
-// // send an NTP request to the time server at the given address
-// void sendNTPpacket(const char * address) {
-//   // set all bytes in the buffer to 0
-//   memset(packetBuffer, 0, NTP_PACKET_SIZE);
-//   // Initialize values needed to form NTP request
-//   // (see URL above for details on the packets)
-//   packetBuffer[0] = 0b11100011;   // LI, Version, Mode
-//   packetBuffer[1] = 0;     // Stratum, or type of clock
-//   packetBuffer[2] = 6;     // Polling Interval
-//   packetBuffer[3] = 0xEC;  // Peer Clock Precision
-//   // 8 bytes of zero for Root Delay & Root Dispersion
-//   packetBuffer[12]  = 49;
-//   packetBuffer[13]  = 0x4E;
-//   packetBuffer[14]  = 49;
-//   packetBuffer[15]  = 52;
+time_t getNtpTime()
+{
+  while (Udp.parsePacket() > 0) ; // discard any previously received packets
+  Serial.println("Transmit NTP Request");
+  sendNTPpacket(timeServer);
+  uint32_t beginWait = millis();
+  while (millis() - beginWait < 1500) {
+    int size = Udp.parsePacket();
+    if (size >= NTP_PACKET_SIZE) {
+      Serial.println("Receive NTP Response");
+      Udp.read(packetBuffer, NTP_PACKET_SIZE);  // read packet into the buffer
+      unsigned long secsSince1900;
+      // convert four bytes starting at location 40 to a long integer
+      secsSince1900 =  (unsigned long)packetBuffer[40] << 24;
+      secsSince1900 |= (unsigned long)packetBuffer[41] << 16;
+      secsSince1900 |= (unsigned long)packetBuffer[42] << 8;
+      secsSince1900 |= (unsigned long)packetBuffer[43];
+      return secsSince1900 - 2208988800UL + timeZone * SECS_PER_HOUR;
+    }
+  }
+  Serial.println("No NTP Response :-(");
+  return 0; // return 0 if unable to get the time
+}
 
-//   // all NTP fields have been given values, now
-//   // you can send a packet requesting a timestamp:
-//   Udp.beginPacket(address, 123); // NTP requests are to port 123
-//   Udp.write(packetBuffer, NTP_PACKET_SIZE);
-//   Udp.endPacket();
-// }
+// send an NTP request to the time server at the given address
+void sendNTPpacket(IPAddress &address)
+{
+  // set all bytes in the buffer to 0
+  memset(packetBuffer, 0, NTP_PACKET_SIZE);
+  // Initialize values needed to form NTP request
+  // (see URL above for details on the packets)
+  packetBuffer[0] = 0b11100011;   // LI, Version, Mode
+  packetBuffer[1] = 0;     // Stratum, or type of clock
+  packetBuffer[2] = 6;     // Polling Interval
+  packetBuffer[3] = 0xEC;  // Peer Clock Precision
+  // 8 bytes of zero for Root Delay & Root Dispersion
+  packetBuffer[12]  = 49;
+  packetBuffer[13]  = 0x4E;
+  packetBuffer[14]  = 49;
+  packetBuffer[15]  = 52;
+  // all NTP fields have been given values, now
+  // you can send a packet requesting a timestamp:                 
+  Udp.beginPacket(address, 123); //NTP requests are to port 123
+  Udp.write(packetBuffer, NTP_PACKET_SIZE);
+  Udp.endPacket();
+}
 
-// void setTimeFromNTPServer() 
-// {
-//   sendNTPpacket(timeServer); // send an NTP packet to a time server
-
-//   // wait to see if a reply is available
-//   delay(1000);
-//   if (Udp.parsePacket()) 
-//   {
-//     // We've received a packet, read the data from it
-//     Udp.read(packetBuffer, NTP_PACKET_SIZE); // read the packet into the buffer
-
-//     // the timestamp starts at byte 40 of the received packet and is four bytes,
-//     // or two words, long. First, extract the two words:
-
-//     unsigned long highWord = word(packetBuffer[40], packetBuffer[41]);
-//     unsigned long lowWord = word(packetBuffer[42], packetBuffer[43]);
-//     // combine the four bytes (two words) into a long integer
-//     // this is NTP time (seconds since Jan 1 1900):
-//     unsigned long secsSince1900 = highWord << 16 | lowWord;
-//     Serial.print("Seconds since Jan 1 1900 = ");
-//     Serial.println(secsSince1900);
-
-//     // now convert NTP time into everyday time:
-//     Serial.print("Unix time = ");
-//     // Unix time starts on Jan 1 1970. In seconds, that's 2208988800:
-//     const unsigned long seventyYears = 2208988800UL;
-//     // subtract seventy years:
-//     unsigned long epoch = secsSince1900 - seventyYears;
-//     // print Unix time:
-//     Serial.println(epoch);
-//     setTime(epoch);
-//   }
-
-  //   // print the hour, minute and second:
-  //   Serial.print("The UTC time is ");       // UTC is the time at Greenwich Meridian (GMT)
-  //   Serial.print((epoch  % 86400L) / 3600); // print the hour (86400 equals secs per day)
-  //   Serial.print(':');
-  //   if (((epoch % 3600) / 60) < 10) {
-  //     // In the first 10 minutes of each hour, we'll want a leading '0'
-  //     Serial.print('0');
-  //   }
-  //   Serial.print((epoch  % 3600) / 60); // print the minute (3600 equals secs per minute)
-  //   Serial.print(':');
-  //   if ((epoch % 60) < 10) {
-  //     // In the first 10 seconds of each minute, we'll want a leading '0'
-  //     Serial.print('0');
-  //   }
-  //   Serial.println(epoch % 60); // print the second
-  // }
-  // // wait ten seconds before asking for the time again
-  // Ethernet.maintain();
+uint32_t getAbsoluteHumidity(float temperature, float humidity) 
+{
+  // approximation formula from Sensirion SGP30 Driver Integration chapter 3.15
+  const float absoluteHumidity = 216.7f * ((humidity / 100.0f) * 6.112f * exp((17.62f * temperature) / (243.12f + temperature)) / (273.15f + temperature)); // [g/m^3]
+  const uint32_t absoluteHumidityScaled = static_cast<uint32_t>(1000.0f * absoluteHumidity); // [mg/m^3]
+  return absoluteHumidityScaled;
+}
