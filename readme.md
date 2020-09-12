@@ -52,7 +52,12 @@ Measure and log temperature, humidity, and CO2 levels every 30 minutes
 
 ### Issues
 - 083120: Need to add baseline readings for the SGP30 (EPROM, FLASH)
-- 083120: Arduino Ethernet doesn't have enough memory for code + libraries, might even be an SRAM issue b4 that
+- 091120: Set SYNC_INTERVAL to minimum for AIO and use in main CLOUDLOG
+- 091120: Crashes again after one loop
+	- might be a DHT issue
+	- main delay(SYNC_INTERVAL) must be factored out, it could be impacting networking
+- 091120: Data not writing to AIO
+	- check sample code
 
 ### Questions
 - 090820: We are generating humidity, heat index, and absolute humidity?
@@ -66,7 +71,7 @@ Measure and log temperature, humidity, and CO2 levels every 30 minutes
 - 090120: Add screen display support
 - 090620: LED blink encoded error messages for non-DEBUG and while(1) errors
 - 090820: Optimize code
-- 090820: After adding cloud db support, try and backport to Arduino Ethernet board
+- 090820: After adding cloud db support, try backport to Arduino Ethernet board (enough memory?)
 - 090820: Switch to Adafruit M0 Datalogger and re-enable SDLOG
 - 091120: Use timedisplay routines for log string
 
@@ -82,4 +87,3 @@ Measure and log temperature, humidity, and CO2 levels every 30 minutes
 	- [I] 090820: Code is only running for one loop -> setSyncInterval(15) locked code on subsequent loops, also not needed
 	- [I] - 090820: time is not correct, sample code is -> byproduct of setSyncInterval(15) issue
 	- [FR] 090820: Display NTP time when received in DEBUG
-	

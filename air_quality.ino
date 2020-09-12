@@ -10,7 +10,7 @@
 #define DEBUG       // Output to the serial port
 // #define SDLOG       // output sensor data to SD Card
 //#define SCREEN      // output sensor data to screen
-//#define CLOUDLOG    // output sensor data to cloud service
+#define CLOUDLOG    // output sensor data to cloud service
 #define RJ45        // use Ethernet to send data to cloud service
 
 // DHT (digital humidity and temperature) sensor
@@ -35,6 +35,9 @@ uint32_t syncTime = 0;        // time of last write to SD or cloud
   File logfile;
 #endif
 
+// setup information for Adafruit IO and physical network device
+#include "config.h"
+
 #ifdef RJ45
   #include <SPI.h>
   #include <Ethernet.h>
@@ -54,13 +57,20 @@ uint32_t syncTime = 0;        // time of last write to SD or cloud
 IPAddress timeServer(132,163,97,6); // time.nist.gov
 
 // Time Zone support
-//const int timeZone = 1;     // Central European Time
 //const int timeZone = -5;  // Eastern Standard Time (USA)
 //const int timeZone = -4;  // Eastern Daylight Time (USA)
 //const int timeZone = -8;  // Pacific Standard Time (USA)
-const int timeZone = -7;  // Pacific Daylight Time (USA)
+const int timeZone = -7;    // Pacific Daylight Time (USA)
 const int NTP_PACKET_SIZE = 48; // NTP time is in the first 48 bytes of message
 byte packetBuffer[NTP_PACKET_SIZE]; //buffer to hold incoming & outgoing packets
+
+#ifdef CLOUDLOG
+  // Adafruit IO feeds to update
+  AdafruitIO_Feed *tempFeed = io.feed(AIO_temp_feed);
+  AdafruitIO_Feed *humidFeed = io.feed(AIO_humidity_feed);
+  AdafruitIO_Feed *heatFeed = io.feed(AIO_heatindex_feed);
+  AdafruitIO_Feed *eCO2Feed = io.feed(AIO_eCO2_feed);
+#endif
 
 void setup() 
 {
@@ -178,19 +188,42 @@ void setup()
     #endif
   #endif
 
-  // serial output data headers
-  #ifdef DEBUG
-    Serial.println("time,humidity,temp,heat_index,eC02");
+  #ifdef CLOUDLOG
+    #ifdef DEBUG
+      Serial.println("Connecting to Adafruit IO");
+    #endif
+
+    io.connect();
+    // wait for a connection
+    while (io.status() < AIO_CONNECTED)
+    {
+      #ifdef DEBUG
+        Serial.println(io.statusText());
+        Serial.print(".");
+      #endif
+      delay(500);
+    }
+    // we are connected
+    #ifdef DEBUG
+      Serial.println();
+      Serial.println(io.statusText());
+    #endif
   #endif
 }
 
 void loop() 
 {
-  // #ifdef DEBUG
-  //   Serial.println("Entering main loop");
-  // #endif
-  // delay between sensor readings
-  delay(LOG_INTERVAL);
+  #ifdef DEBUG
+    Serial.println("Entering main loop");
+  #endif
+
+  // Keep connection to Adafruit IO open
+  #ifdef CLOUDLOG
+    #ifdef DEBUG
+      Serial.println(io.statusText());
+    #endif
+    io.run();
+  #endif
 
   // Reading temperature or humidity takes about 250 milliseconds!
   float humidity = dht.readHumidity();
@@ -200,6 +233,12 @@ void loop()
 
   // Read temperature as Fahrenheit (isFahrenheit = true)
   float temperature_fahr = dht.readTemperature(true);
+
+  // Compute heat index in Fahrenheit (the default)
+  float heat_index_fahr = dht.computeHeatIndex(temperature_fahr, humidity);
+
+  // Compute heat index in Celsius (isFahreheit = false)
+  //float hic = dht.computeHeatIndex(t, h, false);
 
   // set the absolute humidity to enable the humditiy compensation for the SGP30 air quality signals
   sgp.setHumidity(getAbsoluteHumidity(temperature_fahr, humidity));
@@ -220,10 +259,15 @@ void loop()
     return;
   }
 
-  // Compute heat index in Fahrenheit (the default)
-  float heat_index_fahr = dht.computeHeatIndex(temperature_fahr, humidity);
-  // Compute heat index in Celsius (isFahreheit = false)
-  //float hic = dht.computeHeatIndex(t, h, false);
+  #ifdef CLOUDLOG
+    tempFeed->save(temperature_fahr);
+    humidFeed->save(humidity);
+    heatFeed->save(heat_index_fahr);
+    eCO2Feed->save(sgp.eCO2);
+    #ifdef DEBUG
+      Serial.println("Updated Adafruit IO feed");
+    #endif
+  #endif
 
   String logString = "";
   logString = year();
@@ -254,10 +298,6 @@ void loop()
     logString += ",";
   logString += sgp.eCO2;
 
-  #ifdef DEBUG
-    Serial.println(logString);
-  #endif
-
   #ifdef SDLOG
     // writes to SD requires 2048 bytes of I/O to SD card which uses a bunch of power/time
     if ((millis() - syncTime) < SYNC_INTERVAL) return;
@@ -267,6 +307,17 @@ void loop()
       Serial.println("Log data written to SD card");
     #endif
   #endif
+
+  #ifdef DEBUG
+    Serial.println("time,humidity,temp,heat_index,eC02");
+    Serial.println(logString);
+  #endif
+
+  // delay between sensor readings
+  #ifdef DEBUG
+    Serial.println("LOG_INTERVAL delay");
+  #endif
+  delay(LOG_INTERVAL);
 }
 
 time_t getNtpTime()
