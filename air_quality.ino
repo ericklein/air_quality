@@ -9,7 +9,7 @@
 // Conditional compile flags
 #define DEBUG           // Output to the serial port
 // #define SDLOG        // output sensor data to SD Card
-//#define SCREEN        // output sensor data to screen
+#define SCREEN          // output sensor data to screen
 #define CLOUDLOG        // output sensor data to cloud service
 #define RJ45            // use Ethernet to send data to cloud service
 
@@ -63,6 +63,15 @@ const int timeZone = -7;    // Pacific Daylight Time (USA)
 const int NTP_PACKET_SIZE = 48; // NTP time is in the first 48 bytes of message
 byte packetBuffer[NTP_PACKET_SIZE]; //buffer to hold incoming & outgoing packets
 
+#ifdef SCREEN
+  #include <SPI.h>
+  #include <Wire.h>
+  #include <Adafruit_GFX.h>
+  #include <Adafruit_SSD1306.h>
+
+  Adafruit_SSD1306 display = Adafruit_SSD1306(128, 32, &Wire);
+#endif
+
 #ifdef CLOUDLOG
   // Adafruit IO feeds to update
   AdafruitIO_Feed *tempFeed = io.feed(AIO_temp_feed);
@@ -75,10 +84,10 @@ void setup()
 {
   #ifdef DEBUG
     Serial.begin(115200);
-    while (!Serial) 
-      {
-        delay(1);
-      }
+    while (!Serial)
+    {
+      // wait for serial port
+    }
     Serial.println("Indoor Air Quality started");
   #endif
 
@@ -185,6 +194,19 @@ void setup()
       Serial.print("The NTP time is ");
       digitalClockDisplay();
     #endif
+  #endif
+
+  #ifdef SCREEN
+    display.begin(SSD1306_SWITCHCAPVCC, 0x3C); // Address 0x3C for 128x32
+    // display Adafruit logo
+    // display.display();
+    // delay(1000)
+
+    // Clear the buffer and set display parameters
+    display.clearDisplay();
+    display.setTextColor(SSD1306_WHITE);
+    display.setTextSize(2);
+    display.display();
   #endif
 
   #ifdef CLOUDLOG
@@ -310,6 +332,17 @@ void loop()
     #ifdef DEBUG
       Serial.println("Log data written to SD card");
     #endif
+  #endif
+
+  #ifdef SCREEN
+    display.clearDisplay();
+    display.setCursor(0,0);
+    display.print("Tmp:");
+    display.println(temperature_fahr);  // will get truncated to 2 decimal places
+    display.setCursor(0,8*2);           // associated with text size
+    display.print("Hum:");
+    display.println(humidity);
+    display.display(); 
   #endif
 
   #ifdef DEBUG

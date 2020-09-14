@@ -1,30 +1,27 @@
-# project_name
-air_quality
+# Air Quality
 
 ### Purpose
-Measure and log temperature, humidity, and CO2 levels every 30 minutes
+Regularly sample and log temperature, humidity, and CO2 levels
 
 ### Contributors
 
-### Software Dependencies
-- DHT Sensor Library: https://github.com/adafruit/DHT-sensor-library
-- Adafruit Unified Sensor Lib: https://github.com/adafruit/Adafruit_Sensor
+### Software Dependencies not in Arduino Library Manager 
 
 ### BOM
 - 1x: Arduino Feather M4 Express: https://www.adafruit.com/product/3857
 - 1x: Particle Ethernet Featherwing: https://www.adafruit.com/product/4003
 - 1X: DHT22 temp/humidity sensor: https://www.adafruit.com/product/385
 - 1X: SGP30 gas sensor: https://www.adafruit.com/product/3709
+- 1X: Featherwing OLED (128x32): https://www.adafruit.com/product/2900
 
 ### Pinouts
-- Particle Ethernet Featherwing connects to the following pins
+- Particle Ethernet Featherwing
 	- SPI MISO
 	- SPI MOSI
 	- SPI SCK
 	- D3 RESET
 	- D4 INTERRUPT
 	- D10 CHIP SELECT
-
 - DHT sensor
 	- Connect pin 1 (on the left) of DHT22 to +5V or 3.3v depending on board
 	- Connect pin 2 of the sensor to whatever your DHTPIN is
@@ -33,6 +30,9 @@ Measure and log temperature, humidity, and CO2 levels every 30 minutes
 - SGP30 sensor
 	- VIN to 3.3v, 5V
 	- GND to ground
+	- SDA to SDA
+	- SCL to SCL
+- Featherwing OLED
 	- SDA to SDA
 	- SCL to SCL
 
@@ -49,6 +49,10 @@ Measure and log temperature, humidity, and CO2 levels every 30 minutes
 	- https://learn.adafruit.com/adafruit-wiz5500-wiznet-ethernet-featherwing/usage
 	- https://www.arduino.cc/en/reference/ethernet
 	- https://store.arduino.cc/usa/arduino-ethernet-rev3-without-poe
+- Display
+	- https://learn.adafruit.com/adafruit-oled-featherwing/usage
+	- https://cdn-learn.adafruit.com/downloads/pdf/adafruit-gfx-graphics-library.pdf
+	- https://engineeringnotes.blogspot.com/2013/07/using-ssd1306-textgraphics-display.html
 
 ### Learnings
 - 090620: Just push your own MAC address if the device doesn't physically display its address, but avoid duplicates across projects when using common code to set it.
@@ -58,17 +62,17 @@ Measure and log temperature, humidity, and CO2 levels every 30 minutes
 - 083120: Need to add baseline readings for the SGP30 (EPROM, FLASH)
 
 ### Feature Requests
-- 090120: Add screen display support
-- 090620: LED blink encoded error messages for non-DEBUG and while(1) errors
-- 090820: Optimize code
-- 090820: After adding cloud db support, try backport to Arduino Ethernet board (enough memory?)
-- 090820: Switch to Adafruit M0 Datalogger and re-enable SDLOG
-- 091120: Use timedisplay routines for log string
-- 091320: Insert easily visible, detectable (-1) data points into data feed when sensors error during read
-- 091420: Try and move AIO keys to another group
+- 090620: P3, LED blink encoded error messages for non-DEBUG and while(1) errors
+- 090820: P1, Optimize code
+- 091120: P1, Use timedisplay routines for log string
+- 091320: P1, Insert easily visible, detectable (-1) data points into data feed when sensors error during read
+- 091420: P2, Try and move AIO keys to another group
+- 091420: P2, Switch to BME680 integrated sensor
+- 091420: P2, Switch to M0 Proto board and put BME680 in proto space there
 
 ### Questions
 - 090820: We are generating humidity, heat index, and absolute humidity?
+- 091420: eCO2 level never changes? (see baseline issue?)
 
 ### Revisions
 - 083120: First version based on merged sample code for sensors, SD. Ethernet code NOT working.
@@ -88,3 +92,5 @@ Measure and log temperature, humidity, and CO2 levels every 30 minutes
 	- [I] 091120: main delay(SYNC_INTERVAL) must be factored out, it could be impacting networking -> done
 	- [I] 091120: Data not writing to AIO -> side effect of DHT/Ethernet pin conflict
 	- [FR] 083120: Upload data to cloud db -> code now working
+	- [FR] 090820: After adding cloud db support, try backport to Arduino Ethernet board (enough memory?) -> does not fit, not worth the effort
+	- [FR] 090120: Add screen display support
