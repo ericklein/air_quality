@@ -23,7 +23,7 @@ Measure and log temperature, humidity, and CO2 levels every 30 minutes
 	- SPI SCK
 	- D3 RESET
 	- D4 INTERRUPT
-	- D5 CHIP SELECT
+	- D10 CHIP SELECT
 
 - DHT sensor
 	- Connect pin 1 (on the left) of DHT22 to +5V or 3.3v depending on board
@@ -50,30 +50,25 @@ Measure and log temperature, humidity, and CO2 levels every 30 minutes
 	- https://www.arduino.cc/en/reference/ethernet
 	- https://store.arduino.cc/usa/arduino-ethernet-rev3-without-poe
 
-### Issues
-- 083120: Need to add baseline readings for the SGP30 (EPROM, FLASH)
-- 091120: Set SYNC_INTERVAL to minimum for AIO and use in main CLOUDLOG
-- 091120: Crashes again after one loop
-	- might be a DHT issue
-	- main delay(SYNC_INTERVAL) must be factored out, it could be impacting networking
-- 091120: Data not writing to AIO
-	- check sample code
-
-### Questions
-- 090820: We are generating humidity, heat index, and absolute humidity?
-
 ### Learnings
 - 090620: Just push your own MAC address if the device doesn't physically display its address, but avoid duplicates across projects when using common code to set it.
 - 090620: Arduino Ethernet code can't tranverse a DNS fallback list, so if the primary fails (e.g. Pihole crash) it will stop connecting to outside addresses via DNS lookup
 
+### Issues
+- 083120: Need to add baseline readings for the SGP30 (EPROM, FLASH)
+
 ### Feature Requests
-- 083120: Upload data to cloud db
 - 090120: Add screen display support
 - 090620: LED blink encoded error messages for non-DEBUG and while(1) errors
 - 090820: Optimize code
 - 090820: After adding cloud db support, try backport to Arduino Ethernet board (enough memory?)
 - 090820: Switch to Adafruit M0 Datalogger and re-enable SDLOG
 - 091120: Use timedisplay routines for log string
+- 091320: Insert easily visible, detectable (-1) data points into data feed when sensors error during read
+- 091420: Try and move AIO keys to another group
+
+### Questions
+- 090820: We are generating humidity, heat index, and absolute humidity?
 
 ### Revisions
 - 083120: First version based on merged sample code for sensors, SD. Ethernet code NOT working.
@@ -87,3 +82,9 @@ Measure and log temperature, humidity, and CO2 levels every 30 minutes
 	- [I] 090820: Code is only running for one loop -> setSyncInterval(15) locked code on subsequent loops, also not needed
 	- [I] - 090820: time is not correct, sample code is -> byproduct of setSyncInterval(15) issue
 	- [FR] 090820: Display NTP time when received in DEBUG
+-091420
+	- [I] 091120: Set SYNC_INTERVAL to minimum for AIO and use in main CLOUDLOG -> done
+	- [I] 091120: Crashes again after one loop, might be a DHT issue -> DHT moved to pin 11, stopped collision with Ethernet on pin 10 (CS)
+	- [I] 091120: main delay(SYNC_INTERVAL) must be factored out, it could be impacting networking -> done
+	- [I] 091120: Data not writing to AIO -> side effect of DHT/Ethernet pin conflict
+	- [FR] 083120: Upload data to cloud db -> code now working
