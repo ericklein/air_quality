@@ -8,7 +8,7 @@ Regularly sample and log temperature, humidity, and CO2 levels
 ### Software Dependencies not in Arduino Library Manager 
 
 ### BOM
-- 1x: Arduino Feather M4 Express: https://www.adafruit.com/product/3857
+- 1x: Arduino Feather M0/M4 Express
 - 1x: Particle Ethernet Featherwing: https://www.adafruit.com/product/4003
 - 1X: DHT22 temp/humidity sensor: https://www.adafruit.com/product/385
 - 1X: SGP30 gas sensor: https://www.adafruit.com/product/3709
@@ -43,6 +43,8 @@ Regularly sample and log temperature, humidity, and CO2 levels
 	- https://github.com/PaulStoffregen/Time/tree/master/examples/TimeNTP
 - Sensors 
 	- https://learn.adafruit.com/adafruit-sgp30-gas-tvoc-eco2-mox-sensor/arduino-code
+	- https://learn.adafruit.com/adafruit-bme680-humidity-temperature-barometic-pressure-voc-gas/overview
+	- https://www.jaredwolff.com/finding-the-best-tvoc-sensor-ccs811-vs-bme680-vs-sgp30/
 - Ethernet
 	- https://docs.particle.io/datasheets/accessories/gen3-accessories/
 	- https://www.adafruit.com/product/4003#:~:text=Description%2D-,Description,along%20with%20a%20Feather%20accessory
@@ -60,6 +62,7 @@ Regularly sample and log temperature, humidity, and CO2 levels
 
 ### Issues
 - 083120: Need to add baseline readings for the SGP30 (EPROM, FLASH)
+- 092020: SDLOG doesn't actually write values (code was dropped in previous revision)
 
 ### Feature Requests
 - 090620: P3, LED blink encoded error messages for non-DEBUG and while(1) errors
@@ -68,7 +71,6 @@ Regularly sample and log temperature, humidity, and CO2 levels
 - 091320: P1, Insert easily visible, detectable (-1) data points into data feed when sensors error during read
 - 091420: P2, Try and move AIO keys to another group
 - 091420: P2, Switch to BME680 integrated sensor
-- 091420: P2, Switch to M0 Proto board and put BME680 in proto space there
 
 ### Questions
 - 090820: We are generating humidity, heat index, and absolute humidity?
@@ -82,11 +84,11 @@ Regularly sample and log temperature, humidity, and CO2 levels
 	- Switched to timelib getNtpTime example code
 	- [FR] 090120: Conditional compile for network, SD saves, and display
 	- [FR] 090120: Switch to ARM SoC for +memory (post conditionals?)
--091120
+- 091120
 	- [I] 090820: Code is only running for one loop -> setSyncInterval(15) locked code on subsequent loops, also not needed
 	- [I] - 090820: time is not correct, sample code is -> byproduct of setSyncInterval(15) issue
 	- [FR] 090820: Display NTP time when received in DEBUG
--091420
+- 091420
 	- [I] 091120: Set SYNC_INTERVAL to minimum for AIO and use in main CLOUDLOG -> done
 	- [I] 091120: Crashes again after one loop, might be a DHT issue -> DHT moved to pin 11, stopped collision with Ethernet on pin 10 (CS)
 	- [I] 091120: main delay(SYNC_INTERVAL) must be factored out, it could be impacting networking -> done
@@ -94,3 +96,5 @@ Regularly sample and log temperature, humidity, and CO2 levels
 	- [FR] 083120: Upload data to cloud db -> code now working
 	- [FR] 090820: After adding cloud db support, try backport to Arduino Ethernet board (enough memory?) -> does not fit, not worth the effort
 	- [FR] 090120: Add screen display support
+- 092020
+	- [FR] - 091420: P2, Switch to M0 Proto board

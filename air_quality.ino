@@ -192,7 +192,8 @@ void setup()
 
     #ifdef DEBUG
       Serial.print("The NTP time is ");
-      digitalClockDisplay();
+      // digitalClockDisplay();
+      Serial.println(timeString());
     #endif
   #endif
 
@@ -298,42 +299,6 @@ void loop()
     #endif
   #endif
 
-  String logString = "";
-  logString = year();
-  logString += "/";
-  logString += month();
-  logString += "/";
-  logString += day();
-  logString += " ";
-  logString += hour();
-  logString += ":";
-  logString += minute();
-  logString += ":";
-  logString += second();
-  logString += ",";
-  //logString += "Humidity: ";
-  logString += humidity;
-  logString += ",";
-  //logString += "%  Temperature: ";
-    //Serial.print(t);
-    //Serial.print(F("°C "));
-  logString += temperature_fahr;
-  logString += ",";
-  //logString += "°F  Heat index: ";
-    //Serial.print(hic);
-    //Serial.print(F("°C "));
-  logString += heat_index_fahr;
-  //logString += "°F";
-    logString += ",";
-  logString += sgp.eCO2;
-
-  #ifdef SDLOG
-    logfile.flush();
-    #ifdef DEBUG
-      Serial.println("Log data written to SD card");
-    #endif
-  #endif
-
   #ifdef SCREEN
     display.clearDisplay();
     display.setCursor(0,0);
@@ -345,8 +310,48 @@ void loop()
     display.display(); 
   #endif
 
+  //#ifdef SDLOG || SCREEN
+  #if defined(SDLOG) || defined(SCREEN)
+    String logString = "";
+    // logString = year();
+    // logString += "/";
+    // logString += month();
+    // logString += "/";
+    // logString += day();
+    // logString += " ";
+    // logString += hour();
+    // logString += ":";
+    // logString += minute();
+    // logString += ":";
+    // logString += second();
+    logString += ",";
+    //logString += "Humidity: ";
+    logString += humidity;
+    logString += ",";
+    //logString += "%  Temperature: ";
+      //Serial.print(t);
+      //Serial.print(F("°C "));
+    logString += temperature_fahr;
+    logString += ",";
+    //logString += "°F  Heat index: ";
+      //Serial.print(hic);
+      //Serial.print(F("°C "));
+    logString += heat_index_fahr;
+    //logString += "°F";
+      logString += ",";
+    logString += sgp.eCO2;
+  #endif
+
+  #ifdef SDLOG
+    logfile.flush();
+    #ifdef DEBUG
+      Serial.println("Log data written to SD card");
+    #endif
+  #endif
+
   #ifdef DEBUG
     Serial.println("time,humidity,temp,heat_index,eC02");
+    Serial.print(timeString());
     Serial.println(logString);
   #endif
 }
@@ -407,6 +412,25 @@ uint32_t getAbsoluteHumidity(float temperature, float humidity)
   const float absoluteHumidity = 216.7f * ((humidity / 100.0f) * 6.112f * exp((17.62f * temperature) / (243.12f + temperature)) / (273.15f + temperature)); // [g/m^3]
   const uint32_t absoluteHumidityScaled = static_cast<uint32_t>(1000.0f * absoluteHumidity); // [mg/m^3]
   return absoluteHumidityScaled;
+}
+
+String timeString()
+{
+  String logString = "";
+  logString = year();
+  logString += "/";
+  logString += month();
+  logString += "/";
+  logString += day();
+  logString += " ";
+  logString += hour();
+  logString += ":";
+  if (minute()<10) logString += "0";
+  logString += minute();
+  logString += ":";
+  if (second()<10) logString += "0";
+  logString += second();
+  return logString;
 }
 
 void digitalClockDisplay()
