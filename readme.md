@@ -62,15 +62,12 @@ Regularly sample and log temperature, humidity, and CO2 levels
 
 ### Issues
 - 083120: Need to add baseline readings for the SGP30 (EPROM, FLASH)
-- 092020: SDLOG doesn't actually write values (code was dropped in previous revision)
+- 092020: If time isn't set by NTP via RJ45, DEBUG and SDLOG will have errors
 
 ### Feature Requests
 - 090620: P3, LED blink encoded error messages for non-DEBUG and while(1) errors
-- 090820: P1, Optimize code
-- 091120: P1, Use timedisplay routines for log string
 - 091320: P1, Insert easily visible, detectable (-1) data points into data feed when sensors error during read
 - 091420: P2, Try and move AIO keys to another group
-- 091420: P2, Switch to BME680 integrated sensor
 
 ### Questions
 - 090820: We are generating humidity, heat index, and absolute humidity?
@@ -97,4 +94,8 @@ Regularly sample and log temperature, humidity, and CO2 levels
 	- [FR] 090820: After adding cloud db support, try backport to Arduino Ethernet board (enough memory?) -> does not fit, not worth the effort
 	- [FR] 090120: Add screen display support
 - 092020
-	- [FR] - 091420: P2, Switch to M0 Proto board
+	- [FR] 091420: P2, Switch to M0 Proto board
+	- [FR] 091120: P1, Use timedisplay routines for log string
+	- Added DEBUG and production sample rate definitions
+	- [FR] 090820: P1, Optimize code
+	- [I] 092020: SDLOG doesn't actually write values (code was dropped in previous revision) -> this has been true since initial Github checkin; fixed

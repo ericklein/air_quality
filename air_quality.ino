@@ -7,7 +7,7 @@
 */
 
 // Conditional compile flags
-#define DEBUG           // Output to the serial port
+//#define DEBUG           // Output to the serial port
 // #define SDLOG        // output sensor data to SD Card
 #define SCREEN          // output sensor data to screen
 #define CLOUDLOG        // output sensor data to cloud service
@@ -24,7 +24,11 @@ DHT dht(DHTPIN, DHTTYPE);
 #include "Adafruit_SGP30.h"
 Adafruit_SGP30 sgp;
 
-#define LOG_INTERVAL 60000   // millisecond delay between sensor reads
+#ifdef DEBUG
+  #define LOG_INTERVAL 60000   // millisecond delay between sensor reads
+#else
+  #define LOG_INTERVAL 300000   // millisecond delay between sensor reads
+#endif
 uint32_t syncTime = 0;        // milliseconds since last LOG event(s)
 
 #ifdef SDLOG
@@ -33,9 +37,6 @@ uint32_t syncTime = 0;        // milliseconds since last LOG event(s)
   #define SDPIN 4
   File logfile;
 #endif
-
-// setup information for Adafruit IO and physical network device
-#include "config.h"
 
 #ifdef RJ45
   #include <SPI.h>
@@ -68,11 +69,12 @@ byte packetBuffer[NTP_PACKET_SIZE]; //buffer to hold incoming & outgoing packets
   #include <Wire.h>
   #include <Adafruit_GFX.h>
   #include <Adafruit_SSD1306.h>
-
   Adafruit_SSD1306 display = Adafruit_SSD1306(128, 32, &Wire);
 #endif
 
 #ifdef CLOUDLOG
+  // setup information for Adafruit IO and physical network device
+  #include "config.h"
   // Adafruit IO feeds to update
   AdafruitIO_Feed *tempFeed = io.feed(AIO_temp_feed);
   AdafruitIO_Feed *humidFeed = io.feed(AIO_humidity_feed);
@@ -93,7 +95,7 @@ void setup()
 
   dht.begin();
 
-  if (! sgp.begin())
+  if (!sgp.begin())
   {
     #ifdef DEBUG
       Serial.println("SGP30 sensor not found");
@@ -192,7 +194,6 @@ void setup()
 
     #ifdef DEBUG
       Serial.print("The NTP time is ");
-      // digitalClockDisplay();
       Serial.println(timeString());
     #endif
   #endif
@@ -310,39 +311,20 @@ void loop()
     display.display(); 
   #endif
 
-  //#ifdef SDLOG || SCREEN
   #if defined(SDLOG) || defined(SCREEN)
-    String logString = "";
-    // logString = year();
-    // logString += "/";
-    // logString += month();
-    // logString += "/";
-    // logString += day();
-    // logString += " ";
-    // logString += hour();
-    // logString += ":";
-    // logString += minute();
-    // logString += ":";
-    // logString += second();
-    logString += ",";
-    //logString += "Humidity: ";
+    String logString = ";";
     logString += humidity;
     logString += ",";
-    //logString += "%  Temperature: ";
-      //Serial.print(t);
-      //Serial.print(F("°C "));
     logString += temperature_fahr;
     logString += ",";
-    //logString += "°F  Heat index: ";
-      //Serial.print(hic);
-      //Serial.print(F("°C "));
     logString += heat_index_fahr;
-    //logString += "°F";
-      logString += ",";
+    logString += ",";
     logString += sgp.eCO2;
   #endif
 
   #ifdef SDLOG
+    logfile.print(timeString());
+    logfile.println(logString);
     logfile.flush();
     #ifdef DEBUG
       Serial.println("Log data written to SD card");
@@ -431,27 +413,4 @@ String timeString()
   if (second()<10) logString += "0";
   logString += second();
   return logString;
-}
-
-void digitalClockDisplay()
-{
-  // digital clock display of the time
-  Serial.print(hour());
-  printDigits(minute());
-  printDigits(second());
-  Serial.print(" ");
-  Serial.print(month());
-  Serial.print("/");
-  Serial.print(day());
-  Serial.print("/");
-  Serial.println(year()); 
-}
-
-void printDigits(int digits)
-{
-  // utility for digital clock display: prints preceding colon and leading 0
-  Serial.print(":");
-  if(digits < 10)
-    Serial.print('0');
-  Serial.print(digits);
 }
