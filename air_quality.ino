@@ -7,11 +7,16 @@
 */
 
 // Conditional compile flags
-//#define DEBUG           // Output to the serial port
+#define DEBUG         // Output to the serial port
 // #define SDLOG        // output sensor data to SD Card
 #define SCREEN          // output sensor data to screen
-#define CLOUDLOG        // output sensor data to cloud service
-#define RJ45            // use Ethernet to send data to cloud service
+#define ADAFRUITIO      // output sensor data to cloud service
+#define MQTT            // output sensor to MQTT broker
+#define RJ45            // use Ethernet to send data to cloud service(s)
+//#define WIFI            // use WiFi to send data to cloud service(s)
+
+// network and service credentials
+#include "secrets.h"
 
 // DHT (digital humidity and temperature) sensor
 #include "DHT.h"
@@ -38,12 +43,48 @@ uint32_t syncTime = 0;        // milliseconds since last LOG event(s)
   File logfile;
 #endif
 
+#ifdef WiFi
+
+// #if defined(ARDUINO_SAMD_MKRWIFI1010) || defined(ARDUINO_SAMD_NANO_33_IOT) || defined(ARDUINO_AVR_UNO_WIFI_REV2)
+//   #include <WiFiNINA.h>
+// #elif defined(ARDUINO_SAMD_MKR1000)
+//   #include <WiFi101.h>
+// #elif defined(ARDUINO_ESP8266_ESP12)
+//   #include <ESP8266WiFi.h>
+// #endif
+
+// have to add wifi for MQTT client
+
+  #ifdef ADAFRUITIO
+    #include "AdafruitIO_WiFi.h"
+    AdafruitIO_WiFi io(AIO_USERNAME, AIO_KEY, WIFI_SSID, WIFI_PASS);  // defined in secrets.h
+  #endif
+
+  #ifdef MQTT
+    #include <ArduinoMqttClient.h>
+    MqttClient mqttClient(wifi);
+  #endif
+#endif
+
 #ifdef RJ45
+  #ifdef ADAFRUITIO   // has to be included before Ethernet.h include
+    #include "AdafruitIO_Ethernet.h"
+    AdafruitIO_Ethernet io(AIO_USERNAME, AIO_KEY); // defined in secrets.h
+  #endif
+
+  // Set MAC address. If unknown, be careful for duplicate addresses across projects.
+  byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
   #include <SPI.h>
   #include <Ethernet.h>
+
+  #ifdef MQTT
+    EthernetClient ethClient;
+    #include <ArduinoMqttClient.h>
+    MqttClient mqttClient(ethClient);
+  #endif
+
+  // this code is for NTP interaction
   #include <EthernetUdp.h>
-  // Enter a MAC address. If unknown, be careful for duplicate addresses across projects.
-  byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
   EthernetUDP Udp;
   unsigned int localPort = 8888;       // local port to listen for UDP packets
 #endif
@@ -72,14 +113,20 @@ byte packetBuffer[NTP_PACKET_SIZE]; //buffer to hold incoming & outgoing packets
   Adafruit_SSD1306 display = Adafruit_SSD1306(128, 32, &Wire);
 #endif
 
-#ifdef CLOUDLOG
-  // setup information for Adafruit IO and physical network device
-  #include "config.h"
-  // Adafruit IO feeds to update
-  AdafruitIO_Feed *tempFeed = io.feed(AIO_temp_feed);
-  AdafruitIO_Feed *humidFeed = io.feed(AIO_humidity_feed);
-  AdafruitIO_Feed *heatFeed = io.feed(AIO_heatindex_feed);
-  AdafruitIO_Feed *eCO2Feed = io.feed(AIO_eCO2_feed);
+#ifdef ADAFRUITIO
+  // Adafruit IO feeds
+  AdafruitIO_Feed *tempFeed = io.feed("temperature");
+  AdafruitIO_Feed *humidFeed = io.feed("humidity");
+  //AdafruitIO_Feed *heatFeed = io.feed(AIO_heatindex_feed);
+  AdafruitIO_Feed *eCO2Feed = io.feed("eCO2");
+#endif
+
+#ifdef MQTT
+  // MQTT client and topic names
+  char clientID[] = "lab_temp_sensor";
+  char tempTopic[] = "home/lab/temperature";
+  char humidityTopic[] = "home/lab/humidity";
+  char eCO2Topic[] = "home/lab/co2";
 #endif
 
 void setup() 
@@ -181,11 +228,12 @@ void setup()
       }
       while (1);
     }
-    // Get time from NTP
     #ifdef DEBUG
       Serial.print("IP number assigned by DHCP is ");
       Serial.println(Ethernet.localIP());
     #endif
+    
+    // Get time from NTP
     Udp.begin(localPort);
     setSyncProvider(getNtpTime);
 
@@ -211,7 +259,7 @@ void setup()
     display.display();
   #endif
 
-  #ifdef CLOUDLOG
+  #ifdef ADAFRUITIO
     #ifdef DEBUG
       Serial.println("Connecting to Adafruit IO");
     #endif
@@ -232,6 +280,24 @@ void setup()
       Serial.println(io.statusText());
     #endif
   #endif
+
+  #ifdef MQTT
+    // set the credentials for the MQTT client:
+    mqttClient.setId(clientID);
+    mqttClient.setUsernamePassword(SECRET_MQTT_USER, SECRET_MQTT_PASS);
+
+    // try to connect to the MQTT broker
+    while (!connectToBroker()) 
+    {
+      Serial.print("attempting to connect to broker ");
+      Serial.println(broker);
+      delay(1000);
+    }
+    #ifdef DEBUG
+      Serial.print("connected to MQTT broker ");
+      Serial.println(broker);
+    #endif
+  #endif
 }
 
 void loop() 
@@ -241,8 +307,13 @@ void loop()
   #endif
 
   // Keep connection to Adafruit IO open
-  #ifdef CLOUDLOG
+  #ifdef ADAFRUITIO
     io.run();
+  #endif
+
+  // Keep connection to Adafruit IO open
+  #ifdef MQTT
+    mqttClient.poll();
   #endif
 
   if ((millis() - syncTime) < LOG_INTERVAL) return;
@@ -258,7 +329,7 @@ void loop()
   float temperature_fahr = dht.readTemperature(true);
 
   // Compute heat index in Fahrenheit (the default)
-  float heat_index_fahr = dht.computeHeatIndex(temperature_fahr, humidity);
+  //float heat_index_fahr = dht.computeHeatIndex(temperature_fahr, humidity);
 
   // Compute heat index in Celsius (isFahreheit = false)
   //float hic = dht.computeHeatIndex(t, h, false);
@@ -290,14 +361,35 @@ void loop()
   //   ecO2Reading = sgp.eCO2;  
   // }
 
-  #ifdef CLOUDLOG
+  #ifdef ADAFRUITIO
     tempFeed->save(temperature_fahr);
     humidFeed->save(humidity);
-    heatFeed->save(heat_index_fahr);
+    //heatFeed->save(heat_index_fahr);
     eCO2Feed->save(sgp.eCO2);
     #ifdef DEBUG
-      Serial.println("Updated Adafruit IO feed");
+      Serial.println("Updated Adafruit IO feeds");
     #endif
+  #endif
+
+  #ifdef MQTT
+    // if not connected to the broker, try to connect:
+    if (!mqttClient.connected()) 
+    {
+      #ifdef DEBUG
+        Serial.println("reconnecting to MQTT broker");
+      #endif
+      connectToBroker();
+    }
+    mqttClient.beginMessage(tempTopic);
+    mqttClient.print(temperature_fahr);
+    mqttClient.endMessage();
+    mqttClient.beginMessage(humidityTopic);
+    mqttClient.print(humidity);
+    mqttClient.endMessage();
+    mqttClient.beginMessage(eCO2Topic);
+    mqttClient.print(sgp.eCO2);
+    mqttClient.endMessage();
+    Serial.println("Sent messages to MQTT topics");
   #endif
 
   #ifdef SCREEN
@@ -317,8 +409,8 @@ void loop()
     logString += ",";
     logString += temperature_fahr;
     logString += ",";
-    logString += heat_index_fahr;
-    logString += ",";
+    //logString += heat_index_fahr;
+    //logString += ",";
     logString += sgp.eCO2;
   #endif
 
@@ -332,7 +424,7 @@ void loop()
   #endif
 
   #ifdef DEBUG
-    Serial.println("time,humidity,temp,heat_index,eC02");
+    Serial.println("time,humidity,temp,eC02");
     Serial.print(timeString());
     Serial.println(logString);
   #endif
@@ -413,4 +505,20 @@ String timeString()
   if (second()<10) logString += "0";
   logString += second();
   return logString;
+}
+
+boolean connectToBroker()
+{
+  // if the MQTT client is not connected:
+  if (!mqttClient.connect(broker, port))
+  {
+    // print out the error message:
+    #ifdef DEBUG
+      Serial.print("MOTT connection failed. Error no: ");
+      Serial.println(mqttClient.connectError());
+    #endif
+    // return that you're not connected:
+    return false;
+  }
+  return true;
 }

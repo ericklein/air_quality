@@ -63,15 +63,21 @@ Regularly sample and log temperature, humidity, and CO2 levels
 ### Issues
 - 083120: Need to add baseline readings for the SGP30 (EPROM, FLASH)
 - 092020: If time isn't set by NTP via RJ45, DEBUG and SDLOG will have errors
+- 100220: [p1]; MQTT code previously has only updating every 10 minutes and then would stop. Code changes implemented to MQTT code, check for reliability
+- 100220: [p1]; code ran for three hours and stopped generating Adafruit IO output?. Code changes implemented to MQTT code, check for reliability
 
 ### Feature Requests
 - 090620: P3, LED blink encoded error messages for non-DEBUG and while(1) errors
 - 091320: P1, Insert easily visible, detectable (-1) data points into data feed when sensors error during read
-- 091420: P2, Try and move AIO keys to another group
+- 091420: P3, Try and move AIO feeds to another group
+- 100120: P1, re-factor CLOUDLOG?, RJ45, and [i]092020 to add WiFi support
+- 100120: P1, refactor NTP time code, related to [i]092020
 
 ### Questions
 - 090820: We are generating humidity, heat index, and absolute humidity?
 - 091420: eCO2 level never changes? (see baseline issue?)
+- 100120: Can I just subscribe to the higher level topic in connectToBroker() to get all the subs
+- 100220: Every five minutes we are generating a "Transmitting NTP request"?
 
 ### Revisions
 - 083120: First version based on merged sample code for sensors, SD. Ethernet code NOT working.
@@ -99,3 +105,6 @@ Regularly sample and log temperature, humidity, and CO2 levels
 	- Added DEBUG and production sample rate definitions
 	- [FR] 090820: P1, Optimize code
 	- [I] 092020: SDLOG doesn't actually write values (code was dropped in previous revision) -> this has been true since initial Github checkin; fixed
+- 100120
+	- partial refactoring for WIFI
+	- added initial MQTT support
