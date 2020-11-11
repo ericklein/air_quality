@@ -8,8 +8,8 @@ Regularly sample and log temperature, humidity, and CO2 levels
 ### Software Dependencies not in Arduino Library Manager 
 
 ### BOM
-- 1x: Arduino Feather M0/M4 Express
-- 1x: Particle Ethernet Featherwing: https://www.adafruit.com/product/4003
+- 1x: Arduino Feather M0/M4 Express or Feather Huzzah 8266 (WiFi) (Adafruit #2821)
+- 1x: [optional] Particle Ethernet Featherwing: https://www.adafruit.com/product/4003
 - 1X: DHT22 temp/humidity sensor: https://www.adafruit.com/product/385
 - 1X: SGP30 gas sensor: https://www.adafruit.com/product/3709
 - 1X: Featherwing OLED (128x32): https://www.adafruit.com/product/2900
@@ -36,6 +36,10 @@ Regularly sample and log temperature, humidity, and CO2 levels
 	- SDA to SDA
 	- SCL to SCL
 
+### to change hardware build target
+- change DHT pin
+- change #defines
+
 ### Information Sources
 - SD card
 	- https://github.com/adafruit/Light-and-Temp-logger/blob/master/lighttemplogger.ino
@@ -61,17 +65,22 @@ Regularly sample and log temperature, humidity, and CO2 levels
 - 090620: Arduino Ethernet code can't tranverse a DNS fallback list, so if the primary fails (e.g. Pihole crash) it will stop connecting to outside addresses via DNS lookup
 
 ### Issues
-- 083120: Need to add baseline readings for the SGP30 (EPROM, FLASH)
-- 092020: If time isn't set by NTP via RJ45, DEBUG and SDLOG will have errors
-- 100220: [p1]; MQTT code previously has only updating every 10 minutes and then would stop. Code changes implemented to MQTT code, check for reliability
-- 100220: [p1]; code ran for three hours and stopped generating Adafruit IO output?. Code changes implemented to MQTT code, check for reliability
+- [P2]083120: Need to add baseline readings for the SGP30 (EPROM, FLASH), values are likely incorrect
+- [P3]092020: If time isn't set by NTP, DEBUG and SDLOG will have errors
+- [P1]110920: likely that power went out and the device did not auto-restart or some issues emerged that prevented restart, as the screen is not displaying anything?
+- [P1]102420: Need an error indicator for non-DEBUG, while(1) errors, MQTT connection errors
+- [P2]102420: Move local MQTT server to DNS named entry instead of IP address so DNS can resolve it if IP address changes
+- [P2]112020: Publish to Adafruit IO AND another MQTT broker
+- [P3]112020: is #if defined(SDLOG) || defined(SCREEN) needed, because screen has its own output format?
+- [P3]112020: How do we better handle Daylight vs. Standard time?
+- [P1]112020: How to handle MQTT connection timeouts in mqtt_connect?
 
 ### Feature Requests
-- 090620: P3, LED blink encoded error messages for non-DEBUG and while(1) errors
-- 091320: P1, Insert easily visible, detectable (-1) data points into data feed when sensors error during read
-- 091420: P3, Try and move AIO feeds to another group
-- 100120: P1, re-factor CLOUDLOG?, RJ45, and [i]092020 to add WiFi support
-- 100120: P1, refactor NTP time code, related to [i]092020
+- [P2]100120: refactor NTP time code, related to [i]092020
+- [P2]100720: MQTT QoS 1
+- [P3]110920: implement redundant MQTT broker?
+- [P2]111020: combine MQTT publish code blocks for AdafruitIO MQTT and generic MQTT, append username to the secrets.h MQTT_PUB_TOPIC[x]
+- [P2]111020: Display something on screen while waiting for first sensor read
 
 ### Questions
 - 090820: We are generating humidity, heat index, and absolute humidity?
@@ -100,11 +109,21 @@ Regularly sample and log temperature, humidity, and CO2 levels
 	- [FR] 090820: After adding cloud db support, try backport to Arduino Ethernet board (enough memory?) -> does not fit, not worth the effort
 	- [FR] 090120: Add screen display support
 - 092020
-	- [FR] 091420: P2, Switch to M0 Proto board
-	- [FR] 091120: P1, Use timedisplay routines for log string
+	- [FR] 091420: P2; Switch to M0 Proto board
+	- [FR] 091120: P1; Use timedisplay routines for log string
 	- Added DEBUG and production sample rate definitions
-	- [FR] 090820: P1, Optimize code
+	- [FR] 090820: P1; Optimize code
 	- [I] 092020: SDLOG doesn't actually write values (code was dropped in previous revision) -> this has been true since initial Github checkin; fixed
 - 100120
 	- partial refactoring for WIFI
 	- added initial MQTT support
+	- updated credential items in secrets.h
+	- moved network feed locations out of secrets.h
+- 111020
+	- added conditional for CO2 sensor read, will insert -1 if sensor unavailable
+	- [FR] 100120: P2; re-factor CLOUDLOG?, RJ45, and [i]092020 to add WiFi support -> WiFi code changes inherited from cub2bed_mqtt code base, though not addressing [i]092020 yet
+	- [FR] 091420: P3; Try and move Adafruit IO feeds to another group -> implemented for master_bedroom as test
+	- [FR] 110920: P2; Add LiPo battery so if power goes out we have redundant power supply for some period -> added to both deployed rooms
+	- [I] 100220: P1; MQTT code previously has only updating every 10 minutes and then would stop. Code changes implemented to MQTT code, check for reliability -> resolved with tested MQTT code path from cub2bed_mqtt code base
+	- [FR] 091320: P1; Insert detectable (-1) data points into data feed when sensors error during read or create out of parameter values (see code in loop()) -> Added support for read failures, not out of bounds conditions
+	- [I] 100220: P3; leading zero problem on day in timestring() -> Added a leading zero for day()<10
