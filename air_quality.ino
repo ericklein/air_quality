@@ -11,14 +11,16 @@
 #define DEBUG         // Output to the serial port
 //#define SDLOG         // output sensor data to SD Card
 #define SCREEN          // output sensor data to screen
-#define ADAFRUITIO      // Adafruit IO via MQTT vs. another MQTT broke
-#define RJ45            // use Ethernet to send data to cloud service(s)
-//#define WIFI          // use WiFi to send data to cloud service(s)
-#define target_lab      // publish results for the lab
-//#define target_bedroom  // publish results for the master bedroom
+#define MQTTLOG        // Output to MQTT broker defined in secrets.h
+#define RJ45            // use Ethernet
+//#define WIFI          // use WiFi (credentials in secrets.h)
+#define TARGET_LAB      // publish results for the lab
+//#define TARGET_BEDROOM  // publish results for the master bedroom
+#if defined(SDLOG) || defined(DEBUG)
+  #define NTP         // query network time server for logging
+#endif
 
 // Gloval variables
-unsigned long previousMQTTPingTime = 0;
 uint32_t syncTime = 0;        // milliseconds since last LOG event(s)
 
 // DHT (digital humidity and temperature) sensor
@@ -48,7 +50,7 @@ DHT dht(DHTPIN, DHTTYPE);
   File logfile;
 #endif
 
-// Adafruit IO and network device setup
+// MQTT credentials and network device setup
 #include "secrets.h"
 
 #ifdef WIFI
@@ -61,6 +63,9 @@ DHT dht(DHTPIN, DHTTYPE);
   #endif
 
   WiFiClient client;
+  WiFi.hostname(MQTT_CLIENT_ID);
+  //   WiFi.setHostname(“MyArduino”); //for WiFiNINA
+
   //use WiFiClientSecure for SSL
   //WiFiClientSecure client;
 
@@ -83,34 +88,33 @@ DHT dht(DHTPIN, DHTTYPE);
   unsigned int localPort = 8888;       // local port to listen for UDP packets
 #endif
 
-#include "Adafruit_MQTT.h"
-#include "Adafruit_MQTT_Client.h"
-Adafruit_MQTT_Client mqtt(&client, MQTT_BROKER, MQTT_PORT, MQTT_CLIENT_ID, MQTT_USER, MQTT_PASS);
-#ifdef ADAFRUITIO
-  Adafruit_MQTT_Publish tempPub = Adafruit_MQTT_Publish(&mqtt, MQTT_USER MQTT_PUB_TOPIC1);
-  Adafruit_MQTT_Publish humidityPub = Adafruit_MQTT_Publish(&mqtt, MQTT_USER MQTT_PUB_TOPIC2);
-  Adafruit_MQTT_Publish co2Pub = Adafruit_MQTT_Publish(&mqtt, MQTT_USER MQTT_PUB_TOPIC3);
-#else
+#ifdef MQTTLOG
+  unsigned long previousMQTTPingTime = 0;
+  #include "Adafruit_MQTT.h"
+  #include "Adafruit_MQTT_Client.h"
+  Adafruit_MQTT_Client mqtt(&client, MQTT_BROKER, MQTT_PORT, MQTT_CLIENT_ID, MQTT_USER, MQTT_PASS);
   Adafruit_MQTT_Publish tempPub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC1);
   Adafruit_MQTT_Publish humidityPub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC2);
   Adafruit_MQTT_Publish co2Pub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC3);
 #endif
 
-// Time (and time related networking)
-#include <TimeLib.h>
-// NTP Servers
-//IPAddress timeServer(132, 163, 4, 101); // time-a.timefreq.bldrdoc.gov
-// IPAddress timeServer(132, 163, 4, 102); // time-b.timefreq.bldrdoc.gov
-// IPAddress timeServer(132, 163, 4, 103); // time-c.timefreq.bldrdoc.gov
-IPAddress timeServer(132,163,97,6); // time.nist.gov
+#ifdef NTP
+  // Time (and time related networking)
+  #include <TimeLib.h>
+  // NTP Servers
+  //IPAddress timeServer(132, 163, 4, 101); // time-a.timefreq.bldrdoc.gov
+  // IPAddress timeServer(132, 163, 4, 102); // time-b.timefreq.bldrdoc.gov
+  // IPAddress timeServer(132, 163, 4, 103); // time-c.timefreq.bldrdoc.gov
+  IPAddress timeServer(132,163,97,6); // time.nist.gov
 
-// Time Zone support
-//const int timeZone = -5;  // Eastern Standard Time (USA)
-//const int timeZone = -4;  // Eastern Daylight Time (USA)
-const int timeZone = -8;  // Pacific Standard Time (USA)
-//const int timeZone = -7;    // Pacific Daylight Time (USA)
-const int NTP_PACKET_SIZE = 48; // NTP time is in the first 48 bytes of message
-byte packetBuffer[NTP_PACKET_SIZE]; //buffer to hold incoming & outgoing packets
+  // Time Zone support
+  //const int timeZone = -5;  // Eastern Standard Time (USA)
+  //const int timeZone = -4;  // Eastern Daylight Time (USA)
+  const int timeZone = -8;  // Pacific Standard Time (USA)
+  //const int timeZone = -7;    // Pacific Daylight Time (USA)
+  const int NTP_PACKET_SIZE = 48; // NTP time is in the first 48 bytes of message
+  byte packetBuffer[NTP_PACKET_SIZE]; //buffer to hold incoming & outgoing packets
+#endif
 
 #ifdef SCREEN
   #include <SPI.h>
@@ -133,13 +137,38 @@ void setup()
 
   dht.begin();
 
+  #ifdef SCREEN
+    display.begin(SSD1306_SWITCHCAPVCC, 0x3C); // Address 0x3C for 128x32
+
+    // Set display parameters 
+    display.clearDisplay();
+    display.setTextColor(SSD1306_WHITE);
+    display.setTextSize(1);
+
+    // msg displayed until error or first reading is displayed
+    display.setCursor(0,0);
+    display.print("Waiting for");
+    display.setCursor(0,8*2);  // associated with text size
+    display.print("first read");
+    display.display();
+  #endif
+
   #ifdef CO2
     if (!sgp.begin())
     {
       #ifdef DEBUG
-        Serial.println("SGP30 sensor not found");
+        Serial.println("SGP30 sensor not found, no CO2 readings will be sent");
       #endif
-    while (1);
+      #ifdef SCREEN
+        display.clearDisplay();
+        display.setTextSize(2);
+        display.setCursor(0,0);
+        display.print("ERR 02");
+        display.setCursor(0,8*2);
+        display.print("SGP30");
+        display.display(); 
+      #endif
+    //while (1);
     }
     // If you have a baseline measurement from before you can assign it to start, to 'self-calibrate'
     //sgp.setIAQBaseline(0x8E68, 0x8F41);  // Will vary for each sensor!
@@ -201,14 +230,37 @@ void setup()
     #endif
 
     WiFi.begin(WIFI_SSID, WIFI_PASS);
+
+    uint8_t tries = 1;
+
     while (WiFi.status() != WL_CONNECTED) 
     {
       #ifdef DEBUG
-        Serial.print(".");
+        Serial.print("retrying broker connection in");
+        Serial.print(tries*10000);
+        Serial.println(" seconds");
       #endif
-      delay(500);
+      delay(tries*10000);
+      tries++;
+      if (tries == 11)
+      {
+        #ifdef DEBUG
+          Serial.println("FATAL error; can not connect to WiFi after 10 attempts");
+        #endif
+        #ifdef SCREEN
+          display.clearDisplay();
+          display.setTextSize(2);
+          display.setCursor(0,0);
+          display.print("ERR 03");
+          display.setCursor(0,8*2);
+          display.print("WiFi")
+          display.display(); 
+        #endif
+        #ifndef SDLOG
+          while (1);
+        #endif
+      }
     }
-
     #ifdef DEBUG
       Serial.println();  // finishes the status dots print
       Serial.print("WiFi connected, IP address: ");
@@ -252,31 +304,18 @@ void setup()
     #endif
   #endif
     
-  // Get time from NTP
-  Udp.begin(localPort);
-  setSyncProvider(getNtpTime);
+  #ifdef NTP
+    // Get time from NTP
+    Udp.begin(localPort);
+    setSyncProvider(getNtpTime);
 
-  // wait until the time is set by the sync provider
-  while(timeStatus()== timeNotSet);
+    // wait until the time is set by the sync provider
+    while(timeStatus()== timeNotSet);
 
-  #ifdef DEBUG
-    Serial.print("The NTP time is ");
-    Serial.println(timeString());
-  #endif
-
-  #ifdef SCREEN
-    display.begin(SSD1306_SWITCHCAPVCC, 0x3C); // Address 0x3C for 128x32
     #ifdef DEBUG
-      //display Adafruit logo to validate screen is working
-      display.display();
-      delay(2000);
+      Serial.print("The NTP time is ");
+      Serial.println(timeString());
     #endif
-
-    // Clear the buffer and set display parameters
-    display.clearDisplay();
-    display.setTextColor(SSD1306_WHITE);
-    display.setTextSize(2);
-    display.display();
   #endif
 }
 
@@ -293,12 +332,17 @@ void loop()
     }
   #endif
 
-  MQTT_connect();
+  #ifdef MQTTLOG
+  {
+    MQTT_connect();
+  }
+  #endif
 
+  // only read sensors at preset intervals
   if ((millis() - syncTime) < LOG_INTERVAL) return;
   syncTime = millis();
 
-  // Reading temperature or humidity takes about 250 milliseconds!
+  // note: reading temperature or humidity takes ~ 250ms
   float humidity; 
   if (isnan(dht.readHumidity()))
   {
@@ -312,7 +356,7 @@ void loop()
     humidity = dht.readHumidity();
   }
 
-  // Read temperature as Fahrenheit (isFahrenheit = true)
+  // Read temperature as Fahrenheit via true parameter
   float temperature_fahr;
   if (isnan(dht.readTemperature(true)))
   {
@@ -357,47 +401,12 @@ void loop()
     } 
   #endif
 
-  // MQTT publishing
-  #ifdef DEBUG
-    Serial.print("temperature via MQTT publish to: ");
-    Serial.print(MQTT_PUB_TOPIC1);
-  #endif
-  if (!tempPub.publish(temperature_fahr))
-  {
+  #ifdef MQTTLOG
     #ifdef DEBUG
-      Serial.println(" failed");
+      Serial.print("temperature via MQTT publish to: ");
+      Serial.print(MQTT_PUB_TOPIC1);
     #endif
-  }
-  else 
-  {
-    #ifdef DEBUG
-      Serial.println(" successful");
-    #endif
-  }
-
-    #ifdef DEBUG
-    Serial.print("humidity via MQTT publish to: ");
-    Serial.print(MQTT_PUB_TOPIC2);
-  #endif
-  if (!humidityPub.publish(humidity))
-  {
-    #ifdef DEBUG
-      Serial.println(" failed");
-    #endif
-  }
-  else 
-  {
-    #ifdef DEBUG
-      Serial.println(" successful");
-    #endif
-  }
-
-  #ifdef CO2
-    #ifdef DEBUG
-      Serial.print("CO2 via MQTT publish to: ");
-      Serial.print(MQTT_PUB_TOPIC3);
-    #endif
-    if (!co2Pub.publish(ecO2Reading))
+    if (!tempPub.publish(temperature_fahr))
     {
       #ifdef DEBUG
         Serial.println(" failed");
@@ -409,20 +418,57 @@ void loop()
         Serial.println(" successful");
       #endif
     }
+
+      #ifdef DEBUG
+      Serial.print("humidity via MQTT publish to: ");
+      Serial.print(MQTT_PUB_TOPIC2);
+    #endif
+    if (!humidityPub.publish(humidity))
+    {
+      #ifdef DEBUG
+        Serial.println(" failed");
+      #endif
+    }
+    else 
+    {
+      #ifdef DEBUG
+        Serial.println(" successful");
+      #endif
+    }
+
+    #ifdef CO2
+      #ifdef DEBUG
+        Serial.print("CO2 via MQTT publish to: ");
+        Serial.print(MQTT_PUB_TOPIC3);
+      #endif
+      if (!co2Pub.publish(ecO2Reading))
+      {
+        #ifdef DEBUG
+          Serial.println(" failed");
+        #endif
+      }
+      else 
+      {
+        #ifdef DEBUG
+          Serial.println(" successful");
+        #endif
+      }
+    #endif
   #endif
 
-    #ifdef SCREEN
-      display.clearDisplay();
-      display.setCursor(0,0);
-      display.print("Tmp:");
-      display.println(temperature_fahr);  // will get truncated to 2 decimal places
-      display.setCursor(0,8*2);           // associated with text size
-      display.print("Hum:");
-      display.println(humidity);
-      display.display(); 
-    #endif
+  #ifdef SCREEN
+    display.clearDisplay();
+    display.setCursor(0,0);
+    display.setTextSize(2);
+    display.print("Tmp:");
+    display.println(temperature_fahr);  // will get truncated to 2 decimal places
+    display.setCursor(0,8*2);           // associated with text size
+    display.print("Hum:");
+    display.println(humidity);
+    display.display(); 
+  #endif
 
-  #if defined(SDLOG) || defined(SCREEN)
+  #if defined(SDLOG) || defined(DEBUG)
     String logString = ";";
     logString += humidity;
     logString += ",";
@@ -451,55 +497,77 @@ void loop()
   #endif
 }
 
-time_t getNtpTime()
-{
-  while (Udp.parsePacket() > 0) ; // discard any previously received packets
-  #ifdef DEBUG
-    Serial.println("Transmitting NTP Request");
-  #endif
-  sendNTPpacket(timeServer);
-  uint32_t beginWait = millis();
-  while (millis() - beginWait < 1500)
+#ifdef NTP
+  time_t getNtpTime()
   {
-    int size = Udp.parsePacket();
-    if (size >= NTP_PACKET_SIZE)
+    while (Udp.parsePacket() > 0) ; // discard any previously received packets
+    #ifdef DEBUG
+      Serial.println("Transmitting NTP Request");
+    #endif
+    sendNTPpacket(timeServer);
+    uint32_t beginWait = millis();
+    while (millis() - beginWait < 1500)
     {
-      Udp.read(packetBuffer, NTP_PACKET_SIZE);  // read packet into the buffer
-      unsigned long secsSince1900;
-      // convert four bytes starting at location 40 to a long integer
-      secsSince1900 =  (unsigned long)packetBuffer[40] << 24;
-      secsSince1900 |= (unsigned long)packetBuffer[41] << 16;
-      secsSince1900 |= (unsigned long)packetBuffer[42] << 8;
-      secsSince1900 |= (unsigned long)packetBuffer[43];
-      return secsSince1900 - 2208988800UL + timeZone * SECS_PER_HOUR;
+      int size = Udp.parsePacket();
+      if (size >= NTP_PACKET_SIZE)
+      {
+        Udp.read(packetBuffer, NTP_PACKET_SIZE);  // read packet into the buffer
+        unsigned long secsSince1900;
+        // convert four bytes starting at location 40 to a long integer
+        secsSince1900 =  (unsigned long)packetBuffer[40] << 24;
+        secsSince1900 |= (unsigned long)packetBuffer[41] << 16;
+        secsSince1900 |= (unsigned long)packetBuffer[42] << 8;
+        secsSince1900 |= (unsigned long)packetBuffer[43];
+        return secsSince1900 - 2208988800UL + timeZone * SECS_PER_HOUR;
+      }
     }
+    #ifdef DEBUG
+      Serial.println("No NTP response");
+    #endif
+    return 0; // return 0 if unable to get the time
   }
-  #ifdef DEBUG
-    Serial.println("No NTP response");
-  #endif
-  return 0; // return 0 if unable to get the time
-}
 
-// send an NTP request to the time server at the given address
-void sendNTPpacket(IPAddress &address)
-{
-  // set all bytes in the buffer to 0
-  memset(packetBuffer, 0, NTP_PACKET_SIZE);
-  // Initialize values needed to form NTP request
-  packetBuffer[0] = 0b11100011; // LI, Version, Mode
-  packetBuffer[1] = 0;          // Stratum, or type of clock
-  packetBuffer[2] = 6;          // Polling Interval
-  packetBuffer[3] = 0xEC;       // Peer Clock Precision
-  // 8 bytes of zero for Root Delay & Root Dispersion
-  packetBuffer[12]  = 49;
-  packetBuffer[13]  = 0x4E;
-  packetBuffer[14]  = 49;
-  packetBuffer[15]  = 52;
-  // send a packet requesting a timestamp:                 
-  Udp.beginPacket(address, 123); //NTP requests are to port 123
-  Udp.write(packetBuffer, NTP_PACKET_SIZE);
-  Udp.endPacket();
-}
+  // send an NTP request to the time server at the given address
+  void sendNTPpacket(IPAddress &address)
+  {
+    // set all bytes in the buffer to 0
+    memset(packetBuffer, 0, NTP_PACKET_SIZE);
+    // Initialize values needed to form NTP request
+    packetBuffer[0] = 0b11100011; // LI, Version, Mode
+    packetBuffer[1] = 0;          // Stratum, or type of clock
+    packetBuffer[2] = 6;          // Polling Interval
+    packetBuffer[3] = 0xEC;       // Peer Clock Precision
+    // 8 bytes of zero for Root Delay & Root Dispersion
+    packetBuffer[12]  = 49;
+    packetBuffer[13]  = 0x4E;
+    packetBuffer[14]  = 49;
+    packetBuffer[15]  = 52;
+    // send a packet requesting a timestamp:                 
+    Udp.beginPacket(address, 123); //NTP requests are to port 123
+    Udp.write(packetBuffer, NTP_PACKET_SIZE);
+    Udp.endPacket();
+  }
+
+  String timeString()
+  {
+    String logString = "";
+    logString = year();
+    logString += "/";
+    logString += month();
+    logString += "/";
+    if (day()<10) logString += "0";
+    logString += day();
+    logString += " ";
+    logString += hour();
+    logString += ":";
+    if (minute()<10) logString += "0";
+    logString += minute();
+    logString += ":";
+    if (second()<10) logString += "0";
+    logString += second();
+    return logString;
+  }
+#endif
 
 uint32_t getAbsoluteHumidity(float temperature, float humidity) 
 {
@@ -509,59 +577,54 @@ uint32_t getAbsoluteHumidity(float temperature, float humidity)
   return absoluteHumidityScaled;
 }
 
-String timeString()
-{
-  String logString = "";
-  logString = year();
-  logString += "/";
-  logString += month();
-  logString += "/";
-  if (day()<10) logString += "0";
-  logString += day();
-  logString += " ";
-  logString += hour();
-  logString += ":";
-  if (minute()<10) logString += "0";
-  logString += minute();
-  logString += ":";
-  if (second()<10) logString += "0";
-  logString += second();
-  return logString;
-}
-
-void MQTT_connect()
-// Connects and reconnects to MQTT broker, call from loop() to maintain connection
-{
-  // Stop if already connected
-  if (mqtt.connected()) 
+#ifdef MQTTLOG
+  void MQTT_connect()
+  // Connects and reconnects to MQTT broker, call from loop() to maintain connection
   {
-    return;
-  }
-  #ifdef DEBUG
-    Serial.print("connecting to broker: ");
-    Serial.println(MQTT_BROKER);
-  #endif
-
-  uint8_t ret;
-  uint8_t retries = 3;
-  while (mqtt.connect() != 0)
-  {
+    // Stop if already connected
+    if (mqtt.connected()) 
+    {
+      return;
+    }
     #ifdef DEBUG
-      Serial.println(mqtt.connectErrorString(ret));
-      Serial.println("retrying broker connection in 10 seconds");
+      Serial.print("connecting to broker: ");
+      Serial.println(MQTT_BROKER);
     #endif
-    mqtt.disconnect();
-    delay(10000);
-    retries--;
-    if (retries == 0) 
+
+    uint8_t ret;
+    uint8_t tries = 1;
+    while (mqtt.connect() != 0)
     {
       #ifdef DEBUG
-        Serial.println("FATAL error; can not connect to MQTT broker");
+        Serial.println(mqtt.connectErrorString(ret));
+        Serial.print("retrying broker connection in");
+        Serial.print(tries*10000);
+        Serial.println(" seconds");
       #endif
-      while (1);
+      mqtt.disconnect();
+      delay(tries*10000);
+      tries++;
+      if (tries == 11) 
+      {
+        #ifdef DEBUG
+          Serial.println("FATAL error; can not connect to MQTT broker after 10 attempts");
+        #endif
+        #ifdef SCREEN
+          display.clearDisplay();
+          display.setTextSize(2);
+          display.setCursor(0,0);
+          display.print("ERR 01");
+          display.setCursor(0,8*2);
+          display.print("MQTT");
+          display.display(); 
+        #endif
+        #ifndef SDLOG
+          while (1);
+        #endif
+      }
     }
+    #ifdef DEBUG
+      Serial.println("connected to broker");
+    #endif
   }
-  #ifdef DEBUG
-    Serial.println("connected to broker");
-  #endif
-}
+#endif

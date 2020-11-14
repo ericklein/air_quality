@@ -7,8 +7,10 @@ Regularly sample and log temperature, humidity, and CO2 levels
 
 ### Software Dependencies not in Arduino Library Manager 
 
-### BOM
-- 1x: Arduino Feather M0/M4 Express or Feather Huzzah 8266 (WiFi) (Adafruit #2821)
+### known, working BOM parts
+- 1x: Arduino Feather M0 Basic Proto: https://www.adafruit.com/product/2772
+- or
+- 1x: Feather Huzzah 8266 (WiFi): https://www.adafruit.com/product/2821
 - 1x: [optional] Particle Ethernet Featherwing: https://www.adafruit.com/product/4003
 - 1X: DHT22 temp/humidity sensor: https://www.adafruit.com/product/385
 - 1X: SGP30 gas sensor: https://www.adafruit.com/product/3709
@@ -35,6 +37,11 @@ Regularly sample and log temperature, humidity, and CO2 levels
 - Featherwing OLED
 	- SDA to SDA
 	- SCL to SCL
+
+### Error codes 
+- ERR 01: Can not connect to MQTT broker after 10 tries of try# x 10 seconds intervals. Device must be restarted to proceed unless SDLOG enabled.
+- ERR 02: Can not connect to SGP30 CO2 sensor at startup. No CO2 readings will be logged.
+- ERR 03: Can not connect to WiFi after 10 tries of try# x 10 seconds intervals. Device must be restarted to proceed unless SDLOG enabled.
 
 ### to change hardware build target
 - change DHT pin
@@ -63,24 +70,27 @@ Regularly sample and log temperature, humidity, and CO2 levels
 ### Learnings
 - 090620: Just push your own MAC address if the device doesn't physically display its address, but avoid duplicates across projects when using common code to set it.
 - 090620: Arduino Ethernet code can't tranverse a DNS fallback list, so if the primary fails (e.g. Pihole crash) it will stop connecting to outside addresses via DNS lookup
+- 111420: There is no way to set Ethernet hostname in official library. One could edit dhcp.cpp and dhcp.h to change the six character host name, but...
 
 ### Issues
 - [P2]083120: Need to add baseline readings for the SGP30 (EPROM, FLASH), values are likely incorrect
 - [P3]092020: If time isn't set by NTP, DEBUG and SDLOG will have errors
-- [P1]110920: likely that power went out and the device did not auto-restart or some issues emerged that prevented restart, as the screen is not displaying anything?
-- [P1]102420: Need an error indicator for non-DEBUG, while(1) errors, MQTT connection errors
 - [P2]102420: Move local MQTT server to DNS named entry instead of IP address so DNS can resolve it if IP address changes
-- [P2]112020: Publish to Adafruit IO AND another MQTT broker
-- [P3]112020: is #if defined(SDLOG) || defined(SCREEN) needed, because screen has its own output format?
-- [P3]112020: How do we better handle Daylight vs. Standard time?
-- [P1]112020: How to handle MQTT connection timeouts in mqtt_connect?
+- [P3]111020: How do we better handle Daylight vs. Standard time?
+- [P3]111120: Screen is on all the time, which could cause OLED burn in, and in dark environments, is very bright
+- [P2]111120: Disable board lights on Feather Huzzah
+- [P2]111120: Test what happens if SDLOG enabled but MQTT Connect fails
+- [P2]111120: Review SDLOG while (1)
+- [P2]111120: Review Ethernet while (1)
+- [P2]111420: Review NTP wait until data
+- [P2]111120: Test that when SGP30 is not detected, -1 entries will be logged properly
 
 ### Feature Requests
-- [P2]100120: refactor NTP time code, related to [i]092020
-- [P2]100720: MQTT QoS 1
-- [P3]110920: implement redundant MQTT broker?
-- [P2]111020: combine MQTT publish code blocks for AdafruitIO MQTT and generic MQTT, append username to the secrets.h MQTT_PUB_TOPIC[x]
-- [P2]111020: Display something on screen while waiting for first sensor read
+- [P3]100720: MQTT QoS 1
+- [P3]110920: publish to secondary MQTT broker
+- [P3]111020: publish to multiple MQTT brokers
+- [P2]111120: ThinkSpeak investigation
+- [P2]111120: BME680 integration https://www.adafruit.com/product/3660
 
 ### Questions
 - 090820: We are generating humidity, heat index, and absolute humidity?
@@ -120,10 +130,19 @@ Regularly sample and log temperature, humidity, and CO2 levels
 	- updated credential items in secrets.h
 	- moved network feed locations out of secrets.h
 - 111020
-	- added conditional for CO2 sensor read, will insert -1 if sensor unavailable
+	- added conditional for CO2 sensor read
 	- [FR] 100120: P2; re-factor CLOUDLOG?, RJ45, and [i]092020 to add WiFi support -> WiFi code changes inherited from cub2bed_mqtt code base, though not addressing [i]092020 yet
 	- [FR] 091420: P3; Try and move Adafruit IO feeds to another group -> implemented for master_bedroom as test
 	- [FR] 110920: P2; Add LiPo battery so if power goes out we have redundant power supply for some period -> added to both deployed rooms
 	- [I] 100220: P1; MQTT code previously has only updating every 10 minutes and then would stop. Code changes implemented to MQTT code, check for reliability -> resolved with tested MQTT code path from cub2bed_mqtt code base
 	- [FR] 091320: P1; Insert detectable (-1) data points into data feed when sensors error during read or create out of parameter values (see code in loop()) -> Added support for read failures, not out of bounds conditions
 	- [I] 100220: P3; leading zero problem on day in timestring() -> Added a leading zero for day()<10
+-111120
+	- [FR] 111020: P2; combine MQTT publish code blocks for AdafruitIO MQTT and generic MQTT, append username to the secrets.h MQTT_PUB_TOPIC[x] -> completed
+	- [I] 102420: P1; Need an error indicator and better handling for non-DEBUG, while(1) errors, MQTT connection errors -> MQTT connection and SGP30 sensor init while(1) have better handling
+	- [FR] 111020; P3: is #if defined(SDLOG) || defined(SCREEN) needed, because screen has its own output format? -> bug, fixed as #if defined(SDLOG) || defined(DEBUG)
+-111420
+	- [FR] 111420: P1; Add WiFi and Ethernet hostnames -> Added for WiFi but Ethernet not supported in library.
+	- [FR] 100120: P1; refactor NTP time code into monolithic block, only used by SDLOG and DEBUG -> conditional #define NTPTIME
+	- [I] 111020: P1; Display something on screen while waiting for first sensor read. If the device can't get to the MQTT broker on its initial boot, as an example, the screen will never be initialized. -> display text added
+	- [I] 111120: P1; Review WiFi wait until connect that leaves device hung with no visible indicators -> WiFi connect now has 10 attempts then error handling and messaging
