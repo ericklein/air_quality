@@ -8,7 +8,7 @@
 
 // Conditional compile flags
 #define CO2           // Output CO2 data
-#define DEBUG         // Output to the serial port
+//#define DEBUG         // Output to the serial port
 //#define SDLOG         // output sensor data to SD Card
 #define SCREEN          // output sensor data to screen
 #define MQTTLOG        // Output to MQTT broker defined in secrets.h
@@ -16,9 +16,9 @@
 //#define WIFI          // use WiFi (credentials in secrets.h)
 #define TARGET_LAB      // publish results for the lab
 //#define TARGET_BEDROOM  // publish results for the master bedroom
-#if defined(SDLOG) || defined(DEBUG)
+//#if defined(SDLOG) || defined(DEBUG)
   #define NTP         // query network time server for logging
-#endif
+//#endif
 
 // Gloval variables
 uint32_t syncTime = 0;        // milliseconds since last LOG event(s)
@@ -69,9 +69,11 @@ DHT dht(DHTPIN, DHTTYPE);
   //use WiFiClientSecure for SSL
   //WiFiClientSecure client;
 
-  #include <WiFiUdp.h>
-  WiFiUDP Udp;
-  unsigned int localPort = 8888;       // local port to listen for UDP packets
+  #ifdef NTP
+    #include <WiFiUdp.h>
+    WiFiUDP Udp;
+    unsigned int localPort = 8888;       // local port to listen for UDP packets
+  #endif
 #endif
 
 #ifdef RJ45
@@ -82,10 +84,11 @@ DHT dht(DHTPIN, DHTTYPE);
   //#include <EthernetClient.h>  // Adafruit says required, not so in my experience?
   EthernetClient client;
 
-  // this code is for NTP interaction
-  #include <EthernetUdp.h>
-  EthernetUDP Udp;
-  unsigned int localPort = 8888;       // local port to listen for UDP packets
+  #ifdef NTP
+    #include <EthernetUdp.h>
+    EthernetUDP Udp;
+    unsigned int localPort = 8888;       // local port to listen for UDP packets
+  #endif
 #endif
 
 #ifdef MQTTLOG
@@ -401,61 +404,6 @@ void loop()
     } 
   #endif
 
-  #ifdef MQTTLOG
-    #ifdef DEBUG
-      Serial.print("temperature via MQTT publish to: ");
-      Serial.print(MQTT_PUB_TOPIC1);
-    #endif
-    if (!tempPub.publish(temperature_fahr))
-    {
-      #ifdef DEBUG
-        Serial.println(" failed");
-      #endif
-    }
-    else 
-    {
-      #ifdef DEBUG
-        Serial.println(" successful");
-      #endif
-    }
-
-      #ifdef DEBUG
-      Serial.print("humidity via MQTT publish to: ");
-      Serial.print(MQTT_PUB_TOPIC2);
-    #endif
-    if (!humidityPub.publish(humidity))
-    {
-      #ifdef DEBUG
-        Serial.println(" failed");
-      #endif
-    }
-    else 
-    {
-      #ifdef DEBUG
-        Serial.println(" successful");
-      #endif
-    }
-
-    #ifdef CO2
-      #ifdef DEBUG
-        Serial.print("CO2 via MQTT publish to: ");
-        Serial.print(MQTT_PUB_TOPIC3);
-      #endif
-      if (!co2Pub.publish(ecO2Reading))
-      {
-        #ifdef DEBUG
-          Serial.println(" failed");
-        #endif
-      }
-      else 
-      {
-        #ifdef DEBUG
-          Serial.println(" successful");
-        #endif
-      }
-    #endif
-  #endif
-
   #ifdef SCREEN
     display.clearDisplay();
     display.setCursor(0,0);
@@ -468,8 +416,70 @@ void loop()
     display.display(); 
   #endif
 
+  #ifdef MQTTLOG
+    #ifdef DEBUG
+      Serial.print("temperature via MQTT publish to '");
+      Serial.print(MQTT_PUB_TOPIC1);
+    #endif
+    if (!tempPub.publish(temperature_fahr))
+    {
+      #ifdef DEBUG
+        Serial.println("' failed");
+      #endif
+      #ifdef SCREEN
+          display.clearDisplay();
+          display.setTextSize(2);
+          display.setCursor(0,0);
+          display.print("ERR 04");
+          display.setCursor(0,8*2);
+          display.print("MQTT");
+          display.display(); 
+      #endif
+    }
+    else 
+    {
+      #ifdef DEBUG
+        Serial.println("' successful");
+      #endif
+    }
+    #ifdef DEBUG
+      Serial.print("humidity via MQTT publish to '");
+      Serial.print(MQTT_PUB_TOPIC2);
+    #endif
+    if (!humidityPub.publish(humidity))
+    {
+      #ifdef DEBUG
+        Serial.println("' failed");
+      #endif
+    }
+    else 
+    {
+      #ifdef DEBUG
+        Serial.println("' successful");
+      #endif
+    }
+    #ifdef CO2
+      #ifdef DEBUG
+        Serial.print("CO2 via MQTT publish to '");
+        Serial.print(MQTT_PUB_TOPIC3);
+      #endif
+      if (!co2Pub.publish(ecO2Reading))
+      {
+        #ifdef DEBUG
+          Serial.println("' failed");
+        #endif
+      }
+      else 
+      {
+        #ifdef DEBUG
+          Serial.println("' successful");
+        #endif
+      }
+    #endif
+  #endif
+
   #if defined(SDLOG) || defined(DEBUG)
-    String logString = ";";
+    String logString = ",";
     logString += humidity;
     logString += ",";
     logString += temperature_fahr;
@@ -550,7 +560,7 @@ void loop()
 
   String timeString()
   {
-    String logString = "";
+    String logString;
     logString = year();
     logString += "/";
     logString += month();

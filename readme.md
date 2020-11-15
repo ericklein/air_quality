@@ -42,6 +42,7 @@ Regularly sample and log temperature, humidity, and CO2 levels
 - ERR 01: Can not connect to MQTT broker after 10 tries of try# x 10 seconds intervals. Device must be restarted to proceed unless SDLOG enabled.
 - ERR 02: Can not connect to SGP30 CO2 sensor at startup. No CO2 readings will be logged.
 - ERR 03: Can not connect to WiFi after 10 tries of try# x 10 seconds intervals. Device must be restarted to proceed unless SDLOG enabled.
+- ERR 04: MQTT publish failed.
 
 ### to change hardware build target
 - change DHT pin
@@ -84,6 +85,7 @@ Regularly sample and log temperature, humidity, and CO2 levels
 - [P2]111120: Review Ethernet while (1)
 - [P2]111420: Review NTP wait until data
 - [P2]111120: Test that when SGP30 is not detected, -1 entries will be logged properly
+- [P1]111420: MQTT publish (to Adafruit IO?) requires NTP to be defined?! No idea why.
 
 ### Feature Requests
 - [P3]100720: MQTT QoS 1
