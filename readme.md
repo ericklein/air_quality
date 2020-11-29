@@ -1,4 +1,4 @@
-# Air Quality
+ Air Quality
 
 ### Purpose
 Regularly sample and log temperature, humidity, and CO2 levels
@@ -15,6 +15,8 @@ Regularly sample and log temperature, humidity, and CO2 levels
 - 1X: DHT22 temp/humidity sensor: https://www.adafruit.com/product/385
 - 1X: SGP30 gas sensor: https://www.adafruit.com/product/3709
 - 1X: Featherwing OLED (128x32): https://www.adafruit.com/product/2900
+or 
+- 1X: Featherwing OLED (128x64): https://www.adafruit.com/product/4650
 
 ### Pinouts
 - Particle Ethernet Featherwing
@@ -67,6 +69,8 @@ Regularly sample and log temperature, humidity, and CO2 levels
 	- https://learn.adafruit.com/adafruit-oled-featherwing/usage
 	- https://cdn-learn.adafruit.com/downloads/pdf/adafruit-gfx-graphics-library.pdf
 	- https://engineeringnotes.blogspot.com/2013/07/using-ssd1306-textgraphics-display.html
+- MQTT services
+	- https://hackaday.com/2017/10/31/review-iot-data-logging-services-with-mqtt/
 
 ### Learnings
 - 090620: Just push your own MAC address if the device doesn't physically display its address, but avoid duplicates across projects when using common code to set it.
@@ -75,24 +79,31 @@ Regularly sample and log temperature, humidity, and CO2 levels
 
 ### Issues
 - [P2]083120: Need to add baseline readings for the SGP30 (EPROM, FLASH), values are likely incorrect
-- [P3]092020: If time isn't set by NTP, DEBUG and SDLOG will have errors
+- [P3]092020: If time isn't set by NTP, DEBUG and SDLOG have errors
+- [P3]112820: NTP is dependent to WiFi or Ethernet due to IPAddress
 - [P2]102420: Move local MQTT server to DNS named entry instead of IP address so DNS can resolve it if IP address changes
 - [P3]111020: How do we better handle Daylight vs. Standard time?
-- [P3]111120: Screen is on all the time, which could cause OLED burn in, and in dark environments, is very bright
-- [P2]111120: Disable board lights on Feather Huzzah
+- [P1]111120: Screen is on all the time, which could cause OLED burn in, and in dark environments, is very bright
+- [P1]111120: Disable board lights on Feather Huzzah
 - [P2]111120: Test what happens if SDLOG enabled but MQTT Connect fails
 - [P2]111120: Review SDLOG while (1)
 - [P2]111120: Review Ethernet while (1)
 - [P2]111420: Review NTP wait until data
 - [P2]111120: Test that when SGP30 is not detected, -1 entries will be logged properly
 - [P1]111420: MQTT publish (to Adafruit IO?) requires NTP to be defined?! No idea why.
+- [P1]112820: Temperature data is off by a few degrees F when inserted into case?
+- [P2]112820: data logged to SDLOG is not uniquely identified
+- [P2]112820: pin 2 conflict on Adafruit 4650, not sure about 2900
+- [P3]112820: if DHT pin not assigned properly, code crashes
+- [P1]112920: Anonymize TARGET_XXX defines
 
 ### Feature Requests
 - [P3]100720: MQTT QoS 1
 - [P3]110920: publish to secondary MQTT broker
 - [P3]111020: publish to multiple MQTT brokers
 - [P2]111120: ThinkSpeak investigation
-- [P2]111120: BME680 integration https://www.adafruit.com/product/3660
+- [P1]111120: BME680 integration https://www.adafruit.com/product/3660
+- [P1]112020: Heartbeat indicator on-screen
 
 ### Questions
 - 090820: We are generating humidity, heat index, and absolute humidity?
@@ -148,3 +159,9 @@ Regularly sample and log temperature, humidity, and CO2 levels
 	- [FR] 100120: P1; refactor NTP time code into monolithic block, only used by SDLOG and DEBUG -> conditional #define NTPTIME
 	- [I] 111020: P1; Display something on screen while waiting for first sensor read. If the device can't get to the MQTT broker on its initial boot, as an example, the screen will never be initialized. -> display text added
 	- [I] 111120: P1; Review WiFi wait until connect that leaves device hung with no visible indicators -> WiFi connect now has 10 attempts then error handling and messaging
+-112820
+	- Added rudimentary support for SH110x OLED screen
+	- Extracted TimeString from NTP conditional compile
+	- Modified TimeString to return a value if NTP not defined
+	- Tested SCREEN + DEBUG code path
+	- Added untested support for TARGET_ANNE_OFFICE

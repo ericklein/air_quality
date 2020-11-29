@@ -7,17 +7,18 @@
 */
 
 // Conditional compile flags
-#define CO2           // Output CO2 data
-//#define DEBUG         // Output to the serial port
+//#define CO2           // Output CO2 data
+#define DEBUG         // Output to the serial port
 //#define SDLOG         // output sensor data to SD Card
 #define SCREEN          // output sensor data to screen
-#define MQTTLOG        // Output to MQTT broker defined in secrets.h
-#define RJ45            // use Ethernet
+//#define MQTTLOG        // Output to MQTT broker defined in secrets.h
+//#define RJ45            // use Ethernet
 //#define WIFI          // use WiFi (credentials in secrets.h)
-#define TARGET_LAB      // publish results for the lab
-//#define TARGET_BEDROOM  // publish results for the master bedroom
+//#define TARGET_LAB      // publish results for the lab
+//#define TARGET_MASTER_BEDROOM  // publish results for the master bedroom
+//#define TARGET_ANNE_OFFICE
 //#if defined(SDLOG) || defined(DEBUG)
-  #define NTP         // query network time server for logging
+//#define NTP         // query network time server for logging
 //#endif
 
 // Gloval variables
@@ -25,8 +26,8 @@ uint32_t syncTime = 0;        // milliseconds since last LOG event(s)
 
 // DHT (digital humidity and temperature) sensor
 #include "DHT.h"
-//#define DHTPIN  2      // Digital pin connected to DHT sensor (Huzzah for master_bedroom)
-#define DHTPIN  11      // Digital pin connected to DHT sensor (M0 for lab)
+#define DHTPIN  2      // Digital pin connected to DHT sensor (Huzzah for master_bedroom)
+//#define DHTPIN  11      // Digital pin connected to DHT sensor (M0 for lab)
 #define DHTTYPE DHT22   // DHT 22  (AM2302), AM2321
 DHT dht(DHTPIN, DHTTYPE);
 
@@ -123,8 +124,11 @@ DHT dht(DHTPIN, DHTTYPE);
   #include <SPI.h>
   #include <Wire.h>
   #include <Adafruit_GFX.h>
-  #include <Adafruit_SSD1306.h>
-  Adafruit_SSD1306 display = Adafruit_SSD1306(128, 32, &Wire);
+  //#include <Adafruit_SSD1306.h>
+  #include <Adafruit_SH110X.h>
+  //Adafruit_SSD1306 display = Adafruit_SSD1306(128, 32, &Wire);
+  Adafruit_SH110X display = Adafruit_SH110X(64, 128, &Wire);
+
 #endif
 
 void setup() 
@@ -141,18 +145,22 @@ void setup()
   dht.begin();
 
   #ifdef SCREEN
-    display.begin(SSD1306_SWITCHCAPVCC, 0x3C); // Address 0x3C for 128x32
+    //display.begin(SSD1306_SWITCHCAPVCC, 0x3C); // Address 0x3C for 128x32
+    display.begin(0x3C, true); // Address 0x3C default
+
 
     // Set display parameters 
-    display.clearDisplay();
-    display.setTextColor(SSD1306_WHITE);
+    //display.clearDisplay();
     display.setTextSize(1);
+    //display.setTextColor(SSD1306_WHITE);
+    display.setTextColor(SH110X_WHITE);
+    display.setRotation(1);
 
     // msg displayed until error or first reading is displayed
     display.setCursor(0,0);
-    display.print("Waiting for");
-    display.setCursor(0,8*2);  // associated with text size
-    display.print("first read");
+    display.println("Waiting for");
+    //display.setCursor(0,8*2);  // associated with text size
+    display.println("first read");
     display.display();
   #endif
 
@@ -329,7 +337,7 @@ void loop()
     if (((millis() - syncTime) % 10000) == 0)
     {
       Serial.print(((millis()-syncTime)/1000));
-      Serial.print(" seconds before next read in ");
+      Serial.print(" seconds elapsed before next read at ");
       Serial.print(LOG_INTERVAL/1000);
       Serial.println(" seconds");
     }
@@ -410,7 +418,7 @@ void loop()
     display.setTextSize(2);
     display.print("Tmp:");
     display.println(temperature_fahr);  // will get truncated to 2 decimal places
-    display.setCursor(0,8*2);           // associated with text size
+    //display.setCursor(0,8*2);           // associated with text size
     display.print("Hum:");
     display.println(humidity);
     display.display(); 
@@ -557,10 +565,12 @@ void loop()
     Udp.write(packetBuffer, NTP_PACKET_SIZE);
     Udp.endPacket();
   }
+#endif
 
-  String timeString()
-  {
-    String logString;
+String timeString()
+{
+  String logString;
+  #ifdef NTP
     logString = year();
     logString += "/";
     logString += month();
@@ -575,9 +585,11 @@ void loop()
     logString += ":";
     if (second()<10) logString += "0";
     logString += second();
-    return logString;
-  }
-#endif
+  #else
+    logString ="Time not set";
+  #endif
+  return logString;
+}
 
 uint32_t getAbsoluteHumidity(float temperature, float humidity) 
 {
