@@ -12,6 +12,8 @@ Regularly sample and log temperature, humidity, and CO2 levels
 - or
 - 1x: Feather Huzzah 8266 (WiFi): https://www.adafruit.com/product/2821
 - 1x: [optional] Particle Ethernet Featherwing: https://www.adafruit.com/product/4003
+- or
+- 1x: [optional] Silicognition PoE Featherwing: https://www.crowdsupply.com/silicognition/poe-featherwing
 - 1X: DHT22 temp/humidity sensor: https://www.adafruit.com/product/385
 - 1X: SGP30 gas sensor: https://www.adafruit.com/product/3709
 - 1X: Featherwing OLED (128x32): https://www.adafruit.com/product/2900
@@ -40,11 +42,16 @@ or
 	- SDA to SDA
 	- SCL to SCL
 
-### Error codes 
-- ERR 01: Can not connect to MQTT broker after 10 tries of try# x 10 seconds intervals. Device must be restarted to proceed unless SDLOG enabled.
-- ERR 02: Can not connect to SGP30 CO2 sensor at startup. No CO2 readings will be logged.
-- ERR 03: Can not connect to WiFi after 10 tries of try# x 10 seconds intervals. Device must be restarted to proceed unless SDLOG enabled.
-- ERR 04: MQTT publish failed.
+### Error codes
+- FATAL
+	- Always throws a DEBUG message and blinks built-in LED at (error code x 1 second) intervals
+	- ERR 01: Can not connect to MQTT broker. Device must be restarted unless SDLOG enabled.
+	- ERR 02: Can not connect to Ethernet. Device must be restarted to proceed unless SDLOG enabled.
+	- ERR 03: FATAL - Can not connect to WiFi. Device must be restarted to proceed unless SDLOG enabled.
+- CAUTION
+	- Always throws a DEBUG message
+	- ERR 04: MQTT publish failed.
+	- ERR 05: Can not connect to SGP30 CO2 sensor at startup. No CO2 readings will be logged.
 
 ### to change hardware build target
 - change DHT pin
@@ -66,16 +73,20 @@ or
 	- https://www.arduino.cc/en/reference/ethernet
 	- https://store.arduino.cc/usa/arduino-ethernet-rev3-without-poe
 - Display
-	- https://learn.adafruit.com/adafruit-oled-featherwing/usage
+	- https://learn.adafruit.com/adafruit-oled-featherwing/overview
 	- https://cdn-learn.adafruit.com/downloads/pdf/adafruit-gfx-graphics-library.pdf
 	- https://engineeringnotes.blogspot.com/2013/07/using-ssd1306-textgraphics-display.html
+	- https://github.com/adafruit/Adafruit_SSD1306/issues/106 (turning OLED on and off)
 - MQTT services
 	- https://hackaday.com/2017/10/31/review-iot-data-logging-services-with-mqtt/
+- Time of Flight sensor
+	- https://learn.adafruit.com/adafruit-vl53l0x-micro-lidar-distance-sensor-breakout/arduino-code
 
 ### Learnings
 - 090620: Just push your own MAC address if the device doesn't physically display its address, but avoid duplicates across projects when using common code to set it.
 - 090620: Arduino Ethernet code can't tranverse a DNS fallback list, so if the primary fails (e.g. Pihole crash) it will stop connecting to outside addresses via DNS lookup
 - 111420: There is no way to set Ethernet hostname in official library. One could edit dhcp.cpp and dhcp.h to change the six character host name, but...
+- 120220: Adafruit GFX library supports println, but I'm controlling position manually to maintain code alignment with Adafruit_LiquidCrystal
 
 ### Issues
 - [P2]083120: Need to add baseline readings for the SGP30 (EPROM, FLASH), values are likely incorrect
@@ -84,32 +95,37 @@ or
 - [P2]102420: Move local MQTT server to DNS named entry instead of IP address so DNS can resolve it if IP address changes
 - [P3]111020: How do we better handle Daylight vs. Standard time?
 - [P1]111120: Screen is on all the time, which could cause OLED burn in, and in dark environments, is very bright
-- [P1]111120: Disable board lights on Feather Huzzah
 - [P2]111120: Test what happens if SDLOG enabled but MQTT Connect fails
-- [P2]111120: Review SDLOG while (1)
-- [P2]111120: Review Ethernet while (1)
+- [P2]111120: Add improved error handling to SDLOG while (1)
 - [P2]111420: Review NTP wait until data
 - [P2]111120: Test that when SGP30 is not detected, -1 entries will be logged properly
-- [P1]111420: MQTT publish (to Adafruit IO?) requires NTP to be defined?! No idea why.
+- [P2
+]111420: MQTT publish (to Adafruit IO?) requires NTP to be defined?! No idea why.
 - [P1]112820: Temperature data is off by a few degrees F when inserted into case?
 - [P2]112820: data logged to SDLOG is not uniquely identified
 - [P2]112820: pin 2 conflict on Adafruit 4650, not sure about 2900
-- [P3]112820: if DHT pin not assigned properly, code crashes
-- [P1]112920: Anonymize TARGET_XXX defines
+- [P2]112920: Anonymize TARGET_XXX defines
 
 ### Feature Requests
 - [P3]100720: MQTT QoS 1
 - [P3]110920: publish to secondary MQTT broker
 - [P3]111020: publish to multiple MQTT brokers
 - [P2]111120: ThinkSpeak investigation
-- [P1]111120: BME680 integration https://www.adafruit.com/product/3660
+- [P2]111120: BME680 integration https://www.adafruit.com/product/3660
 - [P1]112020: Heartbeat indicator on-screen
+- [P2]112920: Rotating time display
+- [P2]112920: Get time from MQTT broker
+- [P3]120220: Added error checking on string length to displayScreenMessage
+- [P3]120620: Error messages to MQTT broker
+- [P1]012421: Async blinking of built-in LED for non-FATAL errors (e.g. MQTT publish)
 
 ### Questions
 - 090820: We are generating humidity, heat index, and absolute humidity?
 - 091420: eCO2 level never changes? (see baseline issue?)
 - 100120: Can I just subscribe to the higher level topic in connectToBroker() to get all the subs
 - 100220: Every five minutes we are generating a "Transmitting NTP request"?
+- 120220: Why do I need wire and spi for OLED displays?
+
 
 ### Revisions
 - 083120: First version based on merged sample code for sensors, SD. Ethernet code NOT working.
@@ -165,3 +181,12 @@ or
 	- Modified TimeString to return a value if NTP not defined
 	- Tested SCREEN + DEBUG code path
 	- Added untested support for TARGET_ANNE_OFFICE
+- 120120
+	- Tested RJ45 + MQTT code path
+- 123120
+	- Standardized while (1) error handling for WiFi, RJ45, and MQTT_Connect
+	- Partial support for proximity based activation of the screen. Should have been on a branch...
+- 012421
+	- [FR]123120 [P2]: Add error blink codes to onboard LED for while (1) -> Adding BUILT_IN_LED blinking matching the fatal error code, aligning with new code in air_quality
+	- [I]111120 [P2]: Disable board lights on Feather Huzzah -> Built-in LED is supressed at startup then used only for fatal error messages
+	- [I]112820 [P3]: if DHT pin not assigned properly, code crashes -> Just tested where DHT was pinned for Huzzah and compiled for M0. Code properly reported -1 for sensor read.

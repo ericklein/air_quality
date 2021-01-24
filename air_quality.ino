@@ -8,26 +8,27 @@
 
 // Conditional compile flags
 //#define CO2           // Output CO2 data
-#define DEBUG         // Output to the serial port
+//#define DEBUG         // Output to the serial port
 //#define SDLOG         // output sensor data to SD Card
-#define SCREEN          // output sensor data to screen
-//#define MQTTLOG        // Output to MQTT broker defined in secrets.h
-//#define RJ45            // use Ethernet
+//#define SCREEN          // output sensor data to screen
+#define MQTTLOG        // Output to MQTT broker defined in secrets.h
+#define RJ45            // use Ethernet
 //#define WIFI          // use WiFi (credentials in secrets.h)
-//#define TARGET_LAB      // publish results for the lab
+#define TARGET_LAB      // publish results for the lab
 //#define TARGET_MASTER_BEDROOM  // publish results for the master bedroom
 //#define TARGET_ANNE_OFFICE
 //#if defined(SDLOG) || defined(DEBUG)
-//#define NTP         // query network time server for logging
+#define NTP         // query network time server for logging
 //#endif
+//#define PROXIMITY // proximity sensor used to trigger screen display
 
 // Gloval variables
 uint32_t syncTime = 0;        // milliseconds since last LOG event(s)
 
 // DHT (digital humidity and temperature) sensor
 #include "DHT.h"
-#define DHTPIN  2      // Digital pin connected to DHT sensor (Huzzah for master_bedroom)
-//#define DHTPIN  11      // Digital pin connected to DHT sensor (M0 for lab)
+//#define DHTPIN  2      // Digital pin connected to DHT sensor (Huzzah for master_bedroom)
+#define DHTPIN  11      // Digital pin connected to DHT sensor (M0 for lab)
 #define DHTTYPE DHT22   // DHT 22  (AM2302), AM2321
 DHT dht(DHTPIN, DHTTYPE);
 
@@ -36,6 +37,12 @@ DHT dht(DHTPIN, DHTTYPE);
   #include <Wire.h>
   #include "Adafruit_SGP30.h"
   Adafruit_SGP30 sgp;
+#endif
+
+#ifdef PROXIMITY
+  #include <Adafruit_VS1053.h>
+  Adafruit_VL53L0X proximitySensor = Adafruit_VL53L0X();
+  const byte triggerDistance = 20;  // Distance in cm to toggle LCD backlight
 #endif
 
 #ifdef DEBUG
@@ -64,11 +71,7 @@ DHT dht(DHTPIN, DHTTYPE);
   #endif
 
   WiFiClient client;
-  WiFi.hostname(MQTT_CLIENT_ID);
-  //   WiFi.setHostname(“MyArduino”); //for WiFiNINA
-
-  //use WiFiClientSecure for SSL
-  //WiFiClientSecure client;
+  //WiFiClientSecure client; // for SSL
 
   #ifdef NTP
     #include <WiFiUdp.h>
@@ -82,7 +85,6 @@ DHT dht(DHTPIN, DHTTYPE);
   byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
   #include <SPI.h>
   #include <Ethernet.h>
-  //#include <EthernetClient.h>  // Adafruit says required, not so in my experience?
   EthernetClient client;
 
   #ifdef NTP
@@ -121,18 +123,25 @@ DHT dht(DHTPIN, DHTTYPE);
 #endif
 
 #ifdef SCREEN
-  #include <SPI.h>
+  #include <SPI.h> 
   #include <Wire.h>
-  #include <Adafruit_GFX.h>
-  //#include <Adafruit_SSD1306.h>
-  #include <Adafruit_SH110X.h>
-  //Adafruit_SSD1306 display = Adafruit_SSD1306(128, 32, &Wire);
-  Adafruit_SH110X display = Adafruit_SH110X(64, 128, &Wire);
-
+  //#include <Adafruit_GFX.h>
+  #include <Adafruit_SSD1306.h>
+  //#include <Adafruit_SH110X.h>
+  Adafruit_SSD1306 display = Adafruit_SSD1306(128, 32, &Wire);
+  //Adafruit_SH110X display = Adafruit_SH110X(64, 128, &Wire);
+  //#include <Adafruit_LiquidCrystal.h>
+  //#define lcdRows   2
+  //#define lcdColumns 16
+  //Adafruit_LiquidCrystal display(0); //i2c connection, default address #0 (A0-A2 not jumpered)
 #endif
 
 void setup() 
 {
+  // used for fatal error messaging
+  pinMode(LED_BUILTIN, OUTPUT);
+  digitalWrite(LED_BUILTIN, LOW);
+
   #ifdef DEBUG
     Serial.begin(115200);
     while (!Serial)
@@ -145,16 +154,16 @@ void setup()
   dht.begin();
 
   #ifdef SCREEN
-    //display.begin(SSD1306_SWITCHCAPVCC, 0x3C); // Address 0x3C for 128x32
-    display.begin(0x3C, true); // Address 0x3C default
-
+    display.begin(SSD1306_SWITCHCAPVCC, 0x3C); // Address 0x3C for 128x32
+    //display.begin(0x3C, true); // Address 0x3C default
+    //display.begin(lcdColumns, lcdRows);
 
     // Set display parameters 
     //display.clearDisplay();
     display.setTextSize(1);
-    //display.setTextColor(SSD1306_WHITE);
-    display.setTextColor(SH110X_WHITE);
-    display.setRotation(1);
+    display.setTextColor(SSD1306_WHITE);
+    //display.setTextColor(SH110X_WHITE);
+    //display.setRotation(1); // SH110X only?
 
     // msg displayed until error or first reading is displayed
     display.setCursor(0,0);
@@ -174,7 +183,7 @@ void setup()
         display.clearDisplay();
         display.setTextSize(2);
         display.setCursor(0,0);
-        display.print("ERR 02");
+        display.print("ERR 05");
         display.setCursor(0,8*2);
         display.print("SGP30");
         display.display(); 
@@ -190,6 +199,19 @@ void setup()
     #ifdef CO2
         Serial.println("SGP30 sensor ready");  
     #endif
+  #endif
+
+  #ifdef PROXIMITY
+    if (!proximitySensor.begin())
+    {
+        #ifdef DEBUG
+          Serial.println("Failed to initialize VL53L0X");
+      #endif
+        while(1);
+      }
+        #ifdef DEBUG
+          Serial.println("VL53L0X initialized");
+      #endif
   #endif
 
   #ifdef SDLOG
@@ -234,29 +256,43 @@ void setup()
   #endif
 
   #ifdef WIFI
-    // Connect to WiFi access point.
+    uint8_t tries = 1;
+    #define MAXTRIES 11
+
+    // Connect to WiFi access point
     #ifdef DEBUG
-      Serial.print("WiFi connecting to ");
+      Serial.print("Connecting to WiFI AP ");
       Serial.println(WIFI_SSID);
     #endif
 
+    // set hostname has to come before WiFi.begin
+    WiFi.hostname(MQTT_CLIENT_ID);
+    // WiFi.setHostname(MQTT_CLIENT_ID); //for WiFiNINA
     WiFi.begin(WIFI_SSID, WIFI_PASS);
-
-    uint8_t tries = 1;
 
     while (WiFi.status() != WL_CONNECTED) 
     {
+      // Error handler - WiFi does not initially connect
       #ifdef DEBUG
-        Serial.print("retrying broker connection in");
-        Serial.print(tries*10000);
+        Serial.print("WiFi AP connect attempt ");
+        Serial.print(tries);
+        Serial.print("of");
+        Serial.print(MAXTRIES);
+        Serial.print(" in ");
+        Serial.print(tries*10);
         Serial.println(" seconds");
       #endif
+      // use of delay OK as this is initialization code
       delay(tries*10000);
       tries++;
-      if (tries == 11)
+
+      // FATAL ERROR 03 - WiFi doesn't connect
+      if (tries == MAXTRIES)
       {
         #ifdef DEBUG
-          Serial.println("FATAL error; can not connect to WiFi after 10 attempts");
+          Serial.print("FATAL ERROR 03; can not connect to WiFi after ");
+          Serial.print(MAXTRIES);
+          Serial.println(" attempts");
         #endif
         #ifdef SCREEN
           display.clearDisplay();
@@ -268,13 +304,20 @@ void setup()
           display.display(); 
         #endif
         #ifndef SDLOG
-          while (1);
+          while (1)
+          {
+            // endless loop communicating fatal error 03
+            digitalWrite(LED_BUILTIN, HIGH);
+            delay(3000);
+            digitalWrite(LED_BUILTIN, LOW);
+            delay(3000);
+          }
         #endif
       }
     }
     #ifdef DEBUG
       Serial.println();  // finishes the status dots print
-      Serial.print("WiFi connected, IP address: ");
+      Serial.print("WiFi IP address is: ");
       Serial.println(WiFi.localIP());
     #endif
   #endif
@@ -291,26 +334,48 @@ void setup()
     // Initialize Ethernet and UDP
     if (Ethernet.begin(mac) == 0)
     {
+      // FATAL ERROR 02 - Ethernet doesn't connect
+      
+      // generic error
       #ifdef DEBUG
-        Serial.println("Failed to configure Ethernet using DHCP");
+        Serial.println("FATAL ERROR 02; Failed to configure Ethernet using DHCP");
       #endif
-      // Check for Ethernet hardware present
+
+      // identified errors
       if (Ethernet.hardwareStatus() == EthernetNoHardware)
       {
         #ifdef DEBUG
-          Serial.println("Ethernet hardware not found");
+          Serial.println("FATAL ERROR 02; Ethernet hardware not found");
         #endif
       } 
       else if (Ethernet.linkStatus() == LinkOFF) 
       {
         #ifdef DEBUG
-          Serial.println("Ethernet cable is not connected.");
+          Serial.println("FATAL ERROR 02; Ethernet cable is not connected");
         #endif
       }
-      while (1);
+      #ifdef SCREEN
+        display.clearDisplay();
+        display.setTextSize(2);
+        display.setCursor(0,0);
+        display.print("ERR 02");
+        display.setCursor(0,8*2);
+        display.print("Ethernet")
+        display.display(); 
+      #endif
+      #ifndef SDLOG
+        while (1)
+        {
+          // endless loop communicating fatal error 02
+          digitalWrite(LED_BUILTIN, HIGH);
+          delay(2000);
+          digitalWrite(LED_BUILTIN, LOW);
+          delay(2000);
+        }
+      #endif
     }
     #ifdef DEBUG
-      Serial.print("IP number assigned by DHCP is ");
+      Serial.print("Ethernet IP address is: ");
       Serial.println(Ethernet.localIP());
     #endif
   #endif
@@ -349,8 +414,16 @@ void loop()
   }
   #endif
 
-  // only read sensors at preset intervals
-  if ((millis() - syncTime) < LOG_INTERVAL) return;
+  // update display and determine if it is time to read/process sensors
+  if ((millis() - syncTime) < LOG_INTERVAL) 
+  {
+    #ifdef SCREEN
+      #ifdef PROXIMITY
+        screenDisplay(readDistance);
+      #endif
+    #endif
+    return;
+  }
   syncTime = millis();
 
   // note: reading temperature or humidity takes ~ 250ms
@@ -599,11 +672,73 @@ uint32_t getAbsoluteHumidity(float temperature, float humidity)
   return absoluteHumidityScaled;
 }
 
-#ifdef MQTTLOG
-  void MQTT_connect()
-  // Connects and reconnects to MQTT broker, call from loop() to maintain connection
+#ifdef PROXIMITY
+  void screenDisplay(int distance)
   {
-    // Stop if already connected
+    if (distance < triggerDistance)
+    {
+      // display message
+      // set new message flag false
+      // or
+      display.ssd1306_command(SSD1306_DISPLAYON);
+    }
+    else
+    {
+      display.ssd1306_command(SSD1306_DISPLAYOFF);
+      // or
+      //clear display
+    }
+  }
+#endif
+
+// void displayScreenMessage(int row, int column, int textSize, String message)
+// // first row is zero
+// // textSize is for pixel displays only
+// {
+//   //display.clearDisplay();
+//   display.clear(); // ???
+//   display.setCursor(column, row);
+//   //display.setTextSize(textSize);
+//   display.print(message);
+//   // display.display();
+// }
+
+#ifdef PROXIMITY
+int readDistance()
+  {
+    // Returns distance from sensor in centimeters
+    int  distance;
+    VL53L0X_RangingMeasurementData_t measure;
+    proximitySensor.rangingTest(&measure, false); // pass in 'true' to get debug data printout!
+    if (measure.RangeStatus != 4)
+      {  
+        distance = measure.RangeMilliMeter/10; // converting mm to cm
+      }
+    else
+      {
+        // phase failures have incorrect data
+        #ifdef DEBUG
+          Serial.print(measure.RangeMilliMeter);
+          Serial.println("; distance measurement out of range");
+        #endif
+      }
+    // not in #DEBUG due to potential verbosity
+    // Serial.print("proximity distance ");
+    // Serial.print(distance);
+    // Serial.print(" cm");
+    return (distance);
+  }
+#endif
+
+#ifdef MQTTLOG
+  // Connects and reconnects to MQTT broker, call from loop() to maintain connection
+  void MQTT_connect()
+  {
+    uint8_t mqttErr;
+    uint8_t tries = 1;
+    #define MAXTRIES 3
+
+    // exit if already connected
     if (mqtt.connected()) 
     {
       return;
@@ -613,23 +748,30 @@ uint32_t getAbsoluteHumidity(float temperature, float humidity)
       Serial.println(MQTT_BROKER);
     #endif
 
-    uint8_t ret;
-    uint8_t tries = 1;
     while (mqtt.connect() != 0)
     {
+      // Error handler - can not connect to MQTT broker
       #ifdef DEBUG
-        Serial.println(mqtt.connectErrorString(ret));
-        Serial.print("retrying broker connection in");
-        Serial.print(tries*10000);
+        Serial.println(mqtt.connectErrorString(mqttErr));
+        Serial.print("MQTT broker connect attempt ");
+        Serial.print(tries);
+        Serial.print("of");
+        Serial.print(MAXTRIES);
+        Serial.print(" in ");
+        Serial.print(tries*10);
         Serial.println(" seconds");
       #endif
       mqtt.disconnect();
       delay(tries*10000);
       tries++;
-      if (tries == 11) 
+
+      // FATAL ERROR 01 - Can not connect to MQTT broker
+      if (tries == MAXTRIES) 
       {
         #ifdef DEBUG
-          Serial.println("FATAL error; can not connect to MQTT broker after 10 attempts");
+          Serial.print("FATAL error; can not connect to MQTT broker after");
+          Serial.print(MAXTRIES);
+          Serial.println(" attempts");
         #endif
         #ifdef SCREEN
           display.clearDisplay();
@@ -641,12 +783,19 @@ uint32_t getAbsoluteHumidity(float temperature, float humidity)
           display.display(); 
         #endif
         #ifndef SDLOG
-          while (1);
+          while (1)
+          {
+            // endless loop communicating fatal error 01
+            digitalWrite(LED_BUILTIN, HIGH);
+            delay(1000);
+            digitalWrite(LED_BUILTIN, LOW);
+            delay(1000);
+          }
         #endif
       }
     }
     #ifdef DEBUG
-      Serial.println("connected to broker");
+      Serial.println("connected to MQTT broker");
     #endif
   }
 #endif
