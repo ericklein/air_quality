@@ -191,3 +191,4 @@ or
 	- [I]112820 [P3]: if DHT pin not assigned properly, code crashes -> Just tested where DHT was pinned for Huzzah and compiled for M0. Code properly reported -1 for sensor read.
 - 082221
 	- new branch; changing room into a parameter of uploaded data
+	- proximity code removed as it is now in a branch. This branch has all proximity code removed, master had code in main() still
