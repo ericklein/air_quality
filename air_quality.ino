@@ -20,7 +20,6 @@
 //#if defined(SDLOG) || defined(DEBUG)
 #define NTP         // query network time server for logging
 //#endif
-//#define PROXIMITY // proximity sensor used to trigger screen display
 
 // Gloval variables
 uint32_t syncTime = 0;        // milliseconds since last LOG event(s)
@@ -37,12 +36,6 @@ DHT dht(DHTPIN, DHTTYPE);
   #include <Wire.h>
   #include "Adafruit_SGP30.h"
   Adafruit_SGP30 sgp;
-#endif
-
-#ifdef PROXIMITY
-  #include <Adafruit_VS1053.h>
-  Adafruit_VL53L0X proximitySensor = Adafruit_VL53L0X();
-  const byte triggerDistance = 20;  // Distance in cm to toggle LCD backlight
 #endif
 
 #ifdef DEBUG
@@ -199,19 +192,6 @@ void setup()
     #ifdef CO2
         Serial.println("SGP30 sensor ready");  
     #endif
-  #endif
-
-  #ifdef PROXIMITY
-    if (!proximitySensor.begin())
-    {
-        #ifdef DEBUG
-          Serial.println("Failed to initialize VL53L0X");
-      #endif
-        while(1);
-      }
-        #ifdef DEBUG
-          Serial.println("VL53L0X initialized");
-      #endif
   #endif
 
   #ifdef SDLOG
@@ -671,64 +651,6 @@ uint32_t getAbsoluteHumidity(float temperature, float humidity)
   const uint32_t absoluteHumidityScaled = static_cast<uint32_t>(1000.0f * absoluteHumidity); // [mg/m^3]
   return absoluteHumidityScaled;
 }
-
-#ifdef PROXIMITY
-  void screenDisplay(int distance)
-  {
-    if (distance < triggerDistance)
-    {
-      // display message
-      // set new message flag false
-      // or
-      display.ssd1306_command(SSD1306_DISPLAYON);
-    }
-    else
-    {
-      display.ssd1306_command(SSD1306_DISPLAYOFF);
-      // or
-      //clear display
-    }
-  }
-#endif
-
-// void displayScreenMessage(int row, int column, int textSize, String message)
-// // first row is zero
-// // textSize is for pixel displays only
-// {
-//   //display.clearDisplay();
-//   display.clear(); // ???
-//   display.setCursor(column, row);
-//   //display.setTextSize(textSize);
-//   display.print(message);
-//   // display.display();
-// }
-
-#ifdef PROXIMITY
-int readDistance()
-  {
-    // Returns distance from sensor in centimeters
-    int  distance;
-    VL53L0X_RangingMeasurementData_t measure;
-    proximitySensor.rangingTest(&measure, false); // pass in 'true' to get debug data printout!
-    if (measure.RangeStatus != 4)
-      {  
-        distance = measure.RangeMilliMeter/10; // converting mm to cm
-      }
-    else
-      {
-        // phase failures have incorrect data
-        #ifdef DEBUG
-          Serial.print(measure.RangeMilliMeter);
-          Serial.println("; distance measurement out of range");
-        #endif
-      }
-    // not in #DEBUG due to potential verbosity
-    // Serial.print("proximity distance ");
-    // Serial.print(distance);
-    // Serial.print(" cm");
-    return (distance);
-  }
-#endif
 
 #ifdef MQTTLOG
   // Connects and reconnects to MQTT broker, call from loop() to maintain connection
