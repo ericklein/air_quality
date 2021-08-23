@@ -14,13 +14,11 @@
 #define MQTTLOG        // Output to MQTT broker defined in secrets.h
 #define RJ45            // use Ethernet
 //#define WIFI          // use WiFi (credentials in secrets.h)
-#define TARGET_LAB      // publish results for the lab
-//#define TARGET_MASTER_BEDROOM  // publish results for the master bedroom
-//#define TARGET_ANNE_OFFICE
 //#if defined(SDLOG) || defined(DEBUG)
 #define NTP         // query network time server for logging
 //#endif
 //#define PROXIMITY // proximity sensor used to trigger screen display
+#define ROOM = "basementMain"
 
 // Gloval variables
 uint32_t syncTime = 0;        // milliseconds since last LOG event(s)
@@ -102,6 +100,7 @@ DHT dht(DHTPIN, DHTTYPE);
   Adafruit_MQTT_Publish tempPub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC1);
   Adafruit_MQTT_Publish humidityPub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC2);
   Adafruit_MQTT_Publish co2Pub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC3);
+  Adafruit_MQTT_Publish roomPub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC4);
 #endif
 
 #ifdef NTP
@@ -116,8 +115,8 @@ DHT dht(DHTPIN, DHTTYPE);
   // Time Zone support
   //const int timeZone = -5;  // Eastern Standard Time (USA)
   //const int timeZone = -4;  // Eastern Daylight Time (USA)
-  const int timeZone = -8;  // Pacific Standard Time (USA)
-  //const int timeZone = -7;    // Pacific Daylight Time (USA)
+  //const int timeZone = -8;  // Pacific Standard Time (USA)
+  const int timeZone = -7;    // Pacific Daylight Time (USA)
   const int NTP_PACKET_SIZE = 48; // NTP time is in the first 48 bytes of message
   byte packetBuffer[NTP_PACKET_SIZE]; //buffer to hold incoming & outgoing packets
 #endif
@@ -557,10 +556,28 @@ void loop()
         #endif
       }
     #endif
+    #ifdef DEBUG
+      Serial.print("room name via MQTT publish to '");
+      Serial.print(MQTT_PUB_TOPIC4);
+    #endif
+    if (!humidityPub.publish(ROOM))
+    {
+      #ifdef DEBUG
+        Serial.println("' failed");
+      #endif
+    }
+    else 
+    {
+      #ifdef DEBUG
+        Serial.println("' successful");
+      #endif
+    }
   #endif
 
   #if defined(SDLOG) || defined(DEBUG)
     String logString = ",";
+    logString += ROOM;
+    logString += ",";
     logString += humidity;
     logString += ",";
     logString += temperature_fahr;
@@ -582,7 +599,7 @@ void loop()
   #endif
 
   #ifdef DEBUG
-    Serial.println("time,humidity,temp,eC02");
+    Serial.println("time,room name,humidity,temp,eC02");
     Serial.print(timeString());
     Serial.println(logString);
   #endif
