@@ -41,17 +41,19 @@ or
 - Featherwing OLED
 	- SDA to SDA
 	- SCL to SCL
+- 
 
 ### Error codes
-- FATAL
+- FATAL (errorLevel 1)
 	- Always throws a DEBUG message and blinks built-in LED at (error code x 1 second) intervals
-	- ERR 01: Can not connect to MQTT broker. Device must be restarted unless SDLOG enabled.
-	- ERR 02: Can not connect to Ethernet. Device must be restarted to proceed unless SDLOG enabled.
-	- ERR 03: FATAL - Can not connect to WiFi. Device must be restarted to proceed unless SDLOG enabled.
-- CAUTION
+	- ERR 01: Can not connect to MQTT broker. Device must be restarted unless SDLOG enabled
+	- ERR 02: Can not connect to Ethernet. Device must be restarted to proceed unless SDLOG enabled
+	- ERR 03: Can not connect to WiFi. Device must be restarted to proceed unless SDLOG enabled
+	- ERR 04: Can't create log file on SD card
+- CAUTION (errorLevel 2)
 	- Always throws a DEBUG message
-	- ERR 04: MQTT publish failed.
-	- ERR 05: Can not connect to SGP30 CO2 sensor at startup. No CO2 readings will be logged.
+	- ERR 101: MQTT publish failed.
+	- ERR 102: Can not connect to SGP30 CO2 sensor at startup. No CO2 readings will be logged.
 
 ### to change hardware build target
 - change DHT pin
@@ -97,7 +99,7 @@ or
 - [P1]111120: Screen is on all the time, which could cause OLED burn in, and in dark environments, is very bright
 - [P2]111120: Test what happens if SDLOG enabled but MQTT Connect fails
 - [P2]111120: Add improved error handling to SDLOG while (1)
-- [P2]111420: Review NTP wait until data
+- [P2]111420: NTP wait until data replaced with a timeout
 - [P2]111120: Test that when SGP30 is not detected, -1 entries will be logged properly
 - [P2
 ]111420: MQTT publish (to Adafruit IO?) requires NTP to be defined?! No idea why.
@@ -105,6 +107,7 @@ or
 - [P2]112820: data logged to SDLOG is not uniquely identified
 - [P2]112820: pin 2 conflict on Adafruit 4650, not sure about 2900
 - [P2]112920: Anonymize TARGET_XXX defines
+- [P3]060321: Change sample rate to 30 minutes in production
 
 ### Feature Requests
 - [P3]100720: MQTT QoS 1
@@ -116,8 +119,9 @@ or
 - [P2]112920: Rotating time display
 - [P2]112920: Get time from MQTT broker
 - [P3]120220: Added error checking on string length to displayScreenMessage
-- [P3]120620: Error messages to MQTT broker
+- [P1]120620: Status and error messages to MQTT broker
 - [P1]012421: Async blinking of built-in LED for non-FATAL errors (e.g. MQTT publish)
+- [P3]081421: Concat date, not number, to SD card log files
 
 ### Questions
 - 090820: We are generating humidity, heat index, and absolute humidity?
@@ -125,7 +129,10 @@ or
 - 100120: Can I just subscribe to the higher level topic in connectToBroker() to get all the subs
 - 100220: Every five minutes we are generating a "Transmitting NTP request"?
 - 120220: Why do I need wire and spi for OLED displays?
-
+- 060221: Instead of wait(1) could I just reset the MCU depending on the error and ability for a reset to fix it?
+- 081421: Can I merge the LCD and graphic display message routines?
+- 081421: Can we know if the display is not communicating?
+- 081421: Can we know if the DHT22 is not communicating?
 
 ### Revisions
 - 083120: First version based on merged sample code for sensors, SD. Ethernet code NOT working.
@@ -190,3 +197,6 @@ or
 	- [FR]123120 [P2]: Add error blink codes to onboard LED for while (1) -> Adding BUILT_IN_LED blinking matching the fatal error code, aligning with new code in air_quality
 	- [I]111120 [P2]: Disable board lights on Feather Huzzah -> Built-in LED is supressed at startup then used only for fatal error messages
 	- [I]112820 [P3]: if DHT pin not assigned properly, code crashes -> Just tested where DHT was pinned for Huzzah and compiled for M0. Code properly reported -1 for sensor read.
+- 081421
+	- Adding debugMessage routine to improve readability
+	- Adding screenMessage routine to improve readability

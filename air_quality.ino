@@ -10,13 +10,13 @@
 //#define CO2           // Output CO2 data
 //#define DEBUG         // Output to the serial port
 //#define SDLOG         // output sensor data to SD Card
-//#define SCREEN          // output sensor data to screen
+//#define SCREEN        // output sensor data to screen
 #define MQTTLOG        // Output to MQTT broker defined in secrets.h
 #define RJ45            // use Ethernet
 //#define WIFI          // use WiFi (credentials in secrets.h)
-#define TARGET_LAB      // publish results for the lab
+//#define TARGET_LAB      // publish results for the lab
 //#define TARGET_MASTER_BEDROOM  // publish results for the master bedroom
-//#define TARGET_ANNE_OFFICE
+#define TARGET_ANNE_OFFICE
 //#if defined(SDLOG) || defined(DEBUG)
 #define NTP         // query network time server for logging
 //#endif
@@ -148,8 +148,8 @@ void setup()
     {
       // wait for serial port
     }
-    Serial.println("Indoor Air Quality started");
   #endif
+  debugMessage("Indoor Air Quality Started");
 
   dht.begin();
 
@@ -165,63 +165,45 @@ void setup()
     //display.setTextColor(SH110X_WHITE);
     //display.setRotation(1); // SH110X only?
 
-    // msg displayed until error or first reading is displayed
-    display.setCursor(0,0);
-    display.println("Waiting for");
-    //display.setCursor(0,8*2);  // associated with text size
-    display.println("first read");
-    display.display();
+    screenMessage(true,0,,"Waiting for");
+    screenMessage(false,1,,"first read")
   #endif
 
   #ifdef CO2
     if (!sgp.begin())
     {
-      #ifdef DEBUG
-        Serial.println("SGP30 sensor not found, no CO2 readings will be sent");
-      #endif
-      #ifdef SCREEN
-        display.clearDisplay();
-        display.setTextSize(2);
-        display.setCursor(0,0);
-        display.print("ERR 05");
-        display.setCursor(0,8*2);
-        display.print("SGP30");
-        display.display(); 
-      #endif
-    //while (1);
+      debugMessage("SGP30 sensor not found, no CO2 readings will be sent");
+      screenMessage(true,0,,"SPG30");
+      screenMessage(false,1,,"failure");
+      stopApp;
     }
     // If you have a baseline measurement from before you can assign it to start, to 'self-calibrate'
     //sgp.setIAQBaseline(0x8E68, 0x8F41);  // Will vary for each sensor!
+    debugMessage("SGP30 sensor initialized");
   #endif
 
-  #ifdef DEBUG
-    Serial.println("DHT22 sensor ready");
-    #ifdef CO2
-        Serial.println("SGP30 sensor ready");  
-    #endif
-  #endif
+  // how do I know this is true?
+  debugMessage("DHT22 sensor initialized");
 
   #ifdef PROXIMITY
     if (!proximitySensor.begin())
     {
-        #ifdef DEBUG
-          Serial.println("Failed to initialize VL53L0X");
-      #endif
-        while(1);
-      }
-        #ifdef DEBUG
-          Serial.println("VL53L0X initialized");
-      #endif
+      debugMessage("Failed to initialize proximity sensor");
+      screenMessage(true,0,,"VL53L0X");
+      screenMessage(false,1,,"failure");
+      stopApp;
+    }
+    debugMessage("Proximity sensor initialized");
   #endif
 
   #ifdef SDLOG
     // initialize SD card
     if (!SD.begin(SDPIN)) 
     {
-      #ifdef DEBUG
-        Serial.println("Card failed, or not present");
-      #endif
-      while (1);
+      debugMessage("Card failed, or not present");
+      screenMessage(true,0,,"SD card");
+      screenMessage(false,1,,"failure");
+      stopApp;
     }
   
     // create a new file on SD card
@@ -240,15 +222,15 @@ void setup()
   
     if (! logfile) 
     {
-      #ifdef DEBUG
-        Serial.println("Couldn't create log file");
-      #endif
-      while (1);
+      debugMessage("Couldn't create log file on SD card");
+      screenMessage(true,0,,"log file");
+      screenMessage(false,1,,"failure");
+      stopApp;
     }
   
     #ifdef DEBUG
-      Serial.print("Logging to: ");
-      Serial.println(filename);
+      String message = "Logging to: " + filename;
+      debugMessage(message);
     #endif
 
     // Log output headers
@@ -260,11 +242,9 @@ void setup()
     #define MAXTRIES 11
 
     // Connect to WiFi access point
-    #ifdef DEBUG
-      Serial.print("Connecting to WiFI AP ");
-      Serial.println(WIFI_SSID);
-    #endif
-
+    String message = "Connecting to WiFI AP: " + WIFI_SSID;
+    debugMessage(message);
+  
     // set hostname has to come before WiFi.begin
     WiFi.hostname(MQTT_CLIENT_ID);
     // WiFi.setHostname(MQTT_CLIENT_ID); //for WiFiNINA
@@ -273,15 +253,8 @@ void setup()
     while (WiFi.status() != WL_CONNECTED) 
     {
       // Error handler - WiFi does not initially connect
-      #ifdef DEBUG
-        Serial.print("WiFi AP connect attempt ");
-        Serial.print(tries);
-        Serial.print("of");
-        Serial.print(MAXTRIES);
-        Serial.print(" in ");
-        Serial.print(tries*10);
-        Serial.println(" seconds");
-      #endif
+      message = "WiFi AP connect attempt " + tries + "of " + MAXTRIES + " in " + (tries*10) +" seconds";
+      debugMessage(message);
       // use of delay OK as this is initialization code
       delay(tries*10000);
       tries++;
@@ -289,37 +262,17 @@ void setup()
       // FATAL ERROR 03 - WiFi doesn't connect
       if (tries == MAXTRIES)
       {
-        #ifdef DEBUG
-          Serial.print("FATAL ERROR 03; can not connect to WiFi after ");
-          Serial.print(MAXTRIES);
-          Serial.println(" attempts");
-        #endif
-        #ifdef SCREEN
-          display.clearDisplay();
-          display.setTextSize(2);
-          display.setCursor(0,0);
-          display.print("ERR 03");
-          display.setCursor(0,8*2);
-          display.print("WiFi")
-          display.display(); 
-        #endif
+        message = "Can not connect to WiFi after " + MAXTRIES + " attempts";
+        debugMessage(message);
+        screenMessage(true,0,,"WiFi AP");
+        screenMessage(false,1,,"failure");
         #ifndef SDLOG
-          while (1)
-          {
-            // endless loop communicating fatal error 03
-            digitalWrite(LED_BUILTIN, HIGH);
-            delay(3000);
-            digitalWrite(LED_BUILTIN, LOW);
-            delay(3000);
-          }
+          stopApp;
         #endif
       }
     }
-    #ifdef DEBUG
-      Serial.println();  // finishes the status dots print
-      Serial.print("WiFi IP address is: ");
-      Serial.println(WiFi.localIP());
-    #endif
+    message = "WiFi IP address is: " + (WiFi.localIP());
+    debugMessage(message);
   #endif
 
   #ifdef RJ45
@@ -333,51 +286,23 @@ void setup()
 
     // Initialize Ethernet and UDP
     if (Ethernet.begin(mac) == 0)
-    {
-      // FATAL ERROR 02 - Ethernet doesn't connect
-      
-      // generic error
-      #ifdef DEBUG
-        Serial.println("FATAL ERROR 02; Failed to configure Ethernet using DHCP");
-      #endif
-
+    {      
       // identified errors
       if (Ethernet.hardwareStatus() == EthernetNoHardware)
-      {
-        #ifdef DEBUG
-          Serial.println("FATAL ERROR 02; Ethernet hardware not found");
-        #endif
-      } 
+        debugMessage("Ethernet hardware not found");
       else if (Ethernet.linkStatus() == LinkOFF) 
-      {
-        #ifdef DEBUG
-          Serial.println("FATAL ERROR 02; Ethernet cable is not connected");
-        #endif
-      }
-      #ifdef SCREEN
-        display.clearDisplay();
-        display.setTextSize(2);
-        display.setCursor(0,0);
-        display.print("ERR 02");
-        display.setCursor(0,8*2);
-        display.print("Ethernet")
-        display.display(); 
-      #endif
+        debugMessage("Ethernet cable is not connected");
+      else
+        // generic error
+        debugMessage("Failed to configure Ethernet using DHCP");
+      screenMessage(true,0,,"Ethernet");
+      screenMessage(false,1,,"failure");
       #ifndef SDLOG
-        while (1)
-        {
-          // endless loop communicating fatal error 02
-          digitalWrite(LED_BUILTIN, HIGH);
-          delay(2000);
-          digitalWrite(LED_BUILTIN, LOW);
-          delay(2000);
-        }
+        stopApp;
       #endif
     }
-    #ifdef DEBUG
-      Serial.print("Ethernet IP address is: ");
-      Serial.println(Ethernet.localIP());
-    #endif
+    String message = "Ethernet IP address is: " + (Ethernet.localIP);
+    debugMessage(message);
   #endif
     
   #ifdef NTP
@@ -511,7 +436,7 @@ void loop()
           display.clearDisplay();
           display.setTextSize(2);
           display.setCursor(0,0);
-          display.print("ERR 04");
+          display.print("ERR 101");
           display.setCursor(0,8*2);
           display.print("MQTT");
           display.display(); 
@@ -691,18 +616,6 @@ uint32_t getAbsoluteHumidity(float temperature, float humidity)
   }
 #endif
 
-// void displayScreenMessage(int row, int column, int textSize, String message)
-// // first row is zero
-// // textSize is for pixel displays only
-// {
-//   //display.clearDisplay();
-//   display.clear(); // ???
-//   display.setCursor(column, row);
-//   //display.setTextSize(textSize);
-//   display.print(message);
-//   // display.display();
-// }
-
 #ifdef PROXIMITY
 int readDistance()
   {
@@ -799,3 +712,45 @@ int readDistance()
     #endif
   }
 #endif
+
+void debugMessage(String messageText)
+{
+  #ifdef DEBUG
+    Serial.println(messageText);
+  #endif
+}
+
+// void screenMessage(int row, int column, int textSize, String messageText)
+void screenMessage(bool clear, int row, int textSize, String messageText)
+// first row is zero
+// textSize is for pixel displays only
+{
+  #ifdef SCREEN
+    // clear the screen if needed
+    if (clear)
+      // Clear the display
+      display.clearDisplay();
+      //display.clear(); // ???
+    // set the row to display text in
+    display.setCursor(1, row);
+    // set the textSize if needed
+    if (textSize)
+      display.setTextSize(textSize);
+    // add text to display
+    display.print(messageText);
+    // actually display the message
+    display.display();
+  #endif
+}
+
+void stopApp()
+{
+  while(1)
+  {
+    // endless loop communicating fatal error
+    digitalWrite(LED_BUILTIN, HIGH);
+    delay(1000);
+    digitalWrite(LED_BUILTIN, LOW);
+    delay(1000);
+  }
+}
