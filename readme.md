@@ -99,12 +99,12 @@ or
 - [P2]111120: Add improved error handling to SDLOG while (1)
 - [P2]111420: Review NTP wait until data
 - [P2]111120: Test that when SGP30 is not detected, -1 entries will be logged properly
-- [P2
-]111420: MQTT publish (to Adafruit IO?) requires NTP to be defined?! No idea why.
+- [P2]111420: MQTT publish (to Adafruit IO?) requires NTP to be defined?! No idea why.
 - [P1]112820: Temperature data is off by a few degrees F when inserted into case?
 - [P2]112820: data logged to SDLOG is not uniquely identified
 - [P2]112820: pin 2 conflict on Adafruit 4650, not sure about 2900
 - [P2]112920: Anonymize TARGET_XXX defines
+- [P3]082521: quasi clock generates two messages every 10 seconds instead of one
 
 ### Feature Requests
 - [P3]100720: MQTT QoS 1
@@ -190,5 +190,6 @@ or
 	- [FR]123120 [P2]: Add error blink codes to onboard LED for while (1) -> Adding BUILT_IN_LED blinking matching the fatal error code, aligning with new code in air_quality
 	- [I]111120 [P2]: Disable board lights on Feather Huzzah -> Built-in LED is supressed at startup then used only for fatal error messages
 	- [I]112820 [P3]: if DHT pin not assigned properly, code crashes -> Just tested where DHT was pinned for Huzzah and compiled for M0. Code properly reported -1 for sensor read.
-- 082321
-	- Moving proximity changes to dev branch
+- 082221
+	- new branch; changing room into a parameter of uploaded data
+	- proximity code removed as it is now in a branch. This branch has all proximity code removed, master had code in main() still
