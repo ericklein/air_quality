@@ -104,6 +104,7 @@ or
 - [P2]112820: data logged to SDLOG is not uniquely identified
 - [P2]112820: pin 2 conflict on Adafruit 4650, not sure about 2900
 - [P2]112920: Anonymize TARGET_XXX defines
+- [P3]082521: quasi clock generates two messages every 10 seconds instead of one
 
 ### Feature Requests
 - [P3]100720: MQTT QoS 1

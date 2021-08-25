@@ -17,10 +17,10 @@
 //#if defined(SDLOG) || defined(DEBUG)
 #define NTP         // query network time server for logging
 //#endif
-#define ROOM = "basementMain"
 
 // Gloval variables
 uint32_t syncTime = 0;        // milliseconds since last LOG event(s)
+const char* room = "basementMain";
 
 // DHT (digital humidity and temperature) sensor
 #include "DHT.h"
@@ -39,7 +39,7 @@ DHT dht(DHTPIN, DHTTYPE);
 #ifdef DEBUG
   #define LOG_INTERVAL 60000   // millisecond delay between sensor reads
 #else
-  #define LOG_INTERVAL 300000   // millisecond delay between sensor reads
+  #define LOG_INTERVAL 600000   // millisecond delay between sensor reads
 #endif
 
 #ifdef SDLOG
@@ -372,6 +372,10 @@ void setup()
       Serial.println(timeString());
     #endif
   #endif
+
+  #ifdef DEBUG
+    Serial.println("setup() complete");
+  #endif
 }
 
 void loop() 
@@ -394,8 +398,8 @@ void loop()
   #endif
 
   // update display and determine if it is time to read/process sensors
-  if ((millis() - syncTime) < LOG_INTERVAL) 
-    syncTime = millis();
+  if ((millis() - syncTime) < LOG_INTERVAL) return;
+  syncTime = millis();
 
   // note: reading temperature or humidity takes ~ 250ms
   float humidity; 
@@ -532,7 +536,7 @@ void loop()
       Serial.print("room name via MQTT publish to '");
       Serial.print(MQTT_PUB_TOPIC4);
     #endif
-    if (!humidityPub.publish(ROOM))
+    if (!roomPub.publish(room))
     {
       #ifdef DEBUG
         Serial.println("' failed");
@@ -548,7 +552,7 @@ void loop()
 
   #if defined(SDLOG) || defined(DEBUG)
     String logString = ",";
-    logString += ROOM;
+    logString += room;
     logString += ",";
     logString += humidity;
     logString += ",";
@@ -675,7 +679,7 @@ uint32_t getAbsoluteHumidity(float temperature, float humidity)
       return;
     }
     #ifdef DEBUG
-      Serial.print("connecting to broker: ");
+      Serial.print("connecting to MQTT broker: ");
       Serial.println(MQTT_BROKER);
     #endif
 
@@ -686,7 +690,7 @@ uint32_t getAbsoluteHumidity(float temperature, float humidity)
         Serial.println(mqtt.connectErrorString(mqttErr));
         Serial.print("MQTT broker connect attempt ");
         Serial.print(tries);
-        Serial.print("of");
+        Serial.print(" of ");
         Serial.print(MAXTRIES);
         Serial.print(" in ");
         Serial.print(tries*10);
@@ -700,7 +704,7 @@ uint32_t getAbsoluteHumidity(float temperature, float humidity)
       if (tries == MAXTRIES) 
       {
         #ifdef DEBUG
-          Serial.print("FATAL error; can not connect to MQTT broker after");
+          Serial.print("FATAL error; can not connect to MQTT broker after ");
           Serial.print(MAXTRIES);
           Serial.println(" attempts");
         #endif
