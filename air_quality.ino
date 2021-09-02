@@ -19,8 +19,7 @@
 //#endif
 
 // Gloval variables
-uint32_t syncTime = 0;        // milliseconds since last LOG event(s)
-const char* room = "basementMain";
+unsigned long syncTime = 0;        // holds millis() [milliseconds] for timing functions 
 
 // DHT (digital humidity and temperature) sensor
 #include "DHT.h"
@@ -37,9 +36,11 @@ DHT dht(DHTPIN, DHTTYPE);
 #endif
 
 #ifdef DEBUG
-  #define LOG_INTERVAL 60000   // millisecond delay between sensor reads
+  // millisecond delay between sensor reads
+  //#define LOG_INTERVAL 60000  // standard test interval
+  #define LOG_INTERVAL 600000   // long term test interval
 #else
-  #define LOG_INTERVAL 600000   // millisecond delay between sensor reads
+  #define LOG_INTERVAL 600000
 #endif
 
 #ifdef SDLOG
@@ -106,10 +107,11 @@ DHT dht(DHTPIN, DHTTYPE);
   IPAddress timeServer(132,163,97,6); // time.nist.gov
 
   // Time Zone support
+  const int timeZone = 0;     //UTC
   //const int timeZone = -5;  // Eastern Standard Time (USA)
   //const int timeZone = -4;  // Eastern Daylight Time (USA)
   //const int timeZone = -8;  // Pacific Standard Time (USA)
-  const int timeZone = -7;    // Pacific Daylight Time (USA)
+  //const int timeZone = -7;    // Pacific Daylight Time (USA)
   const int NTP_PACKET_SIZE = 48; // NTP time is in the first 48 bytes of message
   byte packetBuffer[NTP_PACKET_SIZE]; //buffer to hold incoming & outgoing packets
 #endif
@@ -369,7 +371,7 @@ void setup()
 
     #ifdef DEBUG
       Serial.print("The NTP time is ");
-      Serial.println(timeString());
+      Serial.println(zuluDateTimeString());
     #endif
   #endif
 
@@ -381,8 +383,8 @@ void setup()
 void loop() 
 {
   #ifdef DEBUG
-    // quasi clock between reads
-    if (((millis() - syncTime) % 10000) == 0)
+    // display heartbeat every 20 seconds between sensor reads; depending on client might display >1 message per interval
+    if (((millis() - syncTime) % 20000) == 0)
     {
       Serial.print(((millis()-syncTime)/1000));
       Serial.print(" seconds elapsed before next read at ");
@@ -427,16 +429,8 @@ void loop()
   else
   {
     temperature_fahr = dht.readTemperature(true);
+    // float t = dht.readTemperature(); // temperature in celsius
   }
-
-  // Read temperature as Celsius (the default)
-  //float t = dht.readTemperature();
-
-  // Compute heat index in Fahrenheit (the default)
-  //float heat_index_fahr = dht.computeHeatIndex(temperature_fahr, humidity);
-
-  // Compute heat index in Celsius (isFahreheit = false)
-  //float hic = dht.computeHeatIndex(t, h, false);
 
   #ifdef CO2
     // set the absolute humidity to enable the humditiy compensation for the SGP30 air quality signals
@@ -551,22 +545,20 @@ void loop()
   #endif
 
   #if defined(SDLOG) || defined(DEBUG)
-    String logString = ",";
+    String logString = zuluDateTimeString();
+    logString += ",";    
     logString += room;
     logString += ",";
     logString += humidity;
     logString += ",";
     logString += temperature_fahr;
-    logString += ",";
-    //logString += heat_index_fahr;
-    //logString += ",";
     #ifdef CO2
+      logString += ",";
       logString += ecO2Reading;
     #endif
   #endif
 
   #ifdef SDLOG
-    logfile.print(timeString());
     logfile.println(logString);
     logfile.flush();
     #ifdef DEBUG
@@ -575,8 +567,6 @@ void loop()
   #endif
 
   #ifdef DEBUG
-    Serial.println("time,room name,humidity,temp,eC02");
-    Serial.print(timeString());
     Serial.println(logString);
   #endif
 }
@@ -633,17 +623,19 @@ void loop()
   }
 #endif
 
-String timeString()
+String zuluDateTimeString()
 {
   String logString;
   #ifdef NTP
     logString = year();
-    logString += "/";
+    logString += "-";
+    if (month()<10) logString += "0";
     logString += month();
-    logString += "/";
+    logString += "-";
     if (day()<10) logString += "0";
     logString += day();
-    logString += " ";
+    logString += "T";
+    if (hour()<10) logString += "0";
     logString += hour();
     logString += ":";
     if (minute()<10) logString += "0";
@@ -651,6 +643,7 @@ String timeString()
     logString += ":";
     if (second()<10) logString += "0";
     logString += second();
+    logString += "Z";
   #else
     logString ="Time not set";
   #endif
@@ -683,7 +676,7 @@ uint32_t getAbsoluteHumidity(float temperature, float humidity)
       Serial.println(MQTT_BROKER);
     #endif
 
-    while (mqtt.connect() != 0)
+    while ((mqtt.connect() != 0)&&(tries<=MAXTRIES))
     {
       // Error handler - can not connect to MQTT broker
       #ifdef DEBUG
@@ -700,14 +693,9 @@ uint32_t getAbsoluteHumidity(float temperature, float humidity)
       delay(tries*10000);
       tries++;
 
-      // FATAL ERROR 01 - Can not connect to MQTT broker
       if (tries == MAXTRIES) 
       {
-        #ifdef DEBUG
-          Serial.print("FATAL error; can not connect to MQTT broker after ");
-          Serial.print(MAXTRIES);
-          Serial.println(" attempts");
-        #endif
+        digitalWrite(LED_BUILTIN, HIGH);
         #ifdef SCREEN
           display.clearDisplay();
           display.setTextSize(2);
@@ -717,20 +705,13 @@ uint32_t getAbsoluteHumidity(float temperature, float humidity)
           display.print("MQTT");
           display.display(); 
         #endif
-        #ifndef SDLOG
-          while (1)
-          {
-            // endless loop communicating fatal error 01
-            digitalWrite(LED_BUILTIN, HIGH);
-            delay(1000);
-            digitalWrite(LED_BUILTIN, LOW);
-            delay(1000);
-          }
-        #endif
       }
     }
-    #ifdef DEBUG
-      Serial.println("connected to MQTT broker");
-    #endif
+    if (tries<=MAXTRIES)
+    {
+      #ifdef DEBUG
+        Serial.println("connected to MQTT broker");
+      #endif
+    }
   }
 #endif

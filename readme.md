@@ -89,43 +89,42 @@ or
 - 120220: Adafruit GFX library supports println, but I'm controlling position manually to maintain code alignment with Adafruit_LiquidCrystal
 
 ### Issues
-- [P2]083120: Need to add baseline readings for the SGP30 (EPROM, FLASH), values are likely incorrect
-- [P3]092020: If time isn't set by NTP, DEBUG and SDLOG have errors
-- [P3]112820: NTP is dependent to WiFi or Ethernet due to IPAddress
-- [P2]102420: Move local MQTT server to DNS named entry instead of IP address so DNS can resolve it if IP address changes
-- [P3]111020: How do we better handle Daylight vs. Standard time?
-- [P1]111120: Screen is on all the time, which could cause OLED burn in, and in dark environments, is very bright
-- [P2]111120: Test what happens if SDLOG enabled but MQTT Connect fails
-- [P2]111120: Add improved error handling to SDLOG while (1)
-- [P2]111420: Review NTP wait until data
-- [P2]111120: Test that when SGP30 is not detected, -1 entries will be logged properly
-- [P2]111420: MQTT publish (to Adafruit IO?) requires NTP to be defined?! No idea why.
-- [P1]112820: Temperature data is off by a few degrees F when inserted into case?
-- [P2]112820: data logged to SDLOG is not uniquely identified
-- [P2]112820: pin 2 conflict on Adafruit 4650, not sure about 2900
-- [P2]112920: Anonymize TARGET_XXX defines
-- [P3]082521: quasi clock generates two messages every 10 seconds instead of one
+- [I][P2]083120: sensor; Need to add baseline readings for the SGP30 (EPROM, FLASH), values are likely incorrect
+- [I][P3]112820: time; NTP is dependent to WiFi or Ethernet due to IPAddress
+- [I][P2]102420: mqtt; Move local MQTT server to DNS named entry instead of IP address so DNS can resolve it if IP address changes
+- [I][P1]111120: screen; Screen is on all the time, which could cause OLED burn in, and in dark environments, is very bright
+- [I][P2]111120: sdlog; Test what happens if SDLOG enabled but MQTT Connect fails
+- [I][P2]111120: sdlog; Add improved error handling to SDLOG while (1)
+- [I][P2]111420: time; Review NTP while until data
+	- See Q about MQTT local server time stamping inbound data?
+	- add code to let NTP fail through rather than while waiting
+	- in zuluDateTimeString switch #ifdef NTP for check timeStatus() for timeNotSet
+- [I][P2]111120: sensor; Test that when SGP30 is not detected, -1 entries will be logged properly
+- [I][P2]111420: mqtt; MQTT publish (to Adafruit IO?) requires NTP to be defined?! No idea why.
+- [I][P1]112820: enclosure; Temperature data is off by a few degrees F when inserted into case?
+- [I][P2]112820: screen; pin 2 conflict on Adafruit 4650, not sure about 2900
 
 ### Feature Requests
-- [P3]100720: MQTT QoS 1
-- [P3]110920: publish to secondary MQTT broker
-- [P3]111020: publish to multiple MQTT brokers
-- [P2]111120: ThinkSpeak investigation
-- [P2]111120: BME680 integration https://www.adafruit.com/product/3660
-- [P1]112020: Heartbeat indicator on-screen
-- [P2]112920: Rotating time display
-- [P2]112920: Get time from MQTT broker
-- [P3]120220: Added error checking on string length to displayScreenMessage
-- [P3]120620: Error messages to MQTT broker
-- [P1]012421: Async blinking of built-in LED for non-FATAL errors (e.g. MQTT publish)
+- [FR][P3]100720: mqtt; MQTT QoS 1
+- [FR][P3]111020: mqtt; publish to multiple MQTT brokers
+- [FR][P2]111120: sensor; BME680 integration https://www.adafruit.com/product/3660
+- [FR][P1]112020: screen; Heartbeat indicator on-screen
+- [FR][P2]112920: screen; Rotating time display
+- [FR][P2]112920: time; Get time from MQTT broker
+- [FR][P3]120220: log; Added error checking on string length to displayScreenMessage
+- [FR][P2]012421: log; Async blinking of built-in LED for non-FATAL errors (e.g. MQTT publish)
+- [FR][P3]120620: log; Error messages to MQTT broker
+	- add error field to adafruitIO->airquality
+	- send error messages to MQTT for wait states
+		- timestamp->machine->error message
+- [FR][P2]090121: power; Deep sleep between sensor reads to lower battery consumption
+- [FR][P2]090121: power; Low battery messaging (to MQTT)
 
 ### Questions
-- 090820: We are generating humidity, heat index, and absolute humidity?
-- 091420: eCO2 level never changes? (see baseline issue?)
-- 100120: Can I just subscribe to the higher level topic in connectToBroker() to get all the subs
-- 100220: Every five minutes we are generating a "Transmitting NTP request"?
-- 120220: Why do I need wire and spi for OLED displays?
-
+- [Q]091420: sensor; eCO2 level never changes? (see baseline issue?)
+- [Q]100120: mqtt; Can I just subscribe to the higher level topic in connectToBroker() to get all the subs
+- [Q]120220: screen; Why do I need wire and spi for OLED displays?
+- [Q]082921: time; when do I need to timestamp data bound for MQTT; adafruit.io time stamps for me, does a local server?
 
 ### Revisions
 - 083120: First version based on merged sample code for sensors, SD. Ethernet code NOT working.
@@ -133,26 +132,26 @@ or
 - 090820
 	- Switched to Particle Ethernet Featherwing and Feather M4 Express
 	- Switched to timelib getNtpTime example code
-	- [FR] 090120: Conditional compile for network, SD saves, and display
-	- [FR] 090120: Switch to ARM SoC for +memory (post conditionals?)
+	- [FR]090120: Conditional compile for network, SD saves, and display
+	- [FR]090120: Switch to ARM SoC for +memory (post conditionals?)
 - 091120
-	- [I] 090820: Code is only running for one loop -> setSyncInterval(15) locked code on subsequent loops, also not needed
-	- [I] - 090820: time is not correct, sample code is -> byproduct of setSyncInterval(15) issue
-	- [FR] 090820: Display NTP time when received in DEBUG
+	- [I]090820: Code is only running for one loop -> setSyncInterval(15) locked code on subsequent loops, also not needed
+	- [I]090820: time is not correct, sample code is -> byproduct of setSyncInterval(15) issue
+	- [FR]090820: Display NTP time when received in DEBUG
 - 091420
-	- [I] 091120: Set SYNC_INTERVAL to minimum for AIO and use in main CLOUDLOG -> done
-	- [I] 091120: Crashes again after one loop, might be a DHT issue -> DHT moved to pin 11, stopped collision with Ethernet on pin 10 (CS)
-	- [I] 091120: main delay(SYNC_INTERVAL) must be factored out, it could be impacting networking -> done
-	- [I] 091120: Data not writing to AIO -> side effect of DHT/Ethernet pin conflict
-	- [FR] 083120: Upload data to cloud db -> code now working
-	- [FR] 090820: After adding cloud db support, try backport to Arduino Ethernet board (enough memory?) -> does not fit, not worth the effort
-	- [FR] 090120: Add screen display support
+	- [I]091120: Set SYNC_INTERVAL to minimum for AIO and use in main CLOUDLOG -> done
+	- [I]091120: Crashes again after one loop, might be a DHT issue -> DHT moved to pin 11, stopped collision with Ethernet on pin 10 (CS)
+	- [I]091120: main delay(SYNC_INTERVAL) must be factored out, it could be impacting networking -> done
+	- [I]091120: Data not writing to AIO -> side effect of DHT/Ethernet pin conflict
+	- [FR]083120: Upload data to cloud db -> code now working
+	- [FR]090820: After adding cloud db support, try backport to Arduino Ethernet board (enough memory?) -> does not fit, not worth the effort
+	- [FR]090120: Add screen display support
 - 092020
-	- [FR] 091420: P2; Switch to M0 Proto board
-	- [FR] 091120: P1; Use timedisplay routines for log string
+	- [FR][P2]091420: Switch to M0 Proto board
+	- [FR][P1]091120: Use timedisplay routines for log string
 	- Added DEBUG and production sample rate definitions
-	- [FR] 090820: P1; Optimize code
-	- [I] 092020: SDLOG doesn't actually write values (code was dropped in previous revision) -> this has been true since initial Github checkin; fixed
+	- [FR][P1]090820: Optimize code
+	- [I]092020: SDLOG doesn't actually write values (code was dropped in previous revision) -> this has been true since initial Github checkin; fixed
 - 100120
 	- partial refactoring for WIFI
 	- added initial MQTT support
@@ -160,21 +159,21 @@ or
 	- moved network feed locations out of secrets.h
 - 111020
 	- added conditional for CO2 sensor read
-	- [FR] 100120: P2; re-factor CLOUDLOG?, RJ45, and [i]092020 to add WiFi support -> WiFi code changes inherited from cub2bed_mqtt code base, though not addressing [i]092020 yet
-	- [FR] 091420: P3; Try and move Adafruit IO feeds to another group -> implemented for master_bedroom as test
-	- [FR] 110920: P2; Add LiPo battery so if power goes out we have redundant power supply for some period -> added to both deployed rooms
-	- [I] 100220: P1; MQTT code previously has only updating every 10 minutes and then would stop. Code changes implemented to MQTT code, check for reliability -> resolved with tested MQTT code path from cub2bed_mqtt code base
-	- [FR] 091320: P1; Insert detectable (-1) data points into data feed when sensors error during read or create out of parameter values (see code in loop()) -> Added support for read failures, not out of bounds conditions
-	- [I] 100220: P3; leading zero problem on day in timestring() -> Added a leading zero for day()<10
+	- [FR][P2]100120: re-factor CLOUDLOG?, RJ45, and [i]092020 to add WiFi support -> WiFi code changes inherited from cub2bed_mqtt code base, though not addressing [i]092020 yet
+	- [FR][P3]091420: Try and move Adafruit IO feeds to another group -> implemented for master_bedroom as test
+	- [FR][P2]110920: Add LiPo battery so if power goes out we have redundant power supply for some period -> added to both deployed rooms
+	- [I][P1]100220: MQTT code previously has only updating every 10 minutes and then would stop. Code changes implemented to MQTT code, check for reliability -> resolved with tested MQTT code path from cub2bed_mqtt code base
+	- [FR][P1]091320: Insert detectable (-1) data points into data feed when sensors error during read or create out of parameter values (see code in loop()) -> Added support for read failures, not out of bounds conditions
+	- [I][P3]100220: leading zero problem on day in timestring() -> Added a leading zero for day()<10
 -111120
-	- [FR] 111020: P2; combine MQTT publish code blocks for AdafruitIO MQTT and generic MQTT, append username to the secrets.h MQTT_PUB_TOPIC[x] -> completed
-	- [I] 102420: P1; Need an error indicator and better handling for non-DEBUG, while(1) errors, MQTT connection errors -> MQTT connection and SGP30 sensor init while(1) have better handling
-	- [FR] 111020; P3: is #if defined(SDLOG) || defined(SCREEN) needed, because screen has its own output format? -> bug, fixed as #if defined(SDLOG) || defined(DEBUG)
+	- [FR][P2]111020: combine MQTT publish code blocks for AdafruitIO MQTT and generic MQTT, append username to the secrets.h MQTT_PUB_TOPIC[x] -> completed
+	- [I][P1]102420: Need an error indicator and better handling for non-DEBUG, while(1) errors, MQTT connection errors -> MQTT connection and SGP30 sensor init while(1) have better handling
+	- [FR][P3]111020: is #if defined(SDLOG) || defined(SCREEN) needed, because screen has its own output format? -> bug, fixed as #if defined(SDLOG) || defined(DEBUG)
 -111420
-	- [FR] 111420: P1; Add WiFi and Ethernet hostnames -> Added for WiFi but Ethernet not supported in library.
-	- [FR] 100120: P1; refactor NTP time code into monolithic block, only used by SDLOG and DEBUG -> conditional #define NTPTIME
-	- [I] 111020: P1; Display something on screen while waiting for first sensor read. If the device can't get to the MQTT broker on its initial boot, as an example, the screen will never be initialized. -> display text added
-	- [I] 111120: P1; Review WiFi wait until connect that leaves device hung with no visible indicators -> WiFi connect now has 10 attempts then error handling and messaging
+	- [FR][P1]111420: Add WiFi and Ethernet hostnames -> Added for WiFi but Ethernet not supported in library.
+	- [FR][P1]100120: refactor NTP time code into monolithic block, only used by SDLOG and DEBUG -> conditional #define NTPTIME
+	- [I][P1] 111020: Display something on screen while waiting for first sensor read. If the device can't get to the MQTT broker on its initial boot, as an example, the screen will never be initialized. -> display text added
+	- [I][P1] 111120: Review WiFi wait until connect that leaves device hung with no visible indicators -> WiFi connect now has 10 attempts then error handling and messaging
 -112820
 	- Added rudimentary support for SH110x OLED screen
 	- Extracted TimeString from NTP conditional compile
@@ -187,9 +186,20 @@ or
 	- Standardized while (1) error handling for WiFi, RJ45, and MQTT_Connect
 	- Partial support for proximity based activation of the screen. Should have been on a branch...
 - 012421
-	- [FR]123120 [P2]: Add error blink codes to onboard LED for while (1) -> Adding BUILT_IN_LED blinking matching the fatal error code, aligning with new code in air_quality
-	- [I]111120 [P2]: Disable board lights on Feather Huzzah -> Built-in LED is supressed at startup then used only for fatal error messages
-	- [I]112820 [P3]: if DHT pin not assigned properly, code crashes -> Just tested where DHT was pinned for Huzzah and compiled for M0. Code properly reported -1 for sensor read.
-- 082221
-	- new branch; changing room into a parameter of uploaded data
+	- [FR][P2]123120: Add error blink codes to onboard LED for while (1) -> Adding BUILT_IN_LED blinking matching the fatal error code, aligning with new code in air_quality
+	- [I][P2]111120: Disable board lights on Feather Huzzah -> Built-in LED is supressed at startup then used only for fatal error messages
+	- [I][P3]112820: if DHT pin not assigned properly, code crashes -> Just tested where DHT was pinned for Huzzah and compiled for M0. Code properly reported -1 for sensor read.
+- 082521
+	- changing room into a parameter of uploaded data
+	- [I][P2]112920: Anonymize TARGET_XXX defines
 	- proximity code removed as it is now in a branch. This branch has all proximity code removed, master had code in main() still
+- 083021
+	- removed while(1) for mqttconnect()
+	- #DEBUG log formatting fixes
+	- Time fixes
+		- [I][P3]082521: quasi clock generates two messages every 10 seconds instead of one -> dependent on code and processor, # of messages dependent on times through loop within the 1ms
+		- [Q]100220: time; Every five minutes we are generating a "Transmitting NTP request"? -> Expected behavior, any time a timelib function is used, timelib is checking and potentially synching to time provider. In this case, a time string was being generated associated with each mqtt log entry, causing the sync
+		- [I][P3]111020: time; How do we better handle Daylight vs. Standard time? -> Switched to UTC time for logging, switched timeString to properly formatted zuluDateTimeString
+		- [I][P3]092020: time; If time isn't set by NTP, DEBUG and SDLOG have errors -> zuluDateTimeString inserts "time not set" instead of UTC time if NTP not defined
+	- [I][P2]112820: sdlog; data logged to SDLOG is not uniquely identified -> room and UTC time attached to readings
+	- [Q]090820: We are generating humidity, heat index, and absolute humidity? -> dropping heat index support, absolute humidity required to calibrate eCO2 reading
