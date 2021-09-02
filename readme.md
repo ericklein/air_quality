@@ -101,7 +101,7 @@ or
 	- in zuluDateTimeString switch #ifdef NTP for check timeStatus() for timeNotSet
 - [I][P2]111120: sensor; Test that when SGP30 is not detected, -1 entries will be logged properly
 - [I][P2]111420: mqtt; MQTT publish (to Adafruit IO?) requires NTP to be defined?! No idea why.
-- [I][P1]112820: Temperature data is off by a few degrees F when inserted into case?
+- [I][P1]112820: enclosure; Temperature data is off by a few degrees F when inserted into case?
 - [I][P2]112820: screen; pin 2 conflict on Adafruit 4650, not sure about 2900
 
 ### Feature Requests
@@ -113,10 +113,12 @@ or
 - [FR][P2]112920: time; Get time from MQTT broker
 - [FR][P3]120220: log; Added error checking on string length to displayScreenMessage
 - [FR][P2]012421: log; Async blinking of built-in LED for non-FATAL errors (e.g. MQTT publish)
-- [FR][P3]120620: mqtt; Error messages to MQTT broker
+- [FR][P3]120620: log; Error messages to MQTT broker
 	- add error field to adafruitIO->airquality
 	- send error messages to MQTT for wait states
 		- timestamp->machine->error message
+- [FR][P2]090121: power; Deep sleep between sensor reads to lower battery consumption
+- [FR][P2]090121: power; Low battery messaging (to MQTT)
 
 ### Questions
 - [Q]091420: sensor; eCO2 level never changes? (see baseline issue?)
@@ -192,12 +194,12 @@ or
 	- [I][P2]112920: Anonymize TARGET_XXX defines
 	- proximity code removed as it is now in a branch. This branch has all proximity code removed, master had code in main() still
 - 083021
-	- removing while(1) for mqttconnect()
-	- #DEBUG log cleanups
+	- removed while(1) for mqttconnect()
+	- #DEBUG log formatting fixes
 	- Time fixes
 		- [I][P3]082521: quasi clock generates two messages every 10 seconds instead of one -> dependent on code and processor, # of messages dependent on times through loop within the 1ms
-		- [Q]090820: We are generating humidity, heat index, and absolute humidity? -> dropping heat index support, absolute humidity required to calibrate eCO2 reading
 		- [Q]100220: time; Every five minutes we are generating a "Transmitting NTP request"? -> Expected behavior, any time a timelib function is used, timelib is checking and potentially synching to time provider. In this case, a time string was being generated associated with each mqtt log entry, causing the sync
 		- [I][P3]111020: time; How do we better handle Daylight vs. Standard time? -> Switched to UTC time for logging, switched timeString to properly formatted zuluDateTimeString
 		- [I][P3]092020: time; If time isn't set by NTP, DEBUG and SDLOG have errors -> zuluDateTimeString inserts "time not set" instead of UTC time if NTP not defined
 	- [I][P2]112820: sdlog; data logged to SDLOG is not uniquely identified -> room and UTC time attached to readings
+	- [Q]090820: We are generating humidity, heat index, and absolute humidity? -> dropping heat index support, absolute humidity required to calibrate eCO2 reading

@@ -8,7 +8,7 @@
 
 // Conditional compile flags
 //#define CO2           // Output CO2 data
-#define DEBUG         // Output to the serial port
+//#define DEBUG         // Output to the serial port
 //#define SDLOG         // output sensor data to SD Card
 //#define SCREEN          // output sensor data to screen
 #define MQTTLOG        // Output to MQTT broker defined in secrets.h
@@ -676,7 +676,7 @@ uint32_t getAbsoluteHumidity(float temperature, float humidity)
       Serial.println(MQTT_BROKER);
     #endif
 
-    while ((mqtt.connect() != 0)&(tries<=MAXTRIES))
+    while ((mqtt.connect() != 0)&&(tries<=MAXTRIES))
     {
       // Error handler - can not connect to MQTT broker
       #ifdef DEBUG
