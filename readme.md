@@ -1,7 +1,7 @@
  Air Quality
 
 ### Purpose
-Regularly sample and log temperature, humidity, and CO2 levels
+Regularly sample and log temperature and humidity
 
 ### Contributors
 
