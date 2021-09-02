@@ -7,7 +7,6 @@
 */
 
 // Conditional compile flags
-//#define CO2           // Output CO2 data
 //#define DEBUG         // Output to the serial port
 //#define SDLOG         // output sensor data to SD Card
 //#define SCREEN          // output sensor data to screen
@@ -28,17 +27,10 @@ unsigned long syncTime = 0;        // holds millis() [milliseconds] for timing f
 #define DHTTYPE DHT22   // DHT 22  (AM2302), AM2321
 DHT dht(DHTPIN, DHTTYPE);
 
-#ifdef CO2
-  // SGP30 (eCO2) sensor
-  #include <Wire.h>
-  #include "Adafruit_SGP30.h"
-  Adafruit_SGP30 sgp;
-#endif
-
 #ifdef DEBUG
   // millisecond delay between sensor reads
-  //#define LOG_INTERVAL 60000  // standard test interval
-  #define LOG_INTERVAL 600000   // long term test interval
+  #define LOG_INTERVAL 60000  // standard test interval
+  //#define LOG_INTERVAL 600000   // long term test interval
 #else
   #define LOG_INTERVAL 600000
 #endif
@@ -93,7 +85,6 @@ DHT dht(DHTPIN, DHTTYPE);
   Adafruit_MQTT_Client mqtt(&client, MQTT_BROKER, MQTT_PORT, MQTT_CLIENT_ID, MQTT_USER, MQTT_PASS);
   Adafruit_MQTT_Publish tempPub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC1);
   Adafruit_MQTT_Publish humidityPub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC2);
-  Adafruit_MQTT_Publish co2Pub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC3);
   Adafruit_MQTT_Publish roomPub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC4);
 #endif
 
@@ -167,27 +158,6 @@ void setup()
     display.display();
   #endif
 
-  #ifdef CO2
-    if (!sgp.begin())
-    {
-      #ifdef DEBUG
-        Serial.println("SGP30 sensor not found, no CO2 readings will be sent");
-      #endif
-      #ifdef SCREEN
-        display.clearDisplay();
-        display.setTextSize(2);
-        display.setCursor(0,0);
-        display.print("ERR 05");
-        display.setCursor(0,8*2);
-        display.print("SGP30");
-        display.display(); 
-      #endif
-    //while (1);
-    }
-    // If you have a baseline measurement from before you can assign it to start, to 'self-calibrate'
-    //sgp.setIAQBaseline(0x8E68, 0x8F41);  // Will vary for each sensor!
-  #endif
-
   #ifdef DEBUG
     Serial.println("DHT22 sensor ready");
     #ifdef CO2
@@ -233,7 +203,7 @@ void setup()
     #endif
 
     // Log output headers
-      logfile.println("time,humidity,temp,heat_index,eCO2");    
+      logfile.println("time,room,humidity,temp");    
   #endif
 
   #ifdef WIFI
@@ -432,28 +402,6 @@ void loop()
     // float t = dht.readTemperature(); // temperature in celsius
   }
 
-  #ifdef CO2
-    // set the absolute humidity to enable the humditiy compensation for the SGP30 air quality signals
-    sgp.setHumidity(getAbsoluteHumidity(temperature_fahr, humidity));
-
-    //float tvocReading;
-    float ecO2Reading;
- 
-    if (! sgp.IAQmeasure()) 
-    {
-      #ifdef DEBUG
-        Serial.println("SGP30 Measurement failed");
-      #endif
-      //tvocReading = -1;
-      ecO2Reading = -1;  
-    }
-    else
-    {
-      // tvocReading = sgp.TVOC;
-      ecO2Reading = sgp.eCO2; 
-    } 
-  #endif
-
   #ifdef SCREEN
     display.clearDisplay();
     display.setCursor(0,0);
@@ -508,24 +456,6 @@ void loop()
         Serial.println("' successful");
       #endif
     }
-    #ifdef CO2
-      #ifdef DEBUG
-        Serial.print("CO2 via MQTT publish to '");
-        Serial.print(MQTT_PUB_TOPIC3);
-      #endif
-      if (!co2Pub.publish(ecO2Reading))
-      {
-        #ifdef DEBUG
-          Serial.println("' failed");
-        #endif
-      }
-      else 
-      {
-        #ifdef DEBUG
-          Serial.println("' successful");
-        #endif
-      }
-    #endif
     #ifdef DEBUG
       Serial.print("room name via MQTT publish to '");
       Serial.print(MQTT_PUB_TOPIC4);
@@ -552,10 +482,6 @@ void loop()
     logString += humidity;
     logString += ",";
     logString += temperature_fahr;
-    #ifdef CO2
-      logString += ",";
-      logString += ecO2Reading;
-    #endif
   #endif
 
   #ifdef SDLOG
@@ -648,14 +574,6 @@ String zuluDateTimeString()
     logString ="Time not set";
   #endif
   return logString;
-}
-
-uint32_t getAbsoluteHumidity(float temperature, float humidity) 
-{
-  // approximation formula from Sensirion SGP30 Driver Integration chapter 3.15
-  const float absoluteHumidity = 216.7f * ((humidity / 100.0f) * 6.112f * exp((17.62f * temperature) / (243.12f + temperature)) / (273.15f + temperature)); // [g/m^3]
-  const uint32_t absoluteHumidityScaled = static_cast<uint32_t>(1000.0f * absoluteHumidity); // [mg/m^3]
-  return absoluteHumidityScaled;
 }
 
 #ifdef MQTTLOG

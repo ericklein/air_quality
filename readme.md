@@ -15,7 +15,6 @@ Regularly sample and log temperature, humidity, and CO2 levels
 - or
 - 1x: [optional] Silicognition PoE Featherwing: https://www.crowdsupply.com/silicognition/poe-featherwing
 - 1X: DHT22 temp/humidity sensor: https://www.adafruit.com/product/385
-- 1X: SGP30 gas sensor: https://www.adafruit.com/product/3709
 - 1X: Featherwing OLED (128x32): https://www.adafruit.com/product/2900
 or 
 - 1X: Featherwing OLED (128x64): https://www.adafruit.com/product/4650
@@ -33,11 +32,6 @@ or
 	- Connect pin 2 of the sensor to whatever your DHTPIN is
 	- Connect pin 4 (on the right) of the sensor to GROUND
 	- Connect a 10K resistor from pin 2 (data) to pin 1 (power) of the sensor
-- SGP30 sensor
-	- VIN to 3.3v, 5V
-	- GND to ground
-	- SDA to SDA
-	- SCL to SCL
 - Featherwing OLED
 	- SDA to SDA
 	- SCL to SCL
@@ -50,7 +44,6 @@ or
 	- ERR 03: FATAL - Can not connect to WiFi. Device must be restarted to proceed unless SDLOG enabled.
 - CAUTION
 	- Always throws a DEBUG message
-	- ERR 04: MQTT publish failed.
 	- ERR 05: Can not connect to SGP30 CO2 sensor at startup. No CO2 readings will be logged.
 
 ### to change hardware build target
@@ -89,7 +82,6 @@ or
 - 120220: Adafruit GFX library supports println, but I'm controlling position manually to maintain code alignment with Adafruit_LiquidCrystal
 
 ### Issues
-- [I][P2]083120: sensor; Need to add baseline readings for the SGP30 (EPROM, FLASH), values are likely incorrect
 - [I][P3]112820: time; NTP is dependent to WiFi or Ethernet due to IPAddress
 - [I][P2]102420: mqtt; Move local MQTT server to DNS named entry instead of IP address so DNS can resolve it if IP address changes
 - [I][P1]111120: screen; Screen is on all the time, which could cause OLED burn in, and in dark environments, is very bright
@@ -99,7 +91,6 @@ or
 	- See Q about MQTT local server time stamping inbound data?
 	- add code to let NTP fail through rather than while waiting
 	- in zuluDateTimeString switch #ifdef NTP for check timeStatus() for timeNotSet
-- [I][P2]111120: sensor; Test that when SGP30 is not detected, -1 entries will be logged properly
 - [I][P2]111420: mqtt; MQTT publish (to Adafruit IO?) requires NTP to be defined?! No idea why.
 - [I][P1]112820: enclosure; Temperature data is off by a few degrees F when inserted into case?
 - [I][P2]112820: screen; pin 2 conflict on Adafruit 4650, not sure about 2900
@@ -121,7 +112,6 @@ or
 - [FR][P2]090121: power; Low battery messaging (to MQTT)
 
 ### Questions
-- [Q]091420: sensor; eCO2 level never changes? (see baseline issue?)
 - [Q]100120: mqtt; Can I just subscribe to the higher level topic in connectToBroker() to get all the subs
 - [Q]120220: screen; Why do I need wire and spi for OLED displays?
 - [Q]082921: time; when do I need to timestamp data bound for MQTT; adafruit.io time stamps for me, does a local server?
@@ -203,3 +193,5 @@ or
 		- [I][P3]092020: time; If time isn't set by NTP, DEBUG and SDLOG have errors -> zuluDateTimeString inserts "time not set" instead of UTC time if NTP not defined
 	- [I][P2]112820: sdlog; data logged to SDLOG is not uniquely identified -> room and UTC time attached to readings
 	- [Q]090820: We are generating humidity, heat index, and absolute humidity? -> dropping heat index support, absolute humidity required to calibrate eCO2 reading
+-090121
+	- moving CO2 measurement to private branch, as it doesn't work
