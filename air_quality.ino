@@ -1,7 +1,7 @@
 /*
   Project Name:   air_quality
   Developer:      Eric Klein Jr. (temp2@ericklein.com)
-  Description:    Measures and logs temp, humidity, and CO2 levels
+  Description:    Regularly sample and log temperature, humidity
 
   See README.md for target information, revision history, feature requests, etc.
 */
@@ -20,12 +20,9 @@
 // Gloval variables
 unsigned long syncTime = 0;        // holds millis() [milliseconds] for timing functions 
 
-// DHT (digital humidity and temperature) sensor
-#include "DHT.h"
-//#define DHTPIN  2      // Digital pin connected to DHT sensor (Huzzah for master_bedroom)
-#define DHTPIN  11      // Digital pin connected to DHT sensor (M0 for lab)
-#define DHTTYPE DHT22   // DHT 22  (AM2302), AM2321
-DHT dht(DHTPIN, DHTTYPE);
+// AHT20 (temperature and humidity)
+#include <Adafruit_AHTX0.h>
+Adafruit_AHTX0 aht;
 
 #ifdef DEBUG
   // millisecond delay between sensor reads
@@ -136,7 +133,33 @@ void setup()
     Serial.println("Indoor Air Quality started");
   #endif
 
-  dht.begin();
+  // sensor check
+  if (! aht.begin())
+  {
+    #ifdef DEBUG
+      Serial.println("FATAL ERROR: AHT sensor not detected");
+    #endif
+    #ifdef SCREEN
+      display.clearDisplay();
+      display.setTextSize(2);
+      display.setCursor(0,0);
+      display.print("ERR 01");
+      display.setCursor(0,8*2);
+      display.print("Sensor")
+      display.display(); 
+    #endif
+    while (1)
+      {
+        // endless loop communicating fatal error 02
+        digitalWrite(LED_BUILTIN, HIGH);
+        delay(1000);
+        digitalWrite(LED_BUILTIN, LOW);
+        delay(1000);
+      }
+  }
+  #ifdef DEBUG
+    Serial.println("AHT10 or AHT20 sensor ready");
+  #endif
 
   #ifdef SCREEN
     display.begin(SSD1306_SWITCHCAPVCC, 0x3C); // Address 0x3C for 128x32
@@ -156,13 +179,6 @@ void setup()
     //display.setCursor(0,8*2);  // associated with text size
     display.println("first read");
     display.display();
-  #endif
-
-  #ifdef DEBUG
-    Serial.println("DHT22 sensor ready");
-    #ifdef CO2
-        Serial.println("SGP30 sensor ready");  
-    #endif
   #endif
 
   #ifdef SDLOG
@@ -373,44 +389,19 @@ void loop()
   if ((millis() - syncTime) < LOG_INTERVAL) return;
   syncTime = millis();
 
-  // note: reading temperature or humidity takes ~ 250ms
-  float humidity; 
-  if (isnan(dht.readHumidity()))
-  {
-    #ifdef DEBUG
-      Serial.println("Failed to read humidity from DHT sensor");
-    #endif
-    humidity = -1;
-  }
-  else
-  {
-    humidity = dht.readHumidity();
-  }
-
-  // Read temperature as Fahrenheit via true parameter
-  float temperature_fahr;
-  if (isnan(dht.readTemperature(true)))
-  {
-    #ifdef DEBUG
-      Serial.println("Failed to read temperature from DHT sensor");
-    #endif
-    temperature_fahr = -1;
-  }
-  else
-  {
-    temperature_fahr = dht.readTemperature(true);
-    // float t = dht.readTemperature(); // temperature in celsius
-  }
+  // populate temp and humidity objects with fresh data
+  sensors_event_t humidity, temp;
+  aht.getEvent(&humidity, &temp);
 
   #ifdef SCREEN
     display.clearDisplay();
     display.setCursor(0,0);
     display.setTextSize(2);
     display.print("Tmp:");
-    display.println(temperature_fahr);  // will get truncated to 2 decimal places
+    display.println((temp.temperature*1.8+32));  // will get truncated to 2 decimal places
     //display.setCursor(0,8*2);           // associated with text size
     display.print("Hum:");
-    display.println(humidity);
+    display.println(humidity.relative_humidity);
     display.display(); 
   #endif
 
@@ -419,7 +410,7 @@ void loop()
       Serial.print("temperature via MQTT publish to '");
       Serial.print(MQTT_PUB_TOPIC1);
     #endif
-    if (!tempPub.publish(temperature_fahr))
+    if (!tempPub.publish((temp.temperature*1.8+32)))
     {
       #ifdef DEBUG
         Serial.println("' failed");
@@ -444,7 +435,7 @@ void loop()
       Serial.print("humidity via MQTT publish to '");
       Serial.print(MQTT_PUB_TOPIC2);
     #endif
-    if (!humidityPub.publish(humidity))
+    if (!humidityPub.publish(humidity.relative_humidity))
     {
       #ifdef DEBUG
         Serial.println("' failed");
@@ -479,9 +470,9 @@ void loop()
     logString += ",";    
     logString += room;
     logString += ",";
-    logString += humidity;
+    logString += humidity.relative_humidity;
     logString += ",";
-    logString += temperature_fahr;
+    logString += temp.temperature*1.8+32;
   #endif
 
   #ifdef SDLOG
@@ -618,7 +609,7 @@ String zuluDateTimeString()
           display.clearDisplay();
           display.setTextSize(2);
           display.setCursor(0,0);
-          display.print("ERR 01");
+          display.print("ERR 10");
           display.setCursor(0,8*2);
           display.print("MQTT");
           display.display(); 

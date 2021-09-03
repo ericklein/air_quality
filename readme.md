@@ -1,23 +1,23 @@
  Air Quality
 
 ### Purpose
-Regularly sample and log temperature and humidity
+Regularly sample and log temperature, humidity
 
 ### Contributors
 
 ### Software Dependencies not in Arduino Library Manager 
 
 ### known, working BOM parts
-- 1x: Arduino Feather M0 Basic Proto: https://www.adafruit.com/product/2772
-- or
-- 1x: Feather Huzzah 8266 (WiFi): https://www.adafruit.com/product/2821
 - 1x: [optional] Particle Ethernet Featherwing: https://www.adafruit.com/product/4003
 - or
 - 1x: [optional] Silicognition PoE Featherwing: https://www.crowdsupply.com/silicognition/poe-featherwing
-- 1X: DHT22 temp/humidity sensor: https://www.adafruit.com/product/385
+- 1X: AHT20 temp/humidity sensor: https://www.adafruit.com/product/4566
+- or
+- 1X: AHT20 temp/humidity sensor: https://www.adafruit.com/product/5183
 - 1X: Featherwing OLED (128x32): https://www.adafruit.com/product/2900
 or 
 - 1X: Featherwing OLED (128x64): https://www.adafruit.com/product/4650
+
 
 ### Pinouts
 - Particle Ethernet Featherwing
@@ -27,28 +27,22 @@ or
 	- D3 RESET
 	- D4 INTERRUPT
 	- D10 CHIP SELECT
-- DHT sensor
-	- Connect pin 1 (on the left) of DHT22 to +5V or 3.3v depending on board
-	- Connect pin 2 of the sensor to whatever your DHTPIN is
-	- Connect pin 4 (on the right) of the sensor to GROUND
-	- Connect a 10K resistor from pin 2 (data) to pin 1 (power) of the sensor
-- Featherwing OLED
+- Featherwing OLED, AHT sensor
 	- SDA to SDA
 	- SCL to SCL
 
 ### Error codes
 - FATAL
 	- Always throws a DEBUG message and blinks built-in LED at (error code x 1 second) intervals
-	- ERR 01: Can not connect to MQTT broker. Device must be restarted unless SDLOG enabled.
+	- ERR 01: Can not connect to temp/humidity sensor
 	- ERR 02: Can not connect to Ethernet. Device must be restarted to proceed unless SDLOG enabled.
-	- ERR 03: FATAL - Can not connect to WiFi. Device must be restarted to proceed unless SDLOG enabled.
+	- ERR 03: Can not connect to WiFi. Device must be restarted to proceed unless SDLOG enabled.
 - CAUTION
-	- Always throws a DEBUG message
-	- ERR 05: Can not connect to SGP30 CO2 sensor at startup. No CO2 readings will be logged.
+	- ERR 10: Can not connect to MQTT broker
 
 ### to change hardware build target
-- change DHT pin
-- change #defines
+- change #defines in air_quality.ino
+- change appropriates values in secrets.h
 
 ### Information Sources
 - SD card
@@ -56,9 +50,7 @@ or
 - NTP
 	- https://github.com/PaulStoffregen/Time/tree/master/examples/TimeNTP
 - Sensors 
-	- https://learn.adafruit.com/adafruit-sgp30-gas-tvoc-eco2-mox-sensor/arduino-code
-	- https://learn.adafruit.com/adafruit-bme680-humidity-temperature-barometic-pressure-voc-gas/overview
-	- https://www.jaredwolff.com/finding-the-best-tvoc-sensor-ccs811-vs-bme680-vs-sgp30/
+	- https://learn.adafruit.com/adafruit-aht20
 - Ethernet
 	- https://docs.particle.io/datasheets/accessories/gen3-accessories/
 	- https://www.adafruit.com/product/4003#:~:text=Description%2D-,Description,along%20with%20a%20Feather%20accessory
@@ -72,8 +64,7 @@ or
 	- https://github.com/adafruit/Adafruit_SSD1306/issues/106 (turning OLED on and off)
 - MQTT services
 	- https://hackaday.com/2017/10/31/review-iot-data-logging-services-with-mqtt/
-- Time of Flight sensor
-	- https://learn.adafruit.com/adafruit-vl53l0x-micro-lidar-distance-sensor-breakout/arduino-code
+
 
 ### Learnings
 - 090620: Just push your own MAC address if the device doesn't physically display its address, but avoid duplicates across projects when using common code to set it.
@@ -195,3 +186,5 @@ or
 	- [Q]090820: We are generating humidity, heat index, and absolute humidity? -> dropping heat index support, absolute humidity required to calibrate eCO2 reading
 -090121
 	- moving CO2 measurement to private branch, as it doesn't work
+-090321
+	- switching to ADT20 (temp/humidity) for i2c connectivity and future proofing
