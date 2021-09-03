@@ -1,54 +1,35 @@
 /*
   Project Name:   air_quality
   Developer:      Eric Klein Jr. (temp2@ericklein.com)
-  Description:    Measures and logs temp, humidity, and CO2 levels
+  Description:    Regularly sample and log temperature, humidity
 
   See README.md for target information, revision history, feature requests, etc.
 */
 
 // Conditional compile flags
-//#define CO2           // Output CO2 data
 //#define DEBUG         // Output to the serial port
 //#define SDLOG         // output sensor data to SD Card
 //#define SCREEN        // output sensor data to screen
 #define MQTTLOG        // Output to MQTT broker defined in secrets.h
 #define RJ45            // use Ethernet
 //#define WIFI          // use WiFi (credentials in secrets.h)
-//#define TARGET_LAB      // publish results for the lab
-//#define TARGET_MASTER_BEDROOM  // publish results for the master bedroom
-#define TARGET_ANNE_OFFICE
 //#if defined(SDLOG) || defined(DEBUG)
 #define NTP         // query network time server for logging
 //#endif
-//#define PROXIMITY // proximity sensor used to trigger screen display
 
 // Gloval variables
-uint32_t syncTime = 0;        // milliseconds since last LOG event(s)
+unsigned long syncTime = 0;        // holds millis() [milliseconds] for timing functions 
 
-// DHT (digital humidity and temperature) sensor
-#include "DHT.h"
-//#define DHTPIN  2      // Digital pin connected to DHT sensor (Huzzah for master_bedroom)
-#define DHTPIN  11      // Digital pin connected to DHT sensor (M0 for lab)
-#define DHTTYPE DHT22   // DHT 22  (AM2302), AM2321
-DHT dht(DHTPIN, DHTTYPE);
-
-#ifdef CO2
-  // SGP30 (eCO2) sensor
-  #include <Wire.h>
-  #include "Adafruit_SGP30.h"
-  Adafruit_SGP30 sgp;
-#endif
-
-#ifdef PROXIMITY
-  #include <Adafruit_VS1053.h>
-  Adafruit_VL53L0X proximitySensor = Adafruit_VL53L0X();
-  const byte triggerDistance = 20;  // Distance in cm to toggle LCD backlight
-#endif
+// AHT20 (temperature and humidity)
+#include <Adafruit_AHTX0.h>
+Adafruit_AHTX0 aht;
 
 #ifdef DEBUG
-  #define LOG_INTERVAL 60000   // millisecond delay between sensor reads
+  // millisecond delay between sensor reads
+  #define LOG_INTERVAL 60000  // standard test interval
+  //#define LOG_INTERVAL 600000   // long term test interval
 #else
-  #define LOG_INTERVAL 300000   // millisecond delay between sensor reads
+  #define LOG_INTERVAL 600000
 #endif
 
 #ifdef SDLOG
@@ -101,7 +82,7 @@ DHT dht(DHTPIN, DHTTYPE);
   Adafruit_MQTT_Client mqtt(&client, MQTT_BROKER, MQTT_PORT, MQTT_CLIENT_ID, MQTT_USER, MQTT_PASS);
   Adafruit_MQTT_Publish tempPub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC1);
   Adafruit_MQTT_Publish humidityPub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC2);
-  Adafruit_MQTT_Publish co2Pub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC3);
+  Adafruit_MQTT_Publish roomPub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC4);
 #endif
 
 #ifdef NTP
@@ -114,9 +95,10 @@ DHT dht(DHTPIN, DHTTYPE);
   IPAddress timeServer(132,163,97,6); // time.nist.gov
 
   // Time Zone support
+  const int timeZone = 0;     //UTC
   //const int timeZone = -5;  // Eastern Standard Time (USA)
   //const int timeZone = -4;  // Eastern Daylight Time (USA)
-  const int timeZone = -8;  // Pacific Standard Time (USA)
+  //const int timeZone = -8;  // Pacific Standard Time (USA)
   //const int timeZone = -7;    // Pacific Daylight Time (USA)
   const int NTP_PACKET_SIZE = 48; // NTP time is in the first 48 bytes of message
   byte packetBuffer[NTP_PACKET_SIZE]; //buffer to hold incoming & outgoing packets
@@ -151,7 +133,33 @@ void setup()
   #endif
   debugMessage("Indoor Air Quality Started");
 
-  dht.begin();
+  // sensor check
+  if (! aht.begin())
+  {
+    #ifdef DEBUG
+      Serial.println("FATAL ERROR: AHT sensor not detected");
+    #endif
+    #ifdef SCREEN
+      display.clearDisplay();
+      display.setTextSize(2);
+      display.setCursor(0,0);
+      display.print("ERR 01");
+      display.setCursor(0,8*2);
+      display.print("Sensor")
+      display.display(); 
+    #endif
+    while (1)
+      {
+        // endless loop communicating fatal error 02
+        digitalWrite(LED_BUILTIN, HIGH);
+        delay(1000);
+        digitalWrite(LED_BUILTIN, LOW);
+        delay(1000);
+      }
+  }
+  #ifdef DEBUG
+    Serial.println("AHT10 or AHT20 sensor ready");
+  #endif
 
   #ifdef SCREEN
     display.begin(SSD1306_SWITCHCAPVCC, 0x3C); // Address 0x3C for 128x32
@@ -167,33 +175,6 @@ void setup()
 
     screenMessage(true,0,,"Waiting for");
     screenMessage(false,1,,"first read")
-  #endif
-
-  #ifdef CO2
-    if (!sgp.begin())
-    {
-      debugMessage("SGP30 sensor not found, no CO2 readings will be sent");
-      screenMessage(true,0,,"SPG30");
-      screenMessage(false,1,,"failure");
-      stopApp;
-    }
-    // If you have a baseline measurement from before you can assign it to start, to 'self-calibrate'
-    //sgp.setIAQBaseline(0x8E68, 0x8F41);  // Will vary for each sensor!
-    debugMessage("SGP30 sensor initialized");
-  #endif
-
-  // how do I know this is true?
-  debugMessage("DHT22 sensor initialized");
-
-  #ifdef PROXIMITY
-    if (!proximitySensor.begin())
-    {
-      debugMessage("Failed to initialize proximity sensor");
-      screenMessage(true,0,,"VL53L0X");
-      screenMessage(false,1,,"failure");
-      stopApp;
-    }
-    debugMessage("Proximity sensor initialized");
   #endif
 
   #ifdef SDLOG
@@ -234,7 +215,7 @@ void setup()
     #endif
 
     // Log output headers
-      logfile.println("time,humidity,temp,heat_index,eCO2");    
+      logfile.println("time,room,humidity,temp");    
   #endif
 
   #ifdef WIFI
@@ -315,16 +296,20 @@ void setup()
 
     #ifdef DEBUG
       Serial.print("The NTP time is ");
-      Serial.println(timeString());
+      Serial.println(zuluDateTimeString());
     #endif
+  #endif
+
+  #ifdef DEBUG
+    Serial.println("setup() complete");
   #endif
 }
 
 void loop() 
 {
   #ifdef DEBUG
-    // quasi clock between reads
-    if (((millis() - syncTime) % 10000) == 0)
+    // display heartbeat every 20 seconds between sensor reads; depending on client might display >1 message per interval
+    if (((millis() - syncTime) % 20000) == 0)
     {
       Serial.print(((millis()-syncTime)/1000));
       Serial.print(" seconds elapsed before next read at ");
@@ -340,85 +325,22 @@ void loop()
   #endif
 
   // update display and determine if it is time to read/process sensors
-  if ((millis() - syncTime) < LOG_INTERVAL) 
-  {
-    #ifdef SCREEN
-      #ifdef PROXIMITY
-        screenDisplay(readDistance);
-      #endif
-    #endif
-    return;
-  }
+  if ((millis() - syncTime) < LOG_INTERVAL) return;
   syncTime = millis();
 
-  // note: reading temperature or humidity takes ~ 250ms
-  float humidity; 
-  if (isnan(dht.readHumidity()))
-  {
-    #ifdef DEBUG
-      Serial.println("Failed to read humidity from DHT sensor");
-    #endif
-    humidity = -1;
-  }
-  else
-  {
-    humidity = dht.readHumidity();
-  }
-
-  // Read temperature as Fahrenheit via true parameter
-  float temperature_fahr;
-  if (isnan(dht.readTemperature(true)))
-  {
-    #ifdef DEBUG
-      Serial.println("Failed to read temperature from DHT sensor");
-    #endif
-    temperature_fahr = -1;
-  }
-  else
-  {
-    temperature_fahr = dht.readTemperature(true);
-  }
-
-  // Read temperature as Celsius (the default)
-  //float t = dht.readTemperature();
-
-  // Compute heat index in Fahrenheit (the default)
-  //float heat_index_fahr = dht.computeHeatIndex(temperature_fahr, humidity);
-
-  // Compute heat index in Celsius (isFahreheit = false)
-  //float hic = dht.computeHeatIndex(t, h, false);
-
-  #ifdef CO2
-    // set the absolute humidity to enable the humditiy compensation for the SGP30 air quality signals
-    sgp.setHumidity(getAbsoluteHumidity(temperature_fahr, humidity));
-
-    //float tvocReading;
-    float ecO2Reading;
- 
-    if (! sgp.IAQmeasure()) 
-    {
-      #ifdef DEBUG
-        Serial.println("SGP30 Measurement failed");
-      #endif
-      //tvocReading = -1;
-      ecO2Reading = -1;  
-    }
-    else
-    {
-      // tvocReading = sgp.TVOC;
-      ecO2Reading = sgp.eCO2; 
-    } 
-  #endif
+  // populate temp and humidity objects with fresh data
+  sensors_event_t humidity, temp;
+  aht.getEvent(&humidity, &temp);
 
   #ifdef SCREEN
     display.clearDisplay();
     display.setCursor(0,0);
     display.setTextSize(2);
     display.print("Tmp:");
-    display.println(temperature_fahr);  // will get truncated to 2 decimal places
+    display.println((temp.temperature*1.8+32));  // will get truncated to 2 decimal places
     //display.setCursor(0,8*2);           // associated with text size
     display.print("Hum:");
-    display.println(humidity);
+    display.println(humidity.relative_humidity);
     display.display(); 
   #endif
 
@@ -427,7 +349,7 @@ void loop()
       Serial.print("temperature via MQTT publish to '");
       Serial.print(MQTT_PUB_TOPIC1);
     #endif
-    if (!tempPub.publish(temperature_fahr))
+    if (!tempPub.publish((temp.temperature*1.8+32)))
     {
       #ifdef DEBUG
         Serial.println("' failed");
@@ -452,7 +374,7 @@ void loop()
       Serial.print("humidity via MQTT publish to '");
       Serial.print(MQTT_PUB_TOPIC2);
     #endif
-    if (!humidityPub.publish(humidity))
+    if (!humidityPub.publish(humidity.relative_humidity))
     {
       #ifdef DEBUG
         Serial.println("' failed");
@@ -464,41 +386,35 @@ void loop()
         Serial.println("' successful");
       #endif
     }
-    #ifdef CO2
-      #ifdef DEBUG
-        Serial.print("CO2 via MQTT publish to '");
-        Serial.print(MQTT_PUB_TOPIC3);
-      #endif
-      if (!co2Pub.publish(ecO2Reading))
-      {
-        #ifdef DEBUG
-          Serial.println("' failed");
-        #endif
-      }
-      else 
-      {
-        #ifdef DEBUG
-          Serial.println("' successful");
-        #endif
-      }
+    #ifdef DEBUG
+      Serial.print("room name via MQTT publish to '");
+      Serial.print(MQTT_PUB_TOPIC4);
     #endif
+    if (!roomPub.publish(room))
+    {
+      #ifdef DEBUG
+        Serial.println("' failed");
+      #endif
+    }
+    else 
+    {
+      #ifdef DEBUG
+        Serial.println("' successful");
+      #endif
+    }
   #endif
 
   #if defined(SDLOG) || defined(DEBUG)
-    String logString = ",";
-    logString += humidity;
+    String logString = zuluDateTimeString();
+    logString += ",";    
+    logString += room;
     logString += ",";
-    logString += temperature_fahr;
+    logString += humidity.relative_humidity;
     logString += ",";
-    //logString += heat_index_fahr;
-    //logString += ",";
-    #ifdef CO2
-      logString += ecO2Reading;
-    #endif
+    logString += temp.temperature*1.8+32;
   #endif
 
   #ifdef SDLOG
-    logfile.print(timeString());
     logfile.println(logString);
     logfile.flush();
     #ifdef DEBUG
@@ -507,8 +423,6 @@ void loop()
   #endif
 
   #ifdef DEBUG
-    Serial.println("time,humidity,temp,eC02");
-    Serial.print(timeString());
     Serial.println(logString);
   #endif
 }
@@ -565,17 +479,19 @@ void loop()
   }
 #endif
 
-String timeString()
+String zuluDateTimeString()
 {
   String logString;
   #ifdef NTP
     logString = year();
-    logString += "/";
+    logString += "-";
+    if (month()<10) logString += "0";
     logString += month();
-    logString += "/";
+    logString += "-";
     if (day()<10) logString += "0";
     logString += day();
-    logString += " ";
+    logString += "T";
+    if (hour()<10) logString += "0";
     logString += hour();
     logString += ":";
     if (minute()<10) logString += "0";
@@ -583,65 +499,12 @@ String timeString()
     logString += ":";
     if (second()<10) logString += "0";
     logString += second();
+    logString += "Z";
   #else
     logString ="Time not set";
   #endif
   return logString;
 }
-
-uint32_t getAbsoluteHumidity(float temperature, float humidity) 
-{
-  // approximation formula from Sensirion SGP30 Driver Integration chapter 3.15
-  const float absoluteHumidity = 216.7f * ((humidity / 100.0f) * 6.112f * exp((17.62f * temperature) / (243.12f + temperature)) / (273.15f + temperature)); // [g/m^3]
-  const uint32_t absoluteHumidityScaled = static_cast<uint32_t>(1000.0f * absoluteHumidity); // [mg/m^3]
-  return absoluteHumidityScaled;
-}
-
-#ifdef PROXIMITY
-  void screenDisplay(int distance)
-  {
-    if (distance < triggerDistance)
-    {
-      // display message
-      // set new message flag false
-      // or
-      display.ssd1306_command(SSD1306_DISPLAYON);
-    }
-    else
-    {
-      display.ssd1306_command(SSD1306_DISPLAYOFF);
-      // or
-      //clear display
-    }
-  }
-#endif
-
-#ifdef PROXIMITY
-int readDistance()
-  {
-    // Returns distance from sensor in centimeters
-    int  distance;
-    VL53L0X_RangingMeasurementData_t measure;
-    proximitySensor.rangingTest(&measure, false); // pass in 'true' to get debug data printout!
-    if (measure.RangeStatus != 4)
-      {  
-        distance = measure.RangeMilliMeter/10; // converting mm to cm
-      }
-    else
-      {
-        // phase failures have incorrect data
-        #ifdef DEBUG
-          Serial.print(measure.RangeMilliMeter);
-          Serial.println("; distance measurement out of range");
-        #endif
-      }
-    // not in #DEBUG due to potential verbosity
-    // Serial.print("proximity distance ");
-    // Serial.print(distance);
-    // Serial.print(" cm");
-    return (distance);
-  }
-#endif
 
 #ifdef MQTTLOG
   // Connects and reconnects to MQTT broker, call from loop() to maintain connection
@@ -657,18 +520,18 @@ int readDistance()
       return;
     }
     #ifdef DEBUG
-      Serial.print("connecting to broker: ");
+      Serial.print("connecting to MQTT broker: ");
       Serial.println(MQTT_BROKER);
     #endif
 
-    while (mqtt.connect() != 0)
+    while ((mqtt.connect() != 0)&&(tries<=MAXTRIES))
     {
       // Error handler - can not connect to MQTT broker
       #ifdef DEBUG
         Serial.println(mqtt.connectErrorString(mqttErr));
         Serial.print("MQTT broker connect attempt ");
         Serial.print(tries);
-        Serial.print("of");
+        Serial.print(" of ");
         Serial.print(MAXTRIES);
         Serial.print(" in ");
         Serial.print(tries*10);
@@ -678,38 +541,26 @@ int readDistance()
       delay(tries*10000);
       tries++;
 
-      // FATAL ERROR 01 - Can not connect to MQTT broker
       if (tries == MAXTRIES) 
       {
-        #ifdef DEBUG
-          Serial.print("FATAL error; can not connect to MQTT broker after");
-          Serial.print(MAXTRIES);
-          Serial.println(" attempts");
-        #endif
+        digitalWrite(LED_BUILTIN, HIGH);
         #ifdef SCREEN
           display.clearDisplay();
           display.setTextSize(2);
           display.setCursor(0,0);
-          display.print("ERR 01");
+          display.print("ERR 10");
           display.setCursor(0,8*2);
           display.print("MQTT");
           display.display(); 
         #endif
-        #ifndef SDLOG
-          while (1)
-          {
-            // endless loop communicating fatal error 01
-            digitalWrite(LED_BUILTIN, HIGH);
-            delay(1000);
-            digitalWrite(LED_BUILTIN, LOW);
-            delay(1000);
-          }
-        #endif
       }
     }
-    #ifdef DEBUG
-      Serial.println("connected to MQTT broker");
-    #endif
+    if (tries<=MAXTRIES)
+    {
+      #ifdef DEBUG
+        Serial.println("connected to MQTT broker");
+      #endif
+    }
   }
 #endif
 
