@@ -1,6 +1,5 @@
 /*
   Project Name:   air_quality
-  Developer:      Eric Klein Jr. (temp2@ericklein.com)
   Description:    Regularly sample and log temperature, humidity
 
   See README.md for target information, revision history, feature requests, etc.
@@ -105,17 +104,20 @@ Adafruit_AHTX0 aht;
 #endif
 
 #ifdef SCREEN
-  #include <SPI.h> 
-  #include <Wire.h>
-  //#include <Adafruit_GFX.h>
-  #include <Adafruit_SSD1306.h>
+  // Do I need these anymore?
+  //#include <SPI.h> 
+  //#include <Wire.h>
+
+  #include <Adafruit_GFX.h>
+
+  #include <Adafruit_ST7789.h>
+  Adafruit_ST7789 display = Adafruit_ST7789(TFT_CS, TFT_DC, TFT_RESET);
+
   //#include <Adafruit_SH110X.h>
-  Adafruit_SSD1306 display = Adafruit_SSD1306(128, 32, &Wire);
   //Adafruit_SH110X display = Adafruit_SH110X(64, 128, &Wire);
-  //#include <Adafruit_LiquidCrystal.h>
-  //#define lcdRows   2
-  //#define lcdColumns 16
-  //Adafruit_LiquidCrystal display(0); //i2c connection, default address #0 (A0-A2 not jumpered)
+
+  //#include <Adafruit_SSD1306.h>
+  //Adafruit_SSD1306 display = Adafruit_SSD1306(128, 32, &Wire);
 #endif
 
 void setup() 
@@ -130,60 +132,45 @@ void setup()
     {
       // wait for serial port
     }
+    Serial.println("Indoor Air Quality started");
   #endif
-  debugMessage("Indoor Air Quality Started");
 
   // sensor check
   if (! aht.begin())
   {
-    #ifdef DEBUG
-      Serial.println("FATAL ERROR: AHT sensor not detected");
-    #endif
-    #ifdef SCREEN
-      display.clearDisplay();
-      display.setTextSize(2);
-      display.setCursor(0,0);
-      display.print("ERR 01");
-      display.setCursor(0,8*2);
-      display.print("Sensor")
-      display.display(); 
-    #endif
-    while (1)
-      {
-        // endless loop communicating fatal error 02
-        digitalWrite(LED_BUILTIN, HIGH);
-        delay(1000);
-        digitalWrite(LED_BUILTIN, LOW);
-        delay(1000);
-      }
+    debugMessage("FATAL ERROR: AHT sensor not detected");
+    screenMessage("ERROR 1: Sensor");
+    stopApp();
   }
-  #ifdef DEBUG
-    Serial.println("AHT10 or AHT20 sensor ready");
-  #endif
+  debugMessage("AHT10 or AHT20 sensor ready");
 
   #ifdef SCREEN
-    display.begin(SSD1306_SWITCHCAPVCC, 0x3C); // Address 0x3C for 128x32
-    //display.begin(0x3C, true); // Address 0x3C default
-    //display.begin(lcdColumns, lcdRows);
+    // Initialize ST7789 screen
+    display.init(240, 240);
+    pinMode(TFT_BACKLIGHT, OUTPUT);
+    digitalWrite(TFT_BACKLIGHT, HIGH); // Backlight on
+    display.fillScreen(BG_COLOR);
+    display.setTextSize(2);
+    display.setTextColor(ST77XX_YELLOW);
 
-    // Set display parameters 
-    //display.clearDisplay();
-    display.setTextSize(1);
-    display.setTextColor(SSD1306_WHITE);
-    //display.setTextColor(SH110X_WHITE);
-    //display.setRotation(1); // SH110X only?
+    // // Initialize SH110X screen
+    // display.setTextSize(1);
+    // display.setTextColor(SH110X_WHITE);
+    // display.setRotation(1); // SH110X only?
 
-    screenMessage(true,0,,"Waiting for");
-    screenMessage(false,1,,"first read")
+    // // Initialize SSD1306 screen
+    // display.setTextSize(1);
+    // display.setTextColor(SSD1306_WHITE);
+
+    display.println("Waiting for first sensor data");
   #endif
 
   #ifdef SDLOG
     // initialize SD card
     if (!SD.begin(SDPIN)) 
     {
-      debugMessage("Card failed, or not present");
-      screenMessage(true,0,,"SD card");
-      screenMessage(false,1,,"failure");
+      debugMessage("SD card failed or not present");
+      screenMessage("SD card failed or not present");
       stopApp;
     }
   
@@ -204,18 +191,14 @@ void setup()
     if (! logfile) 
     {
       debugMessage("Couldn't create log file on SD card");
-      screenMessage(true,0,,"log file");
-      screenMessage(false,1,,"failure");
+      screenMessage("Couldn't create log file on SD card");
       stopApp;
     }
   
-    #ifdef DEBUG
-      String message = "Logging to: " + filename;
-      debugMessage(message);
-    #endif
+    debugMessage("Logging to: " + filename);
 
     // Log output headers
-      logfile.println("time,room,humidity,temp");    
+    logfile.println("time,room,humidity,temp");    
   #endif
 
   #ifdef WIFI
@@ -223,8 +206,7 @@ void setup()
     #define MAXTRIES 11
 
     // Connect to WiFi access point
-    String message = "Connecting to WiFI AP: " + WIFI_SSID;
-    debugMessage(message);
+    debugMessage("Connecting to WiFI AP: " + WIFI_SSID);
   
     // set hostname has to come before WiFi.begin
     WiFi.hostname(MQTT_CLIENT_ID);
@@ -234,8 +216,7 @@ void setup()
     while (WiFi.status() != WL_CONNECTED) 
     {
       // Error handler - WiFi does not initially connect
-      message = "WiFi AP connect attempt " + tries + "of " + MAXTRIES + " in " + (tries*10) +" seconds";
-      debugMessage(message);
+      debugMessage("WiFi AP connect attempt " + tries + "of " + MAXTRIES + " in " + (tries*10) + " seconds");
       // use of delay OK as this is initialization code
       delay(tries*10000);
       tries++;
@@ -243,17 +224,14 @@ void setup()
       // FATAL ERROR 03 - WiFi doesn't connect
       if (tries == MAXTRIES)
       {
-        message = "Can not connect to WiFi after " + MAXTRIES + " attempts";
-        debugMessage(message);
-        screenMessage(true,0,,"WiFi AP");
-        screenMessage(false,1,,"failure");
+        debugMessage("Can not connect to WiFi after " + MAXTRIES + " attempts");
+        screenMessage("Can not connect to WiFi after " + MAXTRIES + " attempts");
         #ifndef SDLOG
           stopApp;
         #endif
       }
     }
-    message = "WiFi IP address is: " + (WiFi.localIP());
-    debugMessage(message);
+    debugMessage("WiFi IP address is: " + ip2CharArray(WiFi.localIP()));
   #endif
 
   #ifdef RJ45
@@ -274,16 +252,21 @@ void setup()
       else if (Ethernet.linkStatus() == LinkOFF) 
         debugMessage("Ethernet cable is not connected");
       else
+      {
         // generic error
         debugMessage("Failed to configure Ethernet using DHCP");
-      screenMessage(true,0,,"Ethernet");
-      screenMessage(false,1,,"failure");
-      #ifndef SDLOG
+        screenMessage("Failed to configure Ethernet using DHCP");
         stopApp;
-      #endif
+      }
     }
-    String message = "Ethernet IP address is: " + (Ethernet.localIP);
-    debugMessage(message);
+    // #ifdef DEBUG
+    //   Serial.print("Ethernet address is:");
+    //   Serial.println(Ethernet.localIP);
+    // #endif 
+    //String ipText = DisplayAddress(Ethernet.localIP);
+    //debugMessage(String("Ethernet IP address is: ") + ipText);
+    debugMessage(String("Ethernet IP address is: ") + ip2CharArray(Ethernet.localIP()));
+
   #endif
     
   #ifdef NTP
@@ -293,15 +276,7 @@ void setup()
 
     // wait until the time is set by the sync provider
     while(timeStatus()== timeNotSet);
-
-    #ifdef DEBUG
-      Serial.print("The NTP time is ");
-      Serial.println(zuluDateTimeString());
-    #endif
-  #endif
-
-  #ifdef DEBUG
-    Serial.println("setup() complete");
+    debugMessage("NTP time is " + zuluDateTimeString());
   #endif
 }
 
@@ -311,10 +286,8 @@ void loop()
     // display heartbeat every 20 seconds between sensor reads; depending on client might display >1 message per interval
     if (((millis() - syncTime) % 20000) == 0)
     {
-      Serial.print(((millis()-syncTime)/1000));
-      Serial.print(" seconds elapsed before next read at ");
-      Serial.print(LOG_INTERVAL/1000);
-      Serial.println(" seconds");
+      String message = String(((millis()-syncTime)/1000)) + " seconds elapsed before next read at " + (LOG_INTERVAL/1000) + " seconds";
+      Serial.println(message);
     }
   #endif
 
@@ -333,107 +306,60 @@ void loop()
   aht.getEvent(&humidity, &temp);
 
   #ifdef SCREEN
-    display.clearDisplay();
     display.setCursor(0,0);
-    display.setTextSize(2);
-    display.print("Tmp:");
+    display.setTextColor(YELLOW);
+    display.print("Temperature: ");
+    display.setTextColor(RED);
     display.println((temp.temperature*1.8+32));  // will get truncated to 2 decimal places
-    //display.setCursor(0,8*2);           // associated with text size
-    display.print("Hum:");
+    display.setTextColor(YELLOW);
+    display.print("Humudity: ");
+    display.setTextColor(RED);
     display.println(humidity.relative_humidity);
-    display.display(); 
   #endif
 
   #ifdef MQTTLOG
-    #ifdef DEBUG
-      Serial.print("temperature via MQTT publish to '");
-      Serial.print(MQTT_PUB_TOPIC1);
-    #endif
     if (!tempPub.publish((temp.temperature*1.8+32)))
     {
-      #ifdef DEBUG
-        Serial.println("' failed");
-      #endif
-      #ifdef SCREEN
-          display.clearDisplay();
-          display.setTextSize(2);
-          display.setCursor(0,0);
-          display.print("ERR 101");
-          display.setCursor(0,8*2);
-          display.print("MQTT");
-          display.display(); 
-      #endif
+      debugMessage(String(MQTT_PUB_TOPIC1) + " MQTT publish failed");
     }
     else 
     {
-      #ifdef DEBUG
-        Serial.println("' successful");
-      #endif
+      debugMessage(String(MQTT_PUB_TOPIC1) + " MQTT publish succeeded");
     }
-    #ifdef DEBUG
-      Serial.print("humidity via MQTT publish to '");
-      Serial.print(MQTT_PUB_TOPIC2);
-    #endif
     if (!humidityPub.publish(humidity.relative_humidity))
-    {
-      #ifdef DEBUG
-        Serial.println("' failed");
-      #endif
+        {
+      debugMessage(String(MQTT_PUB_TOPIC2) + " MQTT publish failed");
     }
     else 
     {
-      #ifdef DEBUG
-        Serial.println("' successful");
-      #endif
+      debugMessage(String(MQTT_PUB_TOPIC2) + " MQTT publish succeeded");
     }
-    #ifdef DEBUG
-      Serial.print("room name via MQTT publish to '");
-      Serial.print(MQTT_PUB_TOPIC4);
-    #endif
     if (!roomPub.publish(room))
     {
-      #ifdef DEBUG
-        Serial.println("' failed");
-      #endif
+      debugMessage(String(MQTT_PUB_TOPIC4) + " MQTT publish failed");
     }
     else 
     {
-      #ifdef DEBUG
-        Serial.println("' successful");
-      #endif
+      debugMessage(String(MQTT_PUB_TOPIC4) + " MQTT publish succeeded");
     }
   #endif
 
-  #if defined(SDLOG) || defined(DEBUG)
-    String logString = zuluDateTimeString();
-    logString += ",";    
-    logString += room;
-    logString += ",";
-    logString += humidity.relative_humidity;
-    logString += ",";
-    logString += temp.temperature*1.8+32;
-  #endif
+  String logString = zuluDateTimeString() + "," + room + "," + humidity.relative_humidity; + "," + String(temp.temperature*1.8+32);
 
   #ifdef SDLOG
     logfile.println(logString);
     logfile.flush();
-    #ifdef DEBUG
-      Serial.println("Log data written to SD card");
-    #endif
+    debugMessage("Log data written to SD card");
   #endif
 
-  #ifdef DEBUG
-    Serial.println(logString);
-  #endif
+  debugMessage(logString);
 }
 
 #ifdef NTP
   time_t getNtpTime()
   {
     while (Udp.parsePacket() > 0) ; // discard any previously received packets
-    #ifdef DEBUG
-      Serial.println("Transmitting NTP Request");
-    #endif
+    debugMessage("Transmitting NTP Request");
     sendNTPpacket(timeServer);
     uint32_t beginWait = millis();
     while (millis() - beginWait < 1500)
@@ -451,9 +377,7 @@ void loop()
         return secsSince1900 - 2208988800UL + timeZone * SECS_PER_HOUR;
       }
     }
-    #ifdef DEBUG
-      Serial.println("No NTP response");
-    #endif
+    debugMessage("No NTP response");
     return 0; // return 0 if unable to get the time
   }
 
@@ -519,47 +443,24 @@ String zuluDateTimeString()
     {
       return;
     }
-    #ifdef DEBUG
-      Serial.print("connecting to MQTT broker: ");
-      Serial.println(MQTT_BROKER);
-    #endif
-
     while ((mqtt.connect() != 0)&&(tries<=MAXTRIES))
     {
       // Error handler - can not connect to MQTT broker
-      #ifdef DEBUG
-        Serial.println(mqtt.connectErrorString(mqttErr));
-        Serial.print("MQTT broker connect attempt ");
-        Serial.print(tries);
-        Serial.print(" of ");
-        Serial.print(MAXTRIES);
-        Serial.print(" in ");
-        Serial.print(tries*10);
-        Serial.println(" seconds");
-      #endif
+      debugMessage(mqtt.connectErrorString(mqttErr));
+      debugMessage(String("MQTT broker connect attempt ") + tries + " of " + MAXTRIES + " in " + (tries*10) + " seconds");
       mqtt.disconnect();
       delay(tries*10000);
       tries++;
 
       if (tries == MAXTRIES) 
       {
-        digitalWrite(LED_BUILTIN, HIGH);
-        #ifdef SCREEN
-          display.clearDisplay();
-          display.setTextSize(2);
-          display.setCursor(0,0);
-          display.print("ERR 10");
-          display.setCursor(0,8*2);
-          display.print("MQTT");
-          display.display(); 
-        #endif
+        debugMessage(String("Connection failed to MQTT broker ") + MQTT_BROKER);
+        screenMessage("ERROR 10: MQTT Broker connection failed");
       }
     }
     if (tries<=MAXTRIES)
     {
-      #ifdef DEBUG
-        Serial.println("connected to MQTT broker");
-      #endif
+      debugMessage(String("Connected to MQTT broker ") + MQTT_BROKER);
     }
   }
 #endif
@@ -571,26 +472,11 @@ void debugMessage(String messageText)
   #endif
 }
 
-// void screenMessage(int row, int column, int textSize, String messageText)
-void screenMessage(bool clear, int row, int textSize, String messageText)
-// first row is zero
-// textSize is for pixel displays only
+void screenMessage(String messageText)
 {
   #ifdef SCREEN
-    // clear the screen if needed
-    if (clear)
-      // Clear the display
-      display.clearDisplay();
-      //display.clear(); // ???
-    // set the row to display text in
-    display.setCursor(1, row);
-    // set the textSize if needed
-    if (textSize)
-      display.setTextSize(textSize);
-    // add text to display
-    display.print(messageText);
-    // actually display the message
-    display.display();
+    display.fillScreen(BLACK);
+    display.println(messageText);
   #endif
 }
 
@@ -604,4 +490,11 @@ void stopApp()
     digitalWrite(LED_BUILTIN, LOW);
     delay(1000);
   }
+}
+
+String ip2CharArray(IPAddress ip) 
+{
+  static char a[16];
+  sprintf(a, "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
+  return a;
 }

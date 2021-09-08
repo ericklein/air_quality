@@ -34,7 +34,7 @@ or
 
 ### Error codes
 - FATAL (errorLevel 1)
-	- Always throws a DEBUG message and blinks built-in LED at (error code x 1 second) intervals
+	- Always throws a DEBUG message and blinks built-in LED at 1 second intervals
 	- ERR 01: Can not connect to temp/humidity sensor
 	- ERR 02: Can not connect to Ethernet. Device must be restarted to proceed unless SDLOG enabled.
 	- ERR 03: Can not connect to WiFi. Device must be restarted to proceed unless SDLOG enabled.
@@ -94,7 +94,7 @@ or
 - [FR][P1]112020: screen; Heartbeat indicator on-screen
 - [FR][P2]112920: screen; Rotating time display
 - [FR][P2]112920: time; Get time from MQTT broker
-- [FR][P3]120220: log; Added error checking on string length to displayScreenMessage
+- [FR][P3]120220: screen; Added error checking on string length to screenMessage()
 - [FR][P2]012421: log; Async blinking of built-in LED for non-FATAL errors (e.g. MQTT publish)
 - [FR][P3]120620: log; Error messages to MQTT broker
 	- add error field to adafruitIO->airquality
@@ -107,6 +107,7 @@ or
 - [Q]100120: mqtt; Can I just subscribe to the higher level topic in connectToBroker() to get all the subs
 - [Q]120220: screen; Why do I need wire and spi for OLED displays?
 - [Q]082921: time; when do I need to timestamp data bound for MQTT; adafruit.io time stamps for me, does a local server?
+- [Q]090721: I've failed at compressing zuluDateTimeString() twice, what is the issue relative to string buildout?
 
 ### Revisions
 - 083120: First version based on merged sample code for sensors, SD. Ethernet code NOT working.
@@ -189,3 +190,11 @@ or
 	- moving CO2 measurement to private branch, as it doesn't work
 -090321
 	- switching to ADT20 (temp/humidity) for i2c connectivity and future proofing
+-090721
+	- #define SCREEN work (untested)
+		- integrate Adafruit Funhouse screen support
+		- added screenMessage wrapper for Adafruit GFX xxx.print related to #define SCREEN
+		- removed LCD code from #define SCREEN, not expecting to use again
+		- general cleanup
+	- implemented debugMessage wrapper for previous #define DEBUG serial messages
+	- general bug fixes
