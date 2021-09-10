@@ -77,8 +77,6 @@ or
 - [I][P3]112820: time; NTP is dependent to WiFi or Ethernet due to IPAddress
 - [I][P2]102420: mqtt; Move local MQTT server to DNS named entry instead of IP address so DNS can resolve it if IP address changes
 - [I][P1]111120: screen; Screen is on all the time, which could cause OLED burn in, and in dark environments, is very bright
-- [I][P2]111120: sdlog; Test what happens if SDLOG enabled but MQTT Connect fails
-- [I][P2]111120: sdlog; Add improved error handling to SDLOG while (1)
 - [I][P2]111420: time; Review NTP while until data
 	- See Q about MQTT local server time stamping inbound data?
 	- add code to let NTP fail through rather than while waiting
@@ -206,3 +204,4 @@ or
 -090921
 	- bug fixes in #define WiFi, MQTT code
 	- log improvements in #define WiFi, MQTT code
+	- moved #define SDLOG code to branch as this code is not being used

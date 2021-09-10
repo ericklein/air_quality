@@ -7,14 +7,11 @@
 
 // Conditional compile flags
 #define DEBUG         // Output to the serial port
-//#define SDLOG         // output sensor data to SD Card
 #define SCREEN        // output sensor data to screen
 #define MQTTLOG        // Output to MQTT broker defined in secrets.h
 //#define RJ45            // use Ethernet
 #define WIFI          // use WiFi (credentials in secrets.h)
-//#if defined(SDLOG) || defined(DEBUG)
 #define NTP         // query network time server for logging
-//#endif
 
 // Gloval variables
 unsigned long syncTime = 0;        // holds millis() [milliseconds] for timing functions 
@@ -31,14 +28,7 @@ Adafruit_AHTX0 aht;
   #define LOG_INTERVAL 600000
 #endif
 
-#ifdef SDLOG
-  #include <SPI.h>
-  #include <SD.h>
-  #define SDPIN 4
-  File logfile;
-#endif
-
-// MQTT credentials and network device setup
+// MQTT credentials and network IDs
 #include "secrets.h"
 
 #ifdef WIFI
@@ -170,42 +160,6 @@ void setup()
     display.println("Waiting for first sensor data");
   #endif
 
-  #ifdef SDLOG
-    // initialize SD card
-    if (!SD.begin(SDPIN)) 
-    {
-      debugMessage("SD card failed or not present");
-      screenMessage("SD card failed or not present");
-      stopApp();
-    }
-  
-    // create a new file on SD card
-    char filename[] = "LOGGER00.CSV";
-    for (uint8_t i = 0; i < 100; i++) 
-    {
-      filename[6] = i/10 + '0';
-      filename[7] = i%10 + '0';
-      if (! SD.exists(filename)) 
-      {
-        // only open a new file if it doesn't exist
-        logfile = SD.open(filename, FILE_WRITE); 
-        break;  // leave the loop!
-      }
-    }
-  
-    if (! logfile) 
-    {
-      debugMessage("Couldn't create log file on SD card");
-      screenMessage("Couldn't create log file on SD card");
-      stopApp();
-    }
-  
-    debugMessage("Logging to: " + filename);
-
-    // Log output headers
-    logfile.println("time,room,humidity,temp");    
-  #endif
-
   #ifdef WIFI
     uint8_t tries = 1;
     #define MAX_TRIES 5
@@ -227,9 +181,7 @@ void setup()
       {
         debugMessage(String("Can not connect to WFii after ") + MAX_TRIES + " attempts");
         screenMessage(String("Can not connect to WiFi after ") + MAX_TRIES + " attempts");
-        #ifndef SDLOG
-          stopApp();
-        #endif
+        stopApp();
       }
       tries++;
     }
@@ -346,16 +298,8 @@ void loop()
     }
   #endif
 
-  String logString = zuluDateTimeString() + "," + MQTT_CLIENT_ID + "," + humidity.relative_humidity + "," + String(temp.temperature*9/5+32);
-
-  #ifdef SDLOG
-    logfile.println(logString);
-    logfile.flush();
-    debugMessage("Log data written to SD card");
-  #endif
-
   #ifndef MQTTLOG   // reduces log clutter
-    debugMessage(logString);
+    debugMessage(zuluDateTimeString() + "," + MQTT_CLIENT_ID + "," + humidity.relative_humidity + "," + String(temp.temperature*9/5+32));
   #endif
 }
 
