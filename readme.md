@@ -30,10 +30,11 @@ or
 - Featherwing OLED, AHT sensor
 	- SDA to SDA
 	- SCL to SCL
+- 
 
 ### Error codes
 - FATAL
-	- Always throws a DEBUG message and blinks built-in LED at (error code x 1 second) intervals
+	- Always throws a DEBUG message and blinks built-in LED at 1 second intervals
 	- ERR 01: Can not connect to temp/humidity sensor
 	- ERR 02: Can not connect to Ethernet. Device must be restarted to proceed unless SDLOG enabled.
 	- ERR 03: Can not connect to WiFi. Device must be restarted to proceed unless SDLOG enabled.
@@ -85,6 +86,7 @@ or
 - [I][P2]111420: mqtt; MQTT publish (to Adafruit IO?) requires NTP to be defined?! No idea why.
 - [I][P1]112820: enclosure; Temperature data is off by a few degrees F when inserted into case?
 - [I][P2]112820: screen; pin 2 conflict on Adafruit 4650, not sure about 2900
+- [I][P2]090921: sensor; values coming from standalone AHT20 and Funhouse AHT20 are very different. Calibration issue? See [FR] on this as well.
 
 ### Feature Requests
 - [FR][P3]100720: mqtt; MQTT QoS 1
@@ -93,19 +95,24 @@ or
 - [FR][P1]112020: screen; Heartbeat indicator on-screen
 - [FR][P2]112920: screen; Rotating time display
 - [FR][P2]112920: time; Get time from MQTT broker
-- [FR][P3]120220: log; Added error checking on string length to displayScreenMessage
+- [FR][P3]120220: screen; Added error checking on string length to screenMessage()
 - [FR][P2]012421: log; Async blinking of built-in LED for non-FATAL errors (e.g. MQTT publish)
-- [FR][P3]120620: log; Error messages to MQTT broker
+- [FR][P3]120620: log; Air Quality messages to MQTT broker
 	- add error field to adafruitIO->airquality
 	- send error messages to MQTT for wait states
 		- timestamp->machine->error message
 - [FR][P2]090121: power; Deep sleep between sensor reads to lower battery consumption
 - [FR][P2]090121: power; Low battery messaging (to MQTT)
+- [FR][P2]090821: wifi; instead of while(1) if unable to connect to WiFi, it would be better to reset
+- [FR][P2]090921: sensor; check calibration before reading and calibrate if needed
+- [FR][P3]090921: wifi; more diagnostic information at connect in log
+- [FR][P2]090921: mqtt; log MQTT server errors https://io.adafruit.com/blog/example/2016/07/06/mqtt-error-reporting/
 
 ### Questions
 - [Q]100120: mqtt; Can I just subscribe to the higher level topic in connectToBroker() to get all the subs
 - [Q]120220: screen; Why do I need wire and spi for OLED displays?
 - [Q]082921: time; when do I need to timestamp data bound for MQTT; adafruit.io time stamps for me, does a local server?
+- [Q]090721: I've failed at compressing zuluDateTimeString() twice, what is the issue relative to string buildout?
 
 ### Revisions
 - 083120: First version based on merged sample code for sensors, SD. Ethernet code NOT working.
@@ -184,7 +191,18 @@ or
 		- [I][P3]092020: time; If time isn't set by NTP, DEBUG and SDLOG have errors -> zuluDateTimeString inserts "time not set" instead of UTC time if NTP not defined
 	- [I][P2]112820: sdlog; data logged to SDLOG is not uniquely identified -> room and UTC time attached to readings
 	- [Q]090820: We are generating humidity, heat index, and absolute humidity? -> dropping heat index support, absolute humidity required to calibrate eCO2 reading
--090121
+- 090121
 	- moving CO2 measurement to private branch, as it doesn't work
--090321
-	- switching to ADT20 (temp/humidity) for i2c connectivity and future proofing
+- 090321
+	- switching to AHT20 (temp/humidity) for i2c connectivity and future proofing
+- 090721
+	- #define SCREEN work (untested)
+		- integrate Adafruit Funhouse screen support
+		- added screenMessage wrapper for Adafruit GFX xxx.print related to #define SCREEN
+		- removed LCD code from #define SCREEN, not expecting to use again
+		- general cleanup
+	- implemented debugMessage wrapper for previous #define DEBUG serial messages
+	- general bug fixes
+-090921
+	- bug fixes in #define WiFi, MQTT code
+	- log improvements in #define WiFi, MQTT code
