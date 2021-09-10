@@ -6,12 +6,12 @@
 */
 
 // Conditional compile flags
-//#define DEBUG         // Output to the serial port
+#define DEBUG         // Output to the serial port
 //#define SDLOG         // output sensor data to SD Card
-//#define SCREEN        // output sensor data to screen
+#define SCREEN        // output sensor data to screen
 #define MQTTLOG        // Output to MQTT broker defined in secrets.h
-#define RJ45            // use Ethernet
-//#define WIFI          // use WiFi (credentials in secrets.h)
+//#define RJ45            // use Ethernet
+#define WIFI          // use WiFi (credentials in secrets.h)
 //#if defined(SDLOG) || defined(DEBUG)
 #define NTP         // query network time server for logging
 //#endif
@@ -48,6 +48,8 @@ Adafruit_AHTX0 aht;
     #include <WiFi101.h>
   #elif defined(ARDUINO_ESP8266_ESP12)
     #include <ESP8266WiFi.h>
+  #else
+    #include <WiFi.h>
   #endif
 
   WiFiClient client;
@@ -75,6 +77,7 @@ Adafruit_AHTX0 aht;
 #endif
 
 #ifdef MQTTLOG
+  #define ATTEMPT_LIMIT 3
   unsigned long previousMQTTPingTime = 0;
   #include "Adafruit_MQTT.h"
   #include "Adafruit_MQTT_Client.h"
@@ -104,10 +107,6 @@ Adafruit_AHTX0 aht;
 #endif
 
 #ifdef SCREEN
-  // Do I need these anymore?
-  //#include <SPI.h> 
-  //#include <Wire.h>
-
   #include <Adafruit_GFX.h>
 
   #include <Adafruit_ST7789.h>
@@ -142,26 +141,32 @@ void setup()
     screenMessage("ERROR 1: Sensor");
     stopApp();
   }
-  debugMessage("AHT10 or AHT20 sensor ready");
+  debugMessage("AHTX0 sensor ready");
 
   #ifdef SCREEN
+    // Color definitions
+    #define BLACK    0x0000
+    #define BLUE     0x001F
+    #define RED      0xF800
+    #define GREEN    0x07E0
+    #define CYAN     0x07FF
+    #define MAGENTA  0xF81F
+    #define YELLOW   0xFFE0 
+    #define WHITE    0xFFFF
+
     // Initialize ST7789 screen
     display.init(240, 240);
     pinMode(TFT_BACKLIGHT, OUTPUT);
     digitalWrite(TFT_BACKLIGHT, HIGH); // Backlight on
-    display.fillScreen(BG_COLOR);
-    display.setTextSize(2);
-    display.setTextColor(ST77XX_YELLOW);
+    display.fillScreen(BLACK);
 
     // // Initialize SH110X screen
-    // display.setTextSize(1);
-    // display.setTextColor(SH110X_WHITE);
     // display.setRotation(1); // SH110X only?
 
     // // Initialize SSD1306 screen
-    // display.setTextSize(1);
-    // display.setTextColor(SSD1306_WHITE);
 
+    display.setTextSize(2);
+    display.setTextColor(WHITE);
     display.println("Waiting for first sensor data");
   #endif
 
@@ -171,7 +176,7 @@ void setup()
     {
       debugMessage("SD card failed or not present");
       screenMessage("SD card failed or not present");
-      stopApp;
+      stopApp();
     }
   
     // create a new file on SD card
@@ -192,7 +197,7 @@ void setup()
     {
       debugMessage("Couldn't create log file on SD card");
       screenMessage("Couldn't create log file on SD card");
-      stopApp;
+      stopApp();
     }
   
     debugMessage("Logging to: " + filename);
@@ -203,11 +208,8 @@ void setup()
 
   #ifdef WIFI
     uint8_t tries = 1;
-    #define MAXTRIES 11
+    #define MAX_TRIES 5
 
-    // Connect to WiFi access point
-    debugMessage("Connecting to WiFI AP: " + WIFI_SSID);
-  
     // set hostname has to come before WiFi.begin
     WiFi.hostname(MQTT_CLIENT_ID);
     // WiFi.setHostname(MQTT_CLIENT_ID); //for WiFiNINA
@@ -216,20 +218,20 @@ void setup()
     while (WiFi.status() != WL_CONNECTED) 
     {
       // Error handler - WiFi does not initially connect
-      debugMessage("WiFi AP connect attempt " + tries + "of " + MAXTRIES + " in " + (tries*10) + " seconds");
+      debugMessage(String("Connection attempt ") + tries + " of " + MAX_TRIES + " to " + WIFI_SSID + " in " + (tries*10) + " seconds");
       // use of delay OK as this is initialization code
       delay(tries*10000);
-      tries++;
 
       // FATAL ERROR 03 - WiFi doesn't connect
-      if (tries == MAXTRIES)
+      if (tries == MAX_TRIES)
       {
-        debugMessage("Can not connect to WiFi after " + MAXTRIES + " attempts");
-        screenMessage("Can not connect to WiFi after " + MAXTRIES + " attempts");
+        debugMessage(String("Can not connect to WFii after ") + MAX_TRIES + " attempts");
+        screenMessage(String("Can not connect to WiFi after ") + MAX_TRIES + " attempts");
         #ifndef SDLOG
-          stopApp;
+          stopApp();
         #endif
       }
+      tries++;
     }
     debugMessage("WiFi IP address is: " + ip2CharArray(WiFi.localIP()));
   #endif
@@ -256,7 +258,7 @@ void setup()
         // generic error
         debugMessage("Failed to configure Ethernet using DHCP");
         screenMessage("Failed to configure Ethernet using DHCP");
-        stopApp;
+        stopApp();
       }
     }
     // #ifdef DEBUG
@@ -286,65 +288,65 @@ void loop()
     // display heartbeat every 20 seconds between sensor reads; depending on client might display >1 message per interval
     if (((millis() - syncTime) % 20000) == 0)
     {
-      String message = String(((millis()-syncTime)/1000)) + " seconds elapsed before next read at " + (LOG_INTERVAL/1000) + " seconds";
-      Serial.println(message);
+      debugMessage(String(((millis()-syncTime)/1000)) + " seconds elapsed before next read at " + (LOG_INTERVAL/1000) + " seconds");
     }
   #endif
 
+  // update display and determine if it is time to read/process sensors
+  if ((millis() - syncTime) < LOG_INTERVAL) return;
+
+  syncTime = millis();
   #ifdef MQTTLOG
   {
     MQTT_connect();
   }
   #endif
 
-  // update display and determine if it is time to read/process sensors
-  if ((millis() - syncTime) < LOG_INTERVAL) return;
-  syncTime = millis();
-
   // populate temp and humidity objects with fresh data
   sensors_event_t humidity, temp;
   aht.getEvent(&humidity, &temp);
 
   #ifdef SCREEN
+    display.fillScreen(BLACK);
     display.setCursor(0,0);
     display.setTextColor(YELLOW);
     display.print("Temperature: ");
     display.setTextColor(RED);
-    display.println((temp.temperature*1.8+32));  // will get truncated to 2 decimal places
+    display.println((temp.temperature*9/5+32));  // will get truncated to 2 decimal places
     display.setTextColor(YELLOW);
-    display.print("Humudity: ");
+    display.print("Humidity: ");
     display.setTextColor(RED);
     display.println(humidity.relative_humidity);
   #endif
 
   #ifdef MQTTLOG
-    if (!tempPub.publish((temp.temperature*1.8+32)))
+    if (!tempPub.publish((temp.temperature*9/5+32)))
     {
-      debugMessage(String(MQTT_PUB_TOPIC1) + " MQTT publish failed");
+      debugMessage(String(MQTT_PUB_TOPIC1) + " MQTT publish failed at " + zuluDateTimeString());
     }
     else 
     {
-      debugMessage(String(MQTT_PUB_TOPIC1) + " MQTT publish succeeded");
+      debugMessage(String("Published ") + (temp.temperature*9/5+32) + " to MQTT endpoint " + MQTT_PUB_TOPIC1 + " at " + zuluDateTimeString());
     }
     if (!humidityPub.publish(humidity.relative_humidity))
-        {
+    {
       debugMessage(String(MQTT_PUB_TOPIC2) + " MQTT publish failed");
     }
     else 
     {
-      debugMessage(String(MQTT_PUB_TOPIC2) + " MQTT publish succeeded");
+      debugMessage(String("Published ") + (humidity.relative_humidity) + " to MQTT endpoint " + MQTT_PUB_TOPIC2);
     }
-    if (!roomPub.publish(room))
+    if (!roomPub.publish(MQTT_CLIENT_ID))
     {
       debugMessage(String(MQTT_PUB_TOPIC4) + " MQTT publish failed");
     }
     else 
     {
-      debugMessage(String(MQTT_PUB_TOPIC4) + " MQTT publish succeeded");
+      debugMessage(String("Published ") + MQTT_CLIENT_ID + " to MQTT endpoint " + MQTT_PUB_TOPIC4);
     }
   #endif
 
-  String logString = zuluDateTimeString() + "," + room + "," + humidity.relative_humidity; + "," + String(temp.temperature*1.8+32);
+  String logString = zuluDateTimeString() + "," + MQTT_CLIENT_ID + "," + humidity.relative_humidity + "," + String(temp.temperature*9/5+32);
 
   #ifdef SDLOG
     logfile.println(logString);
@@ -352,14 +354,16 @@ void loop()
     debugMessage("Log data written to SD card");
   #endif
 
-  debugMessage(logString);
+  #ifndef MQTTLOG   // reduces log clutter
+    debugMessage(logString);
+  #endif
 }
 
 #ifdef NTP
   time_t getNtpTime()
   {
     while (Udp.parsePacket() > 0) ; // discard any previously received packets
-    debugMessage("Transmitting NTP Request");
+    //debugMessage("Transmitting NTP Request");
     sendNTPpacket(timeServer);
     uint32_t beginWait = millis();
     while (millis() - beginWait < 1500)
@@ -434,31 +438,49 @@ String zuluDateTimeString()
   // Connects and reconnects to MQTT broker, call from loop() to maintain connection
   void MQTT_connect()
   {
-    uint8_t mqttErr;
-    uint8_t tries = 1;
-    #define MAXTRIES 3
+    int8_t mqttErr;
+    int8_t tries = 1;
 
     // exit if already connected
     if (mqtt.connected()) 
     {
       return;
     }
-    while ((mqtt.connect() != 0)&&(tries<=MAXTRIES))
+
+    // Useful if device is always on and log gaps between reads
+    // if (WiFi.status() != WL_CONNECTED)
+    // {
+    //   return;
+    // }
+
+    while ((mqttErr = mqtt.connect() != 0) && (tries<=ATTEMPT_LIMIT))
     {
-      // Error handler - can not connect to MQTT broker
-      debugMessage(mqtt.connectErrorString(mqttErr));
-      debugMessage(String("MQTT broker connect attempt ") + tries + " of " + MAXTRIES + " in " + (tries*10) + " seconds");
+      // generic MQTT error
+      // debugMessage(mqtt.connectErrorString(mqttErr));
+
+      // Adafruit IO connect errors
+      switch (mqttErr) 
+      {
+        case 1: debugMessage("Wrong protocol"); break;
+        case 2: debugMessage("ID rejected"); break;
+        case 3: debugMessage("Server unavailable"); break;
+        case 4: debugMessage("Incorrect user or password"); break;
+        case 5: debugMessage("Not authorized"); break;
+        case 6: debugMessage("Failed to subscribe"); break;
+        default: debugMessage("GENERIC - Connection failed"); break;
+      }
+      debugMessage(String(MQTT_BROKER) + " connect attempt " + tries + " of " + ATTEMPT_LIMIT + " happens in " + (tries*10) + " seconds");
       mqtt.disconnect();
       delay(tries*10000);
       tries++;
 
-      if (tries == MAXTRIES) 
+      if (tries == ATTEMPT_LIMIT) 
       {
         debugMessage(String("Connection failed to MQTT broker ") + MQTT_BROKER);
         screenMessage("ERROR 10: MQTT Broker connection failed");
       }
     }
-    if (tries<=MAXTRIES)
+    if (tries<ATTEMPT_LIMIT)
     {
       debugMessage(String("Connected to MQTT broker ") + MQTT_BROKER);
     }
