@@ -8,16 +8,20 @@ Regularly sample and log temperature, humidity
 ### Software Dependencies not in Arduino Library Manager 
 
 ### known, working BOM parts
-- 1x: [optional] Particle Ethernet Featherwing: https://www.adafruit.com/product/4003
-- or
-- 1x: [optional] Silicognition PoE Featherwing: https://www.crowdsupply.com/silicognition/poe-featherwing
-- 1X: AHT20 temp/humidity sensor: https://www.adafruit.com/product/4566
-- or
-- 1X: AHT20 temp/humidity sensor: https://www.adafruit.com/product/5183
-- 1X: Featherwing OLED (128x32): https://www.adafruit.com/product/2900
-or 
-- 1X: Featherwing OLED (128x64): https://www.adafruit.com/product/4650
-
+- MCU
+	- tested on ESP32S2, ESP8266, ARM(m0,m4)
+	- networking
+	- Particle Ethernet Featherwing: https://www.adafruit.com/product/4003
+	- Silicognition PoE Featherwing: https://www.crowdsupply.com/silicognition/poe-featherwing
+- sensors
+	- AHT20 temp/humidity sensor: https://www.adafruit.com/product/4566, https://www.adafruit.com/product/5183
+	- DHT11,21 also supported, see code history
+	- SGP30 VO2 partially supported in separate code branch
+- screens
+	- LCD screen supported, see code history
+	- Featherwing OLED (SSD1306, 128x32): https://www.adafruit.com/product/2900
+	- Featherwing OLED (SH110X, 128x64): https://www.adafruit.com/product/4650
+	- Adafruit Funhouse (ST7789, 240x240): https://www.adafruit.com/product/4985
 
 ### Pinouts
 - Particle Ethernet Featherwing
@@ -30,7 +34,6 @@ or
 - Featherwing OLED, AHT sensor
 	- SDA to SDA
 	- SCL to SCL
-- 
 
 ### Error codes
 - FATAL
@@ -85,6 +88,7 @@ or
 - [I][P1]112820: enclosure; Temperature data is off by a few degrees F when inserted into case?
 - [I][P2]112820: screen; pin 2 conflict on Adafruit 4650, not sure about 2900
 - [I][P2]090921: sensor; values coming from standalone AHT20 and Funhouse AHT20 are very different. Calibration issue? See [FR] on this as well.
+- [I][P1]091021: wifi; If WiFi comes down for an extended period, functionality does not recover
 
 ### Feature Requests
 - [FR][P3]100720: mqtt; MQTT QoS 1
@@ -201,7 +205,10 @@ or
 		- general cleanup
 	- implemented debugMessage wrapper for previous #define DEBUG serial messages
 	- general bug fixes
--090921
+- 090921
 	- bug fixes in #define WiFi, MQTT code
 	- log improvements in #define WiFi, MQTT code
 	- moved #define SDLOG code to branch as this code is not being used
+- 091021
+	- e-ink support for the Adafruit Magtag
+	- support for Adafruit SiH7021: https://www.adafruit.com/product/3251, temporary until I get more AHTx0 parts

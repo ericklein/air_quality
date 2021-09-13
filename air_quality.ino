@@ -16,9 +16,13 @@
 // Gloval variables
 unsigned long syncTime = 0;        // holds millis() [milliseconds] for timing functions 
 
-// AHT20 (temperature and humidity)
-#include <Adafruit_AHTX0.h>
-Adafruit_AHTX0 aht;
+// AHTX0 (temperature and humidity)
+// #include <Adafruit_AHTX0.h>
+// Adafruit_AHTX0 sensor;
+
+// Si7021 (temperature and humidity)
+#include "Adafruit_Si7021.h"
+Adafruit_Si7021 sensor = Adafruit_Si7021();
 
 #ifdef DEBUG
   // millisecond delay between sensor reads
@@ -99,8 +103,31 @@ Adafruit_AHTX0 aht;
 #ifdef SCREEN
   #include <Adafruit_GFX.h>
 
-  #include <Adafruit_ST7789.h>
-  Adafruit_ST7789 display = Adafruit_ST7789(TFT_CS, TFT_DC, TFT_RESET);
+  // magtag support
+  #include "Adafruit_ThinkInk.h"
+  #define EPD_DC      7 // can be any pin, but required!
+  #define EPD_CS      8  // can be any pin, but required!
+  #define EPD_BUSY    -1  // can set to -1 to not use a pin (will wait a fixed delay)
+  #define SRAM_CS     -1  // can set to -1 to not use a pin (uses a lot of RAM!)
+  #define EPD_RESET   6  // can set to -1 and share with chip Reset (can't deep sleep)
+  ThinkInk_290_Grayscale4_T5 display(EPD_DC, EPD_RESET, EPD_CS, SRAM_CS, EPD_BUSY);
+  #define COLOR1 EPD_BLACK
+  #define COLOR2 EPD_LIGHT
+  #define COLOR3 EPD_DARK
+  bool gray = false;
+
+  // LED, OLED color definitions
+  // #define BLACK    0x0000
+  // #define BLUE     0x001F
+  // #define RED      0xF800
+  // #define GREEN    0x07E0
+  // #define CYAN     0x07FF
+  // #define MAGENTA  0xF81F
+  // #define YELLOW   0xFFE0 
+  // #define WHITE    0xFFFF
+
+  // #include <Adafruit_ST7789.h>
+  // Adafruit_ST7789 display = Adafruit_ST7789(TFT_CS, TFT_DC, TFT_RESET);
 
   //#include <Adafruit_SH110X.h>
   //Adafruit_SH110X display = Adafruit_SH110X(64, 128, &Wire);
@@ -125,39 +152,35 @@ void setup()
   #endif
 
   // sensor check
-  if (! aht.begin())
+  if (! sensor.begin())
   {
-    debugMessage("FATAL ERROR: AHT sensor not detected");
+    debugMessage("FATAL ERROR: temp/humidity sensor not detected");
     screenMessage("ERROR 1: Sensor");
     stopApp();
   }
-  debugMessage("AHTX0 sensor ready");
+  debugMessage("temp/humidity sensor ready");
 
   #ifdef SCREEN
-    // Color definitions
-    #define BLACK    0x0000
-    #define BLUE     0x001F
-    #define RED      0xF800
-    #define GREEN    0x07E0
-    #define CYAN     0x07FF
-    #define MAGENTA  0xF81F
-    #define YELLOW   0xFFE0 
-    #define WHITE    0xFFFF
-
     // Initialize ST7789 screen
-    display.init(240, 240);
-    pinMode(TFT_BACKLIGHT, OUTPUT);
-    digitalWrite(TFT_BACKLIGHT, HIGH); // Backlight on
-    display.fillScreen(BLACK);
+    // display.init(240, 240);
+    // pinMode(TFT_BACKLIGHT, OUTPUT);
+    // digitalWrite(TFT_BACKLIGHT, HIGH); // Backlight on
+    // display.fillScreen(BLACK);
 
     // // Initialize SH110X screen
     // display.setRotation(1); // SH110X only?
 
     // // Initialize SSD1306 screen
 
-    display.setTextSize(2);
-    display.setTextColor(WHITE);
+    // Initalize e-ink screen
+    if (gray) display.begin(THINKINK_GRAYSCALE4);
+    else display.begin(THINKINK_MONO);
+    display.clearBuffer();      // e-ink only?
+    display.setTextSize(3);
+    display.setTextColor(EPD_BLACK);
+
     display.println("Waiting for first sensor data");
+    display.display(); // e-ink
   #endif
 
   #ifdef WIFI
@@ -255,38 +278,51 @@ void loop()
   #endif
 
   // populate temp and humidity objects with fresh data
-  sensors_event_t humidity, temp;
-  aht.getEvent(&humidity, &temp);
+  // AHTX0
+  // sensors_event_t humidity, temp;
+  // sensor.getEvent(&humidity, &temp);
+  // SiH7021
+
+  // intermediate variable helps moving between sensor APIs easier in code
+  // AHTX0
+  // float temperature = temp.temperature*9/5+32;
+  // float humidity = humidity.relative_humidity;
+
+  // SiH7021
+  float temperature = sensor.readHumidity();
+  float humidity = sensor.readTemperature();
 
   #ifdef SCREEN
-    display.fillScreen(BLACK);
+    //display.fillScreen(BLACK);
+    display.clearBuffer();
     display.setCursor(0,0);
-    display.setTextColor(YELLOW);
+    //display.setTextColor(YELLOW);
     display.print("Temperature: ");
-    display.setTextColor(RED);
-    display.println((temp.temperature*9/5+32));  // will get truncated to 2 decimal places
-    display.setTextColor(YELLOW);
+    //display.setTextColor(RED);
+    display.println(temperature);  // will get truncated to 2 decimal places
+    //display.setTextColor(YELLOW);
     display.print("Humidity: ");
-    display.setTextColor(RED);
-    display.println(humidity.relative_humidity);
+    //display.setTextColor(RED);
+    display.println(humidity);
+    display.display();
   #endif
 
   #ifdef MQTTLOG
-    if (!tempPub.publish((temp.temperature*9/5+32)))
+    if (!tempPub.publish(temperature))
     {
       debugMessage(String(MQTT_PUB_TOPIC1) + " MQTT publish failed at " + zuluDateTimeString());
     }
     else 
     {
-      debugMessage(String("Published ") + (temp.temperature*9/5+32) + " to MQTT endpoint " + MQTT_PUB_TOPIC1 + " at " + zuluDateTimeString());
+      debugMessage(String("Published ") + temperature + " to MQTT endpoint " + MQTT_PUB_TOPIC1 + " at " + zuluDateTimeString());
     }
-    if (!humidityPub.publish(humidity.relative_humidity))
+    if (!humidityPub.publish(humidity))
     {
       debugMessage(String(MQTT_PUB_TOPIC2) + " MQTT publish failed");
     }
     else 
     {
-      debugMessage(String("Published ") + (humidity.relative_humidity) + " to MQTT endpoint " + MQTT_PUB_TOPIC2);
+      debugMessage(String("Published ") + humidity + " to MQTT endpoint " + MQTT_PUB_TOPIC2);
     }
     if (!roomPub.publish(MQTT_CLIENT_ID))
     {
@@ -299,7 +335,7 @@ void loop()
   #endif
 
   #ifndef MQTTLOG   // reduces log clutter
-    debugMessage(zuluDateTimeString() + "," + MQTT_CLIENT_ID + "," + humidity.relative_humidity + "," + String(temp.temperature*9/5+32));
+    debugMessage(zuluDateTimeString() + "," + MQTT_CLIENT_ID + "," + temperature + "," + humidity);
   #endif
 }
 
@@ -441,8 +477,10 @@ void debugMessage(String messageText)
 void screenMessage(String messageText)
 {
   #ifdef SCREEN
-    display.fillScreen(BLACK);
+    //display.fillScreen(BLACK);
+    display.clearBuffer();
     display.println(messageText);
+    display.display();
   #endif
 }
 
