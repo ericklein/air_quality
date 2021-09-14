@@ -89,6 +89,8 @@ Regularly sample and log temperature, humidity
 - [I][P2]112820: screen; pin 2 conflict on Adafruit 4650, not sure about 2900
 - [I][P2]090921: sensor; values coming from standalone AHT20 and Funhouse AHT20 are very different. Calibration issue? See [FR] on this as well.
 - [I][P1]091021: wifi; If WiFi comes down for an extended period, functionality does not recover
+- [I][P2]091321: log; don't think MagTag BSP has LED_BUILTIN defined. No blinking LED on FATAL errors
+- [I][P1]091321: time; No NTP response doesn't not reattempt until success
 
 ### Feature Requests
 - [FR][P3]100720: mqtt; MQTT QoS 1
@@ -109,6 +111,7 @@ Regularly sample and log temperature, humidity
 - [FR][P2]090921: sensor; check calibration before reading and calibrate if needed
 - [FR][P3]090921: wifi; more diagnostic information at connect in log
 - [FR][P2]090921: mqtt; log MQTT server errors https://io.adafruit.com/blog/example/2016/07/06/mqtt-error-reporting/
+- [FR][P3]091321: screen; convert pixel coordinates in screenUIBorders to offsets of the screen pixel size in X,Y
 
 ### Questions
 - [Q]100120: mqtt; Can I just subscribe to the higher level topic in connectToBroker() to get all the subs
@@ -212,3 +215,8 @@ Regularly sample and log temperature, humidity
 - 091021
 	- e-ink support for the Adafruit Magtag
 	- support for Adafruit SiH7021: https://www.adafruit.com/product/3251, temporary until I get more AHTx0 parts
+- 091321
+	- Sleep support for MagTag; moving from loop() to singular runs of setup()
+	- Moving temp/humidity display to separate function
+	- UI elements function
+	- screenMessage updated to call UI element function

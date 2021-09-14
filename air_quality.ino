@@ -25,11 +25,10 @@ unsigned long syncTime = 0;        // holds millis() [milliseconds] for timing f
 Adafruit_Si7021 sensor = Adafruit_Si7021();
 
 #ifdef DEBUG
-  // millisecond delay between sensor reads
-  #define LOG_INTERVAL 60000  // standard test interval
-  //#define LOG_INTERVAL 600000   // long term test interval
+  // microsecond delay between sensor reads
+  #define LOG_INTERVAL 240000000  // debug interval; 240 seconds 
 #else
-  #define LOG_INTERVAL 600000
+  #define LOG_INTERVAL 1800000000 // production interval; 1800 seconds
 #endif
 
 // MQTT credentials and network IDs
@@ -105,15 +104,16 @@ Adafruit_Si7021 sensor = Adafruit_Si7021();
 
   // magtag support
   #include "Adafruit_ThinkInk.h"
+  #include <Fonts/FreeSans9pt7b.h>
   #define EPD_DC      7 // can be any pin, but required!
-  #define EPD_CS      8  // can be any pin, but required!
-  #define EPD_BUSY    -1  // can set to -1 to not use a pin (will wait a fixed delay)
-  #define SRAM_CS     -1  // can set to -1 to not use a pin (uses a lot of RAM!)
   #define EPD_RESET   6  // can set to -1 and share with chip Reset (can't deep sleep)
+  #define EPD_CS      8  // can be any pin, but required!
+  #define SRAM_CS     -1  // can set to -1 to not use a pin (uses a lot of RAM!)
+  #define EPD_BUSY    -1  // can set to -1 to not use a pin (will wait a fixed delay)
   ThinkInk_290_Grayscale4_T5 display(EPD_DC, EPD_RESET, EPD_CS, SRAM_CS, EPD_BUSY);
-  #define COLOR1 EPD_BLACK
-  #define COLOR2 EPD_LIGHT
-  #define COLOR3 EPD_DARK
+  // #define COLOR1 EPD_BLACK
+  // #define COLOR2 EPD_LIGHT
+  // #define COLOR3 EPD_DARK
   bool gray = false;
 
   // LED, OLED color definitions
@@ -175,12 +175,8 @@ void setup()
     // Initalize e-ink screen
     if (gray) display.begin(THINKINK_GRAYSCALE4);
     else display.begin(THINKINK_MONO);
-    display.clearBuffer();      // e-ink only?
-    display.setTextSize(3);
+    display.setFont(&FreeSans9pt7b);
     display.setTextColor(EPD_BLACK);
-
-    display.println("Waiting for first sensor data");
-    display.display(); // e-ink
   #endif
 
   #ifdef WIFI
@@ -255,28 +251,8 @@ void setup()
     while(timeStatus()== timeNotSet);
     debugMessage("NTP time is " + zuluDateTimeString());
   #endif
-}
 
-void loop() 
-{
-  #ifdef DEBUG
-    // display heartbeat every 20 seconds between sensor reads; depending on client might display >1 message per interval
-    if (((millis() - syncTime) % 20000) == 0)
-    {
-      debugMessage(String(((millis()-syncTime)/1000)) + " seconds elapsed before next read at " + (LOG_INTERVAL/1000) + " seconds");
-    }
-  #endif
-
-  // update display and determine if it is time to read/process sensors
-  if ((millis() - syncTime) < LOG_INTERVAL) return;
-
-  syncTime = millis();
-  #ifdef MQTTLOG
-  {
-    MQTT_connect();
-  }
-  #endif
-
+  // One time run of main logic before sleep
   // populate temp and humidity objects with fresh data
   // AHTX0
   // sensors_event_t humidity, temp;
@@ -285,29 +261,17 @@ void loop()
 
   // intermediate variable helps moving between sensor APIs easier in code
   // AHTX0
-  // float temperature = temp.temperature*9/5+32;
+  // float temperature = (temp.temperature*1.8)+32;
   // float humidity = humidity.relative_humidity;
 
   // SiH7021
-  float temperature = sensor.readHumidity();
-  float humidity = sensor.readTemperature();
+  float temperature = (sensor.readTemperature()*1.8)+32;
+  float humidity = sensor.readHumidity();
 
-  #ifdef SCREEN
-    //display.fillScreen(BLACK);
-    display.clearBuffer();
-    display.setCursor(0,0);
-    //display.setTextColor(YELLOW);
-    display.print("Temperature: ");
-    //display.setTextColor(RED);
-    display.println(temperature);  // will get truncated to 2 decimal places
-    //display.setTextColor(YELLOW);
-    display.print("Humidity: ");
-    //display.setTextColor(RED);
-    display.println(humidity);
-    display.display();
-  #endif
+  screenValues(temperature, humidity);
 
   #ifdef MQTTLOG
+    MQTT_connect();
     if (!tempPub.publish(temperature))
     {
       debugMessage(String(MQTT_PUB_TOPIC1) + " MQTT publish failed at " + zuluDateTimeString());
@@ -337,6 +301,15 @@ void loop()
   #ifndef MQTTLOG   // reduces log clutter
     debugMessage(zuluDateTimeString() + "," + MQTT_CLIENT_ID + "," + temperature + "," + humidity);
   #endif
+
+  #ifdef WIFI
+    client.stop();
+  #endif
+    deepSleep();
+}
+
+void loop() 
+{
 }
 
 #ifdef NTP
@@ -474,14 +447,49 @@ void debugMessage(String messageText)
   #endif
 }
 
+void screenUIBorders()
+{
+  #ifdef SCREEN
+    display.drawRoundRect(0,0,295,42,10,EPD_WHITE);
+    display.drawRoundRect(0,41,295,42,10, EPD_WHITE);
+    display.drawRoundRect(0,82,295,44,10, EPD_WHITE);
+  #endif
+}
+
 void screenMessage(String messageText)
 {
   #ifdef SCREEN
     //display.fillScreen(BLACK);
     display.clearBuffer();
+    display.setTextSize(1);
+    screenUIBorders();
+    display.setCursor(5,88);
     display.println(messageText);
     display.display();
   #endif
+}
+
+void screenValues(float temperature, float humidity)
+{
+    #ifdef SCREEN
+      //display.fillScreen(BLACK);
+      display.clearBuffer();
+      display.setTextSize(1);
+      screenUIBorders();
+      display.setCursor(5,20);
+      //display.setTextColor(YELLOW);
+      //display.print("Temperature: ");
+      display.print(String("Temperature is ") + temperature + "F");
+      //display.setTextColor(RED);
+      //display.println(temperature);  // will get truncated to 2 decimal places
+      display.setCursor(5,60);
+      //display.setTextColor(YELLOW);
+      //display.print("Humidity: ");
+      display.print(String("Humidity is ") + humidity + "%");
+      //display.setTextColor(RED);
+      //display.println(humidity);
+      display.display();
+    #endif
 }
 
 void stopApp()
@@ -501,4 +509,13 @@ String ip2CharArray(IPAddress ip)
   static char a[16];
   sprintf(a, "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
   return a;
+}
+
+void deepSleep()
+{
+  debugMessage(String("Going to sleep for ") + (LOG_INTERVAL/100000) + " seconds");
+  display.powerDown();
+  digitalWrite(EPD_RESET, LOW); // hardware power down mode
+  esp_sleep_enable_timer_wakeup(LOG_INTERVAL);
+  esp_deep_sleep_start();
 }
