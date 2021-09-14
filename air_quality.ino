@@ -25,7 +25,7 @@ unsigned long syncTime = 0;        // holds millis() [milliseconds] for timing f
 Adafruit_Si7021 sensor = Adafruit_Si7021();
 
 #ifdef DEBUG
-  // microsecond delay between sensor reads
+  // microsecond delay for deep sleep
   #define LOG_INTERVAL 240000000  // debug interval; 240 seconds 
 #else
   #define LOG_INTERVAL 1800000000 // production interval; 1800 seconds

@@ -74,7 +74,6 @@ Regularly sample and log temperature, humidity
 - 090620: Just push your own MAC address if the device doesn't physically display its address, but avoid duplicates across projects when using common code to set it.
 - 090620: Arduino Ethernet code can't tranverse a DNS fallback list, so if the primary fails (e.g. Pihole crash) it will stop connecting to outside addresses via DNS lookup
 - 111420: There is no way to set Ethernet hostname in official library. One could edit dhcp.cpp and dhcp.h to change the six character host name, but...
-- 120220: Adafruit GFX library supports println, but I'm controlling position manually to maintain code alignment with Adafruit_LiquidCrystal
 
 ### Issues
 - [I][P3]112820: time; NTP is dependent to WiFi or Ethernet due to IPAddress
@@ -83,19 +82,21 @@ Regularly sample and log temperature, humidity
 - [I][P2]111420: time; Review NTP while until data
 	- See Q about MQTT local server time stamping inbound data?
 	- add code to let NTP fail through rather than while waiting
+- [I][P1]091321: time; "No NTP response" does not reattempt until success
 	- in zuluDateTimeString switch #ifdef NTP for check timeStatus() for timeNotSet
 - [I][P2]111420: mqtt; MQTT publish (to Adafruit IO?) requires NTP to be defined?! No idea why.
 - [I][P1]112820: enclosure; Temperature data is off by a few degrees F when inserted into case?
-- [I][P2]112820: screen; pin 2 conflict on Adafruit 4650, not sure about 2900
+- [I][P2]112820: screen; pin 2 conflict with XXXX? on SH110x, not sure about SSD1306
 - [I][P2]090921: sensor; values coming from standalone AHT20 and Funhouse AHT20 are very different. Calibration issue? See [FR] on this as well.
+	- 091321 SiH7021 is close to the standalone AHT20 values
 - [I][P1]091021: wifi; If WiFi comes down for an extended period, functionality does not recover
 - [I][P2]091321: log; don't think MagTag BSP has LED_BUILTIN defined. No blinking LED on FATAL errors
-- [I][P1]091321: time; No NTP response doesn't not reattempt until success
+- [I][P1]091321: screen; is the deepsleep function for EPD causing the screen to grey out? look at powerUp(), which I'm not using, and powerDown()
+- [I][P3]091321: wifi; validate host name is being set via network admin tool
 
 ### Feature Requests
 - [FR][P3]100720: mqtt; MQTT QoS 1
 - [FR][P3]111020: mqtt; publish to multiple MQTT brokers
-- [FR][P2]111120: sensor; BME680 integration https://www.adafruit.com/product/3660
 - [FR][P1]112020: screen; Heartbeat indicator on-screen
 - [FR][P2]112920: screen; Rotating time display
 - [FR][P2]112920: time; Get time from MQTT broker
@@ -105,19 +106,21 @@ Regularly sample and log temperature, humidity
 	- add error field to adafruitIO->airquality
 	- send error messages to MQTT for wait states
 		- timestamp->machine->error message
-- [FR][P2]090121: power; Deep sleep between sensor reads to lower battery consumption
 - [FR][P2]090121: power; Low battery messaging (to MQTT)
 - [FR][P2]090821: wifi; instead of while(1) if unable to connect to WiFi, it would be better to reset
 - [FR][P2]090921: sensor; check calibration before reading and calibrate if needed
 - [FR][P3]090921: wifi; more diagnostic information at connect in log
 - [FR][P2]090921: mqtt; log MQTT server errors https://io.adafruit.com/blog/example/2016/07/06/mqtt-error-reporting/
-- [FR][P3]091321: screen; convert pixel coordinates in screenUIBorders to offsets of the screen pixel size in X,Y
+- [FR][P3]091321: screen; convert pixel coordinates in screenUIBorders to offsets of display.width, display.height
+- [FR][P3]091321: mqtt; inject lat/long into data, other extended fields for adafruit io?
+- [FR][P3]091321: screen; cycle to local weather forcast
 
 ### Questions
 - [Q]100120: mqtt; Can I just subscribe to the higher level topic in connectToBroker() to get all the subs
 - [Q]120220: screen; Why do I need wire and spi for OLED displays?
 - [Q]082921: time; when do I need to timestamp data bound for MQTT; adafruit.io time stamps for me, does a local server?
 - [Q]090721: I've failed at compressing zuluDateTimeString() twice, what is the issue relative to string buildout?
+- [Q]091321: should I push data to MQTT as JSON?
 
 ### Revisions
 - 083120: First version based on merged sample code for sensors, SD. Ethernet code NOT working.
@@ -216,7 +219,7 @@ Regularly sample and log temperature, humidity
 	- e-ink support for the Adafruit Magtag
 	- support for Adafruit SiH7021: https://www.adafruit.com/product/3251, temporary until I get more AHTx0 parts
 - 091321
-	- Sleep support for MagTag; moving from loop() to singular runs of setup()
+	- [FR][P2]090121: power; Deep sleep between sensor reads to lower battery consumption -> Sleep support for ESP32; moving from loop() to singular runs of setup()
 	- Moving temp/humidity display to separate function
 	- UI elements function
 	- screenMessage updated to call UI element function
