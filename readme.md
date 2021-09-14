@@ -76,44 +76,60 @@ Regularly sample and log temperature, humidity
 - 111420: There is no way to set Ethernet hostname in official library. One could edit dhcp.cpp and dhcp.h to change the six character host name, but...
 
 ### Issues
-- [I][P3]112820: time; NTP is dependent to WiFi or Ethernet due to IPAddress
-- [I][P2]102420: mqtt; Move local MQTT server to DNS named entry instead of IP address so DNS can resolve it if IP address changes
-- [I][P1]111120: screen; Screen is on all the time, which could cause OLED burn in, and in dark environments, is very bright
-- [I][P2]111420: time; Review NTP while until data
-	- See Q about MQTT local server time stamping inbound data?
-	- add code to let NTP fail through rather than while waiting
-- [I][P1]091321: time; "No NTP response" does not reattempt until success
-	- in zuluDateTimeString switch #ifdef NTP for check timeStatus() for timeNotSet
-- [I][P2]111420: mqtt; MQTT publish (to Adafruit IO?) requires NTP to be defined?! No idea why.
-- [I][P1]112820: enclosure; Temperature data is off by a few degrees F when inserted into case?
-- [I][P2]112820: screen; pin 2 conflict with XXXX? on SH110x, not sure about SSD1306
-- [I][P2]090921: sensor; values coming from standalone AHT20 and Funhouse AHT20 are very different. Calibration issue? See [FR] on this as well.
-	- 091321 SiH7021 is close to the standalone AHT20 values
-- [I][P1]091021: wifi; If WiFi comes down for an extended period, functionality does not recover
-- [I][P2]091321: log; don't think MagTag BSP has LED_BUILTIN defined. No blinking LED on FATAL errors
-- [I][P1]091321: screen; is the deepsleep function for EPD causing the screen to grey out? look at powerUp(), which I'm not using, and powerDown()
-- [I][P3]091321: wifi; validate host name is being set via network admin tool
+- mqtt
+	- [I][P2]102420: mqtt; Move local MQTT server to DNS named entry instead of IP address so DNS can resolve it if IP address changes
+	- [I][P2]111420: mqtt; MQTT publish (to Adafruit IO?) requires NTP to be defined?! No idea why.
+	- [I][P1]091321: mqtt; semi-consistently seeing issue where, over WiFI, temp is logging to mqtt properly but humidity and room are not. I thought I resolved it via different MQTT_CLIENT_ID, but no.
+	- [I][P1]091321: mqtt; should I be using a mqtt.disconnect() during the sleep process. Might help with issues I'm seeing?
+- time
+	- [I][P3]112820: time; NTP is dependent to WiFi or Ethernet due to IPAddress
+	- [I][P2]111420: time; Review NTP while until data
+		- See Q about MQTT local server time stamping inbound data?
+		- add code to let NTP fail through rather than while waiting
+		- [I][P1]091321: time; "No NTP response" does not reattempt until success
+		- in zuluDateTimeString switch #ifdef NTP for check timeStatus() for timeNotSet
+- screen
+	- [I][P2]111120: screen; Screen is on all the time, which could cause OLED burn in, and in dark environments, is very bright
+	- [I][P2]112820: screen; pin 2 conflict with XXXX? on SH110x, not sure about SSD1306
+	- [I][P1]091321: screen; is the deepsleep function for EPD causing the screen to grey out? look at powerUp(), which I'm not using, and powerDown()
+- wifi
+	- [I][P1]091021: wifi; If WiFi comes down for an extended period, functionality does not recover
+	- [I][P3]091321: wifi; validate host name is being set via network admin tool
+- log
+	- [I][P2]091321: log; don't think MagTag BSP has LED_BUILTIN defined. No blinking LED on FATAL errors
+- sensor
+	- [I][P2]112820: sensor; Temperature data is off by a few degrees F when inserted into case?
+	- [I][P2]090921: sensor; values coming from standalone AHT20 and Funhouse AHT20 are very different. Calibration issue? See [FR] on this as well.
+		- 091321 SiH7021 is close to the standalone AHT20 values
+- power
 
 ### Feature Requests
-- [FR][P3]100720: mqtt; MQTT QoS 1
-- [FR][P3]111020: mqtt; publish to multiple MQTT brokers
-- [FR][P1]112020: screen; Heartbeat indicator on-screen
-- [FR][P2]112920: screen; Rotating time display
-- [FR][P2]112920: time; Get time from MQTT broker
-- [FR][P3]120220: screen; Added error checking on string length to screenMessage()
-- [FR][P2]012421: log; Async blinking of built-in LED for non-FATAL errors (e.g. MQTT publish)
-- [FR][P3]120620: log; Air Quality messages to MQTT broker
-	- add error field to adafruitIO->airquality
-	- send error messages to MQTT for wait states
-		- timestamp->machine->error message
-- [FR][P2]090121: power; Low battery messaging (to MQTT)
-- [FR][P2]090821: wifi; instead of while(1) if unable to connect to WiFi, it would be better to reset
-- [FR][P2]090921: sensor; check calibration before reading and calibrate if needed
-- [FR][P3]090921: wifi; more diagnostic information at connect in log
-- [FR][P2]090921: mqtt; log MQTT server errors https://io.adafruit.com/blog/example/2016/07/06/mqtt-error-reporting/
-- [FR][P3]091321: screen; convert pixel coordinates in screenUIBorders to offsets of display.width, display.height
-- [FR][P3]091321: mqtt; inject lat/long into data, other extended fields for adafruit io?
-- [FR][P3]091321: screen; cycle to local weather forcast
+- mqtt
+	- [FR][P3]100720: mqtt; MQTT QoS 1
+	- [FR][P3]111020: mqtt; publish to multiple MQTT brokers
+	- [FR][P2]090921: mqtt; log MQTT server errors https://io.adafruit.com/blog/example/2016/07/06/mqtt-error-reporting/
+	- [FR][P3]091321: mqtt; inject lat/long into data, other extended fields for adafruit io?
+- time
+	- [FR][P2]112920: time; Get time from MQTT broker
+- screen
+	- [FR][P1]112020: screen; Heartbeat indicator on-screen
+	- [FR][P2]112920: screen; Rotating time display
+	- [FR][P3]120220: screen; Added error checking on string length to screenMessage()
+	- [FR][P3]091321: screen; convert pixel coordinates in screenUIBorders to offsets of display.width, display.height
+	- [FR][P3]091321: screen; cycle to local weather forcast
+- wifi
+	- [FR][P2]090821: wifi; instead of while(1) if unable to connect to WiFi, it would be better to reset
+	- [FR][P3]090921: wifi; more diagnostic information at connect in log
+- log
+	- [FR][P2]012421: log; Async blinking of built-in LED for non-FATAL errors (e.g. MQTT publish)
+		- [FR][P3]120620: log; Air Quality messages to MQTT broker
+			- add error field to adafruitIO->airquality
+			- send error messages to MQTT for wait states
+				- timestamp->machine->error message
+- sensor
+	- [FR][P2]090921: sensor; check calibration before reading and calibrate if needed
+- power
+	- [FR][P2]090121: power; Low battery messaging (to MQTT)
 
 ### Questions
 - [Q]100120: mqtt; Can I just subscribe to the higher level topic in connectToBroker() to get all the subs
