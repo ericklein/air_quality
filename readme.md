@@ -10,11 +10,12 @@ Regularly sample and log temperature, humidity
 ### known, working BOM parts
 - MCU
 	- tested on ESP32S2, ESP8266, ARM(m0,m4)
-	- networking
+- networking
 	- Particle Ethernet Featherwing: https://www.adafruit.com/product/4003
 	- Silicognition PoE Featherwing: https://www.crowdsupply.com/silicognition/poe-featherwing
 - sensors
 	- AHT20 temp/humidity sensor: https://www.adafruit.com/product/4566, https://www.adafruit.com/product/5183
+	- SiH7021 temp/humidity sensor: https://www.adafruit.com/product/3251
 	- DHT11,21 also supported, see code history
 	- SGP30 VO2 partially supported in separate code branch
 - screens
@@ -22,6 +23,7 @@ Regularly sample and log temperature, humidity
 	- Featherwing OLED (SSD1306, 128x32): https://www.adafruit.com/product/2900
 	- Featherwing OLED (SH110X, 128x64): https://www.adafruit.com/product/4650
 	- Adafruit Funhouse (ST7789, 240x240): https://www.adafruit.com/product/4985
+	- Adafruit MagTag (EPD): https://www.adafruit.com/product/4800
 
 ### Pinouts
 - Particle Ethernet Featherwing
@@ -79,7 +81,6 @@ Regularly sample and log temperature, humidity
 - mqtt
 	- [I][P3]102420: mqtt; Move local MQTT server to DNS named entry instead of IP address so DNS can resolve it if IP address changes
 	- [I][P3]111420: mqtt; MQTT publish (to Adafruit IO?) requires NTP to be defined?! No idea why.
-	- [I][P1]091321: mqtt; semi-consistently seeing issue where, over WiFI, temp is logging to mqtt properly but humidity and room are not. I thought I resolved it via different MQTT_CLIENT_ID, but no.
 - time
 	- [I][P3]112820: time; NTP is dependent to WiFi or Ethernet due to IPAddress
 	- [I][P2]111420: time; Review NTP while until data
@@ -90,9 +91,7 @@ Regularly sample and log temperature, humidity
 - screen
 	- [I][P2]111120: screen; Screen is on all the time, which could cause OLED burn in, and in dark environments, is very bright
 	- [I][P2]112820: screen; pin 2 conflict with XXXX? on SH110x, not sure about SSD1306
-	- [I][P1]091521: screen; can't call screenMessage after screenValues because the latter will overwrite the screen
 - wifi
-	- [I][P1]091021: wifi; If WiFi comes down for an extended period, functionality does not recover
 	- [I][P3]091321: wifi; validate host name is being set via network admin tool
 - log
 	- [I][P2]091321: log; don't think MagTag BSP has LED_BUILTIN defined. No blinking LED on FATAL errors
@@ -103,35 +102,33 @@ Regularly sample and log temperature, humidity
 		- 091321 SiH7021 is close to the standalone AHT20 values
 - power
 	- [I][P1]090121: power; Low battery messaging (to MQTT)
-
+	- [I][P2]091521: power; why is stemmaQT board getting power (LED light is on) in deepsleep()?
 
 ### Feature Requests
 - mqtt
-	- [FR][P3]100720: mqtt; MQTT QoS 1
 	- [FR][P3]111020: mqtt; publish to multiple MQTT brokers
 	- [FR][P2]090921: mqtt; log MQTT server errors https://io.adafruit.com/blog/example/2016/07/06/mqtt-error-reporting/
 	- [FR][P3]091321: mqtt; inject lat/long into data, other extended fields for adafruit io?
-- time
-	- [FR][P2]112920: time; Get time from MQTT broker
-- screen
-	- [FR][P1]112920: screen; time display
-	- [FR][P3]120220: screen; Add string length checking to screenMessage()
-	- [FR][P3]091321: screen; local weather (forecast)
-- wifi
-	- [FR][P2]090821: wifi; instead of while(1) if unable to connect to WiFi, it would be better to reset
-	- [FR][P3]090921: wifi; more diagnostic information at connect in log
-- log
-	- [FR][P2]012421: log; Async blinking of built-in LED for non-FATAL errors (e.g. MQTT publish)
+	- [FR][P3]012421: log; Async blinking of built-in LED for non-FATAL errors (e.g. MQTT publish)
 		- [FR][P3]120620: log; Air Quality messages to MQTT broker
 			- add error field to adafruitIO->airquality
 			- send error messages to MQTT for wait states
 				- timestamp->machine->error message
+- time
+	- [FR][P2]112920: time; Get time from MQTT broker
+- screen
+	- [FR][P3]120220: screen; Add string length checking to screenUpdate()
+	- [FR][P3]091321: screen; local weather (forecast)
+- wifi
+	- [FR][P3]090921: wifi; more diagnostic information at connect in log
+- log
+
 - sensor
 	- [FR][P2]090921: sensor; check calibration before reading and calibrate if needed
 - power
+	- [FR][P2]091521: power; deepsleep for feather board (M0, M4) implementations
 
 ### Questions
-- [Q]100120: mqtt; Can I just subscribe to the higher level topic in connectToBroker() to get all the subs
 - [Q]120220: screen; Why do I need wire and spi for OLED displays?
 - [Q]082921: time; when do I need to timestamp data bound for MQTT; adafruit.io time stamps for me, does a local server?
 - [Q]090721: I've failed at compressing zuluDateTimeString() twice, what is the issue relative to string buildout?
@@ -209,7 +206,7 @@ Regularly sample and log temperature, humidity
 	- #DEBUG log formatting fixes
 	- Time fixes
 		- [I][P3]082521: quasi clock generates two messages every 10 seconds instead of one -> dependent on code and processor, # of messages dependent on times through loop within the 1ms
-		- [Q]100220: time; Every five minutes we are generating a "Transmitting NTP request"? -> Expected behavior, any time a timelib function is used, timelib is checking and potentially synching to time provider. In this case, a time string was being generated associated with each mqtt log entry, causing the sync
+		- [Q]100220: time; Every five minutes we are generating a "Transmitting NTP request"? -> Expected behavior, any time a timelib function is used, timelib is checking and potentially synching to time provider. In this case, a time string was being generated associated with each mqtt log entry, causing the sync. Also, MQTT reconnect is set for 5 minutes, and MQTT reconnect (see bug) is driving NTP request
 		- [I][P3]111020: time; How do we better handle Daylight vs. Standard time? -> Switched to UTC time for logging, switched timeString to properly formatted zuluDateTimeString
 		- [I][P3]092020: time; If time isn't set by NTP, DEBUG and SDLOG have errors -> zuluDateTimeString inserts "time not set" instead of UTC time if NTP not defined
 	- [I][P2]112820: sdlog; data logged to SDLOG is not uniquely identified -> room and UTC time attached to readings
@@ -239,6 +236,15 @@ Regularly sample and log temperature, humidity
 	- UI elements function
 	- screenMessage updated to call UI element function
 - 091521
+	- validated code paths for only DEBUG and only DEBUG and SCREEN
 	- [FR][P3]091321: screen; convert pixel coordinates in screen draws to offsets of display.width, display.height -> done
 	- [I][P1]091321: mqtt; should I be using a mqtt.disconnect() during the sleep process? -> added
 	- [I][P1]091321: screen; is the deepsleep function for EPD causing the screen to grey out? -> significant debugging, fixed by changing EPD_BUSY from -1 (default in all Adafruit code) to 5 (from Magtag pinout)
+- 091621
+	- [I][P1]091521: screen; can't call screenMessage after screenValues because the latter will overwrite the screen -> compressed all screen routines into a single screenUpdate function
+	- [FR][P1]112920: screen; time display -> injected as messageText when displaying temperature and humidity
+	- [Q]100120: mqtt; Can I just publish to the higher level topic in connectToBroker() to get all the subs -> no
+	- [I][P2]091021: wifi; If WiFi comes down for an extended period, functionality does not recover in non-deepsleep code branches -> switched from stopApp() to deepSleep() for WiFi failures at initialization
+	- [FR][P2]090821: wifi; instead of while(1) if unable to connect to WiFi, it would be better to reset -> switched from stopApp() to deepSleep() for WiFi failures at initialization
+	- [I][P1]091321: mqtt; semi-consistently seeing issue where, over WiFI, temp is logging to mqtt properly but room and sometimes humidity is not -> solved by implementing MQTT QoS 1
+	- [FR][P3]100720: mqtt; implement MQTT QoS 1 -> done

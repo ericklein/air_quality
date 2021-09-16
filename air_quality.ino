@@ -75,9 +75,9 @@ Adafruit_Si7021 sensor = Adafruit_Si7021();
   #include "Adafruit_MQTT.h"
   #include "Adafruit_MQTT_Client.h"
   Adafruit_MQTT_Client mqtt(&client, MQTT_BROKER, MQTT_PORT, MQTT_CLIENT_ID, MQTT_USER, MQTT_PASS);
-  Adafruit_MQTT_Publish tempPub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC1);
-  Adafruit_MQTT_Publish humidityPub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC2);
-  Adafruit_MQTT_Publish roomPub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC4);
+  Adafruit_MQTT_Publish tempPub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC1,MQTT_QOS_1);
+  Adafruit_MQTT_Publish humidityPub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC2, MQTT_QOS_1);
+  Adafruit_MQTT_Publish roomPub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC4, MQTT_QOS_1);
 #endif
 
 #ifdef NTP
@@ -155,7 +155,7 @@ void setup()
   if (! sensor.begin())
   {
     debugMessage("FATAL ERROR: temp/humidity sensor not detected");
-    screenMessage("ERROR 1: Sensor");
+    screenUpdate(0,0,"temp/humidity sensor not detected");
     stopApp();
   }
   debugMessage("temp/humidity sensor ready");
@@ -198,8 +198,9 @@ void setup()
       if (tries == MAX_TRIES)
       {
         debugMessage(String("Can not connect to WFii after ") + MAX_TRIES + " attempts");
-        screenMessage(String("Can not connect to WiFi after ") + MAX_TRIES + " attempts");
-        stopApp();
+        screenUpdate(0,0,String("Can not connect to WiFi after ") + MAX_TRIES + " attempts");
+        //stopApp();
+        deepSleep();
       }
       tries++;
     }
@@ -227,16 +228,10 @@ void setup()
       {
         // generic error
         debugMessage("Failed to configure Ethernet using DHCP");
-        screenMessage("Failed to configure Ethernet using DHCP");
+        screenUpdate(0,0,"Failed to configure Ethernet using DHCP");
         stopApp();
       }
     }
-    // #ifdef DEBUG
-    //   Serial.print("Ethernet address is:");
-    //   Serial.println(Ethernet.localIP);
-    // #endif 
-    //String ipText = DisplayAddress(Ethernet.localIP);
-    //debugMessage(String("Ethernet IP address is: ") + ipText);
     debugMessage(String("Ethernet IP address is: ") + ip2CharArray(Ethernet.localIP()));
 
   #endif
@@ -267,29 +262,34 @@ void setup()
   float temperature = (sensor.readTemperature()*1.8)+32;
   float humidity = sensor.readHumidity();
 
-  screenValues(temperature, humidity);
+  screenUpdate(temperature, humidity,zuluDateTimeString());
 
   #ifdef MQTTLOG
     MQTT_connect();
     if (!tempPub.publish(temperature))
     {
       debugMessage(String(MQTT_PUB_TOPIC1) + " MQTT publish failed at " + zuluDateTimeString());
+      screenUpdate(temperature, humidity, String(MQTT_PUB_TOPIC1) + " publish failed at " + zuluDateTimeString());
     }
     else 
     {
       debugMessage(String("Published ") + temperature + " to MQTT endpoint " + MQTT_PUB_TOPIC1 + " at " + zuluDateTimeString());
     }
+
     if (!humidityPub.publish(humidity))
     {
-      debugMessage(String(MQTT_PUB_TOPIC2) + " MQTT publish failed");
+      debugMessage(String(MQTT_PUB_TOPIC2) + " MQTT publish failed at " + zuluDateTimeString());
+      screenUpdate(temperature, humidity, String(MQTT_PUB_TOPIC2) + " publish failed at " + zuluDateTimeString());
     }
     else 
     {
       debugMessage(String("Published ") + humidity + " to MQTT endpoint " + MQTT_PUB_TOPIC2);
     }
+
     if (!roomPub.publish(MQTT_CLIENT_ID))
     {
-      debugMessage(String(MQTT_PUB_TOPIC4) + " MQTT publish failed");
+      debugMessage(String(MQTT_PUB_TOPIC4) + " MQTT publish failed at " + zuluDateTimeString());
+      screenUpdate(temperature, humidity, String(MQTT_PUB_TOPIC4) + " publish failed at " + zuluDateTimeString());
     }
     else 
     {
@@ -430,7 +430,6 @@ String zuluDateTimeString()
       if (tries == ATTEMPT_LIMIT) 
       {
         debugMessage(String("Connection failed to MQTT broker ") + MQTT_BROKER);
-        screenMessage("ERROR 10: MQTT Broker connection failed");
       }
     }
     if (tries<ATTEMPT_LIMIT)
@@ -447,51 +446,32 @@ void debugMessage(String messageText)
   #endif
 }
 
-void screenUIBorders()
+void screenUpdate(float temperature, float humidity, String messageText)
 {
   #ifdef SCREEN
+    display.clearBuffer();
+    // UI borders
     display.drawRoundRect(0,0,display.width(),(display.height()/3),10,EPD_BLACK);
     display.drawRoundRect(0,((display.height()/3)-1),display.width(),(display.height()/3),10, EPD_BLACK);
     display.drawRoundRect(0,((display.height()*2/3)-3),display.width(),((display.height()/3)+2),10, EPD_BLACK);
-  #endif
-}
-
-void screenMessage(String messageText)
-{
-  #ifdef SCREEN
-    //display.fillScreen(BLACK);
-    display.clearBuffer();
-    screenUIBorders();
-    display.setFont();  // resets to system default (monospace)
+    // temperature and humidity display
+    display.setFont(&FreeSans9pt7b);
     display.setTextSize(1);
+    display.setCursor(5,(display.height()/6)); // midpoint of first roundRect
+    if (temperature>0)
+      display.print(String("Temperature is ") + temperature + "F");
+    else
+      display.print("Temperature is unavailable");
+    display.setCursor(5,(display.height()/2)); // midpoint of second roundRect
+    if (humidity>0)
+      display.print(String("Humidity is ") + humidity + "%");
+    else
+      display.print("Humidity is unavailable");
+    display.setFont();  // resets to system default (monospace)
     display.setCursor(5,(display.height()*5/6));
     display.println(messageText);
     display.display();
   #endif
-}
-
-void screenValues(float temperature, float humidity)
-{
-    #ifdef SCREEN
-      //display.fillScreen(BLACK);
-      display.clearBuffer();
-      display.setFont(&FreeSans9pt7b);
-      display.setTextSize(1);
-      screenUIBorders();
-      display.setCursor(5,(display.height()/6)); // midpoint of first roundRect
-      //display.setTextColor(YELLOW);
-      //display.print("Temperature: ");
-      display.print(String("Temperature is ") + temperature + "F");
-      //display.setTextColor(RED);
-      //display.println(temperature);  // will get truncated to 2 decimal places
-      display.setCursor(5,(display.height()/2)); // midpoint of second roundRect
-      //display.setTextColor(YELLOW);
-      //display.print("Humidity: ");
-      display.print(String("Humidity is ") + humidity + "%");
-      //display.setTextColor(RED);
-      //display.println(humidity);
-      display.display();
-    #endif
 }
 
 void stopApp()
