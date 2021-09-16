@@ -6,7 +6,7 @@
 */
 
 // Conditional compile flags
-#define DEBUG         // Output to the serial port
+//#define DEBUG         // Output to the serial port
 #define SCREEN        // output sensor data to screen
 #define MQTTLOG        // Output to MQTT broker defined in secrets.h
 //#define RJ45            // use Ethernet
@@ -16,16 +16,19 @@
 // Gloval variables
 unsigned long syncTime = 0;        // holds millis() [milliseconds] for timing functions 
 
-// AHT20 (temperature and humidity)
-#include <Adafruit_AHTX0.h>
-Adafruit_AHTX0 aht;
+// AHTX0 (temperature and humidity)
+// #include <Adafruit_AHTX0.h>
+// Adafruit_AHTX0 sensor;
+
+// Si7021 (temperature and humidity)
+#include "Adafruit_Si7021.h"
+Adafruit_Si7021 sensor = Adafruit_Si7021();
 
 #ifdef DEBUG
-  // millisecond delay between sensor reads
-  #define LOG_INTERVAL 60000  // standard test interval
-  //#define LOG_INTERVAL 600000   // long term test interval
+  // microsecond delay for deep sleep
+  #define LOG_INTERVAL 240000000  // debug interval; 240 seconds 
 #else
-  #define LOG_INTERVAL 600000
+  #define LOG_INTERVAL 1800000000 // production interval; 1800 seconds
 #endif
 
 // MQTT credentials and network IDs
@@ -72,9 +75,9 @@ Adafruit_AHTX0 aht;
   #include "Adafruit_MQTT.h"
   #include "Adafruit_MQTT_Client.h"
   Adafruit_MQTT_Client mqtt(&client, MQTT_BROKER, MQTT_PORT, MQTT_CLIENT_ID, MQTT_USER, MQTT_PASS);
-  Adafruit_MQTT_Publish tempPub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC1);
-  Adafruit_MQTT_Publish humidityPub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC2);
-  Adafruit_MQTT_Publish roomPub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC4);
+  Adafruit_MQTT_Publish tempPub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC1,MQTT_QOS_1);
+  Adafruit_MQTT_Publish humidityPub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC2, MQTT_QOS_1);
+  Adafruit_MQTT_Publish roomPub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC4, MQTT_QOS_1);
 #endif
 
 #ifdef NTP
@@ -99,8 +102,32 @@ Adafruit_AHTX0 aht;
 #ifdef SCREEN
   #include <Adafruit_GFX.h>
 
-  #include <Adafruit_ST7789.h>
-  Adafruit_ST7789 display = Adafruit_ST7789(TFT_CS, TFT_DC, TFT_RESET);
+  // magtag support
+  #include "Adafruit_ThinkInk.h"
+  #include <Fonts/FreeSans9pt7b.h>
+  #define EPD_DC      7 // can be any pin, but required!
+  #define EPD_RESET   6  // can set to -1 and share with chip Reset (can't deep sleep)
+  #define EPD_CS      8  // can be any pin, but required!
+  #define SRAM_CS     -1  // can set to -1 to not use a pin (uses a lot of RAM!)
+  #define EPD_BUSY    5  // can set to -1 to not use a pin (will wait a fixed delay)
+  ThinkInk_290_Grayscale4_T5 display(EPD_DC, EPD_RESET, EPD_CS, SRAM_CS, EPD_BUSY);
+  // #define COLOR1 EPD_BLACK
+  // #define COLOR2 EPD_LIGHT
+  // #define COLOR3 EPD_DARK
+  bool gray = false;
+
+  // LED, OLED color definitions
+  // #define BLACK    0x0000
+  // #define BLUE     0x001F
+  // #define RED      0xF800
+  // #define GREEN    0x07E0
+  // #define CYAN     0x07FF
+  // #define MAGENTA  0xF81F
+  // #define YELLOW   0xFFE0 
+  // #define WHITE    0xFFFF
+
+  // #include <Adafruit_ST7789.h>
+  // Adafruit_ST7789 display = Adafruit_ST7789(TFT_CS, TFT_DC, TFT_RESET);
 
   //#include <Adafruit_SH110X.h>
   //Adafruit_SH110X display = Adafruit_SH110X(64, 128, &Wire);
@@ -125,39 +152,30 @@ void setup()
   #endif
 
   // sensor check
-  if (! aht.begin())
+  if (! sensor.begin())
   {
-    debugMessage("FATAL ERROR: AHT sensor not detected");
-    screenMessage("ERROR 1: Sensor");
+    debugMessage("FATAL ERROR: temp/humidity sensor not detected");
+    screenUpdate(0,0,"temp/humidity sensor not detected");
     stopApp();
   }
-  debugMessage("AHTX0 sensor ready");
+  debugMessage("temp/humidity sensor ready");
 
   #ifdef SCREEN
-    // Color definitions
-    #define BLACK    0x0000
-    #define BLUE     0x001F
-    #define RED      0xF800
-    #define GREEN    0x07E0
-    #define CYAN     0x07FF
-    #define MAGENTA  0xF81F
-    #define YELLOW   0xFFE0 
-    #define WHITE    0xFFFF
-
     // Initialize ST7789 screen
-    display.init(240, 240);
-    pinMode(TFT_BACKLIGHT, OUTPUT);
-    digitalWrite(TFT_BACKLIGHT, HIGH); // Backlight on
-    display.fillScreen(BLACK);
+    // display.init(240, 240);
+    // pinMode(TFT_BACKLIGHT, OUTPUT);
+    // digitalWrite(TFT_BACKLIGHT, HIGH); // Backlight on
+    // display.fillScreen(BLACK);
 
     // // Initialize SH110X screen
     // display.setRotation(1); // SH110X only?
 
     // // Initialize SSD1306 screen
 
-    display.setTextSize(2);
-    display.setTextColor(WHITE);
-    display.println("Waiting for first sensor data");
+    // Initalize e-ink screen
+    if (gray) display.begin(THINKINK_GRAYSCALE4);
+    else display.begin(THINKINK_MONO);
+    display.setTextColor(EPD_BLACK);
   #endif
 
   #ifdef WIFI
@@ -180,8 +198,9 @@ void setup()
       if (tries == MAX_TRIES)
       {
         debugMessage(String("Can not connect to WFii after ") + MAX_TRIES + " attempts");
-        screenMessage(String("Can not connect to WiFi after ") + MAX_TRIES + " attempts");
-        stopApp();
+        screenUpdate(0,0,String("Can not connect to WiFi after ") + MAX_TRIES + " attempts");
+        //stopApp();
+        deepSleep();
       }
       tries++;
     }
@@ -209,16 +228,10 @@ void setup()
       {
         // generic error
         debugMessage("Failed to configure Ethernet using DHCP");
-        screenMessage("Failed to configure Ethernet using DHCP");
+        screenUpdate(0,0,"Failed to configure Ethernet using DHCP");
         stopApp();
       }
     }
-    // #ifdef DEBUG
-    //   Serial.print("Ethernet address is:");
-    //   Serial.println(Ethernet.localIP);
-    // #endif 
-    //String ipText = DisplayAddress(Ethernet.localIP);
-    //debugMessage(String("Ethernet IP address is: ") + ipText);
     debugMessage(String("Ethernet IP address is: ") + ip2CharArray(Ethernet.localIP()));
 
   #endif
@@ -232,75 +245,71 @@ void setup()
     while(timeStatus()== timeNotSet);
     debugMessage("NTP time is " + zuluDateTimeString());
   #endif
-}
 
-void loop() 
-{
-  #ifdef DEBUG
-    // display heartbeat every 20 seconds between sensor reads; depending on client might display >1 message per interval
-    if (((millis() - syncTime) % 20000) == 0)
-    {
-      debugMessage(String(((millis()-syncTime)/1000)) + " seconds elapsed before next read at " + (LOG_INTERVAL/1000) + " seconds");
-    }
-  #endif
-
-  // update display and determine if it is time to read/process sensors
-  if ((millis() - syncTime) < LOG_INTERVAL) return;
-
-  syncTime = millis();
-  #ifdef MQTTLOG
-  {
-    MQTT_connect();
-  }
-  #endif
-
+  // One time run of main logic before sleep
   // populate temp and humidity objects with fresh data
-  sensors_event_t humidity, temp;
-  aht.getEvent(&humidity, &temp);
+  // AHTX0
+  // sensors_event_t humidity, temp;
+  // sensor.getEvent(&humidity, &temp);
+  // SiH7021
 
-  #ifdef SCREEN
-    display.fillScreen(BLACK);
-    display.setCursor(0,0);
-    display.setTextColor(YELLOW);
-    display.print("Temperature: ");
-    display.setTextColor(RED);
-    display.println((temp.temperature*9/5+32));  // will get truncated to 2 decimal places
-    display.setTextColor(YELLOW);
-    display.print("Humidity: ");
-    display.setTextColor(RED);
-    display.println(humidity.relative_humidity);
-  #endif
+  // intermediate variable helps moving between sensor APIs easier in code
+  // AHTX0
+  // float temperature = (temp.temperature*1.8)+32;
+  // float humidity = humidity.relative_humidity;
+
+  // SiH7021
+  float temperature = (sensor.readTemperature()*1.8)+32;
+  float humidity = sensor.readHumidity();
+
+  screenUpdate(temperature, humidity,zuluDateTimeString());
 
   #ifdef MQTTLOG
-    if (!tempPub.publish((temp.temperature*9/5+32)))
+    MQTT_connect();
+    if (!tempPub.publish(temperature))
     {
       debugMessage(String(MQTT_PUB_TOPIC1) + " MQTT publish failed at " + zuluDateTimeString());
+      screenUpdate(temperature, humidity, String(MQTT_PUB_TOPIC1) + " publish failed at " + zuluDateTimeString());
     }
     else 
     {
-      debugMessage(String("Published ") + (temp.temperature*9/5+32) + " to MQTT endpoint " + MQTT_PUB_TOPIC1 + " at " + zuluDateTimeString());
+      debugMessage(String("Published ") + temperature + " to MQTT endpoint " + MQTT_PUB_TOPIC1 + " at " + zuluDateTimeString());
     }
-    if (!humidityPub.publish(humidity.relative_humidity))
+
+    if (!humidityPub.publish(humidity))
     {
-      debugMessage(String(MQTT_PUB_TOPIC2) + " MQTT publish failed");
+      debugMessage(String(MQTT_PUB_TOPIC2) + " MQTT publish failed at " + zuluDateTimeString());
+      screenUpdate(temperature, humidity, String(MQTT_PUB_TOPIC2) + " publish failed at " + zuluDateTimeString());
     }
     else 
     {
-      debugMessage(String("Published ") + (humidity.relative_humidity) + " to MQTT endpoint " + MQTT_PUB_TOPIC2);
+      debugMessage(String("Published ") + humidity + " to MQTT endpoint " + MQTT_PUB_TOPIC2);
     }
+
     if (!roomPub.publish(MQTT_CLIENT_ID))
     {
-      debugMessage(String(MQTT_PUB_TOPIC4) + " MQTT publish failed");
+      debugMessage(String(MQTT_PUB_TOPIC4) + " MQTT publish failed at " + zuluDateTimeString());
+      screenUpdate(temperature, humidity, String(MQTT_PUB_TOPIC4) + " publish failed at " + zuluDateTimeString());
     }
     else 
     {
       debugMessage(String("Published ") + MQTT_CLIENT_ID + " to MQTT endpoint " + MQTT_PUB_TOPIC4);
     }
+    mqtt.disconnect();
   #endif
 
   #ifndef MQTTLOG   // reduces log clutter
-    debugMessage(zuluDateTimeString() + "," + MQTT_CLIENT_ID + "," + humidity.relative_humidity + "," + String(temp.temperature*9/5+32));
+    debugMessage(zuluDateTimeString() + "," + MQTT_CLIENT_ID + "," + temperature + "," + humidity);
   #endif
+
+  #ifdef WIFI
+    client.stop();
+  #endif
+    deepSleep();
+}
+
+void loop() 
+{
 }
 
 #ifdef NTP
@@ -421,7 +430,6 @@ String zuluDateTimeString()
       if (tries == ATTEMPT_LIMIT) 
       {
         debugMessage(String("Connection failed to MQTT broker ") + MQTT_BROKER);
-        screenMessage("ERROR 10: MQTT Broker connection failed");
       }
     }
     if (tries<ATTEMPT_LIMIT)
@@ -438,11 +446,31 @@ void debugMessage(String messageText)
   #endif
 }
 
-void screenMessage(String messageText)
+void screenUpdate(float temperature, float humidity, String messageText)
 {
   #ifdef SCREEN
-    display.fillScreen(BLACK);
+    display.clearBuffer();
+    // UI borders
+    display.drawRoundRect(0,0,display.width(),(display.height()/3),10,EPD_BLACK);
+    display.drawRoundRect(0,((display.height()/3)-1),display.width(),(display.height()/3),10, EPD_BLACK);
+    display.drawRoundRect(0,((display.height()*2/3)-3),display.width(),((display.height()/3)+2),10, EPD_BLACK);
+    // temperature and humidity display
+    display.setFont(&FreeSans9pt7b);
+    display.setTextSize(1);
+    display.setCursor(5,(display.height()/6)); // midpoint of first roundRect
+    if (temperature>0)
+      display.print(String("Temperature is ") + temperature + "F");
+    else
+      display.print("Temperature is unavailable");
+    display.setCursor(5,(display.height()/2)); // midpoint of second roundRect
+    if (humidity>0)
+      display.print(String("Humidity is ") + humidity + "%");
+    else
+      display.print("Humidity is unavailable");
+    display.setFont();  // resets to system default (monospace)
+    display.setCursor(5,(display.height()*5/6));
     display.println(messageText);
+    display.display();
   #endif
 }
 
@@ -458,9 +486,22 @@ void stopApp()
   }
 }
 
-String ip2CharArray(IPAddress ip) 
+#if defined(WIFI) || defined(RJ45)
+  String ip2CharArray(IPAddress ip) 
+    {
+      static char a[16];
+      sprintf(a, "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
+      return a;
+    }
+#endif
+
+void deepSleep()
 {
-  static char a[16];
-  sprintf(a, "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
-  return a;
+  debugMessage(String("Going to sleep for ") + (LOG_INTERVAL/100000) + " seconds");
+  #ifdef SCREEN
+    display.powerDown();
+    digitalWrite(EPD_RESET, LOW); // hardware power down mode
+  #endif
+  esp_sleep_enable_timer_wakeup(LOG_INTERVAL);
+  esp_deep_sleep_start();
 }
