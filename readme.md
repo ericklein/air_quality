@@ -77,10 +77,9 @@ Regularly sample and log temperature, humidity
 
 ### Issues
 - mqtt
-	- [I][P2]102420: mqtt; Move local MQTT server to DNS named entry instead of IP address so DNS can resolve it if IP address changes
-	- [I][P2]111420: mqtt; MQTT publish (to Adafruit IO?) requires NTP to be defined?! No idea why.
+	- [I][P3]102420: mqtt; Move local MQTT server to DNS named entry instead of IP address so DNS can resolve it if IP address changes
+	- [I][P3]111420: mqtt; MQTT publish (to Adafruit IO?) requires NTP to be defined?! No idea why.
 	- [I][P1]091321: mqtt; semi-consistently seeing issue where, over WiFI, temp is logging to mqtt properly but humidity and room are not. I thought I resolved it via different MQTT_CLIENT_ID, but no.
-	- [I][P1]091321: mqtt; should I be using a mqtt.disconnect() during the sleep process. Might help with issues I'm seeing?
 - time
 	- [I][P3]112820: time; NTP is dependent to WiFi or Ethernet due to IPAddress
 	- [I][P2]111420: time; Review NTP while until data
@@ -91,17 +90,20 @@ Regularly sample and log temperature, humidity
 - screen
 	- [I][P2]111120: screen; Screen is on all the time, which could cause OLED burn in, and in dark environments, is very bright
 	- [I][P2]112820: screen; pin 2 conflict with XXXX? on SH110x, not sure about SSD1306
-	- [I][P1]091321: screen; is the deepsleep function for EPD causing the screen to grey out? look at powerUp(), which I'm not using, and powerDown()
+	- [I][P1]091521: screen; can't call screenMessage after screenValues because the latter will overwrite the screen
 - wifi
 	- [I][P1]091021: wifi; If WiFi comes down for an extended period, functionality does not recover
 	- [I][P3]091321: wifi; validate host name is being set via network admin tool
 - log
 	- [I][P2]091321: log; don't think MagTag BSP has LED_BUILTIN defined. No blinking LED on FATAL errors
+		- Pin 13 on MagTag
 - sensor
 	- [I][P2]112820: sensor; Temperature data is off by a few degrees F when inserted into case?
 	- [I][P2]090921: sensor; values coming from standalone AHT20 and Funhouse AHT20 are very different. Calibration issue? See [FR] on this as well.
 		- 091321 SiH7021 is close to the standalone AHT20 values
 - power
+	- [I][P1]090121: power; Low battery messaging (to MQTT)
+
 
 ### Feature Requests
 - mqtt
@@ -112,11 +114,9 @@ Regularly sample and log temperature, humidity
 - time
 	- [FR][P2]112920: time; Get time from MQTT broker
 - screen
-	- [FR][P1]112020: screen; Heartbeat indicator on-screen
-	- [FR][P2]112920: screen; Rotating time display
-	- [FR][P3]120220: screen; Added error checking on string length to screenMessage()
-	- [FR][P3]091321: screen; convert pixel coordinates in screenUIBorders to offsets of display.width, display.height
-	- [FR][P3]091321: screen; cycle to local weather forcast
+	- [FR][P1]112920: screen; time display
+	- [FR][P3]120220: screen; Add string length checking to screenMessage()
+	- [FR][P3]091321: screen; local weather (forecast)
 - wifi
 	- [FR][P2]090821: wifi; instead of while(1) if unable to connect to WiFi, it would be better to reset
 	- [FR][P3]090921: wifi; more diagnostic information at connect in log
@@ -129,7 +129,6 @@ Regularly sample and log temperature, humidity
 - sensor
 	- [FR][P2]090921: sensor; check calibration before reading and calibrate if needed
 - power
-	- [FR][P2]090121: power; Low battery messaging (to MQTT)
 
 ### Questions
 - [Q]100120: mqtt; Can I just subscribe to the higher level topic in connectToBroker() to get all the subs
@@ -239,3 +238,7 @@ Regularly sample and log temperature, humidity
 	- Moving temp/humidity display to separate function
 	- UI elements function
 	- screenMessage updated to call UI element function
+- 091521
+	- [FR][P3]091321: screen; convert pixel coordinates in screen draws to offsets of display.width, display.height -> done
+	- [I][P1]091321: mqtt; should I be using a mqtt.disconnect() during the sleep process? -> added
+	- [I][P1]091321: screen; is the deepsleep function for EPD causing the screen to grey out? -> significant debugging, fixed by changing EPD_BUSY from -1 (default in all Adafruit code) to 5 (from Magtag pinout)

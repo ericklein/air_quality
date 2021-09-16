@@ -6,7 +6,7 @@
 */
 
 // Conditional compile flags
-#define DEBUG         // Output to the serial port
+//#define DEBUG         // Output to the serial port
 #define SCREEN        // output sensor data to screen
 #define MQTTLOG        // Output to MQTT broker defined in secrets.h
 //#define RJ45            // use Ethernet
@@ -109,7 +109,7 @@ Adafruit_Si7021 sensor = Adafruit_Si7021();
   #define EPD_RESET   6  // can set to -1 and share with chip Reset (can't deep sleep)
   #define EPD_CS      8  // can be any pin, but required!
   #define SRAM_CS     -1  // can set to -1 to not use a pin (uses a lot of RAM!)
-  #define EPD_BUSY    -1  // can set to -1 to not use a pin (will wait a fixed delay)
+  #define EPD_BUSY    5  // can set to -1 to not use a pin (will wait a fixed delay)
   ThinkInk_290_Grayscale4_T5 display(EPD_DC, EPD_RESET, EPD_CS, SRAM_CS, EPD_BUSY);
   // #define COLOR1 EPD_BLACK
   // #define COLOR2 EPD_LIGHT
@@ -175,7 +175,6 @@ void setup()
     // Initalize e-ink screen
     if (gray) display.begin(THINKINK_GRAYSCALE4);
     else display.begin(THINKINK_MONO);
-    display.setFont(&FreeSans9pt7b);
     display.setTextColor(EPD_BLACK);
   #endif
 
@@ -296,6 +295,7 @@ void setup()
     {
       debugMessage(String("Published ") + MQTT_CLIENT_ID + " to MQTT endpoint " + MQTT_PUB_TOPIC4);
     }
+    mqtt.disconnect();
   #endif
 
   #ifndef MQTTLOG   // reduces log clutter
@@ -450,9 +450,9 @@ void debugMessage(String messageText)
 void screenUIBorders()
 {
   #ifdef SCREEN
-    display.drawRoundRect(0,0,295,42,10,EPD_WHITE);
-    display.drawRoundRect(0,41,295,42,10, EPD_WHITE);
-    display.drawRoundRect(0,82,295,44,10, EPD_WHITE);
+    display.drawRoundRect(0,0,display.width(),(display.height()/3),10,EPD_BLACK);
+    display.drawRoundRect(0,((display.height()/3)-1),display.width(),(display.height()/3),10, EPD_BLACK);
+    display.drawRoundRect(0,((display.height()*2/3)-3),display.width(),((display.height()/3)+2),10, EPD_BLACK);
   #endif
 }
 
@@ -461,9 +461,10 @@ void screenMessage(String messageText)
   #ifdef SCREEN
     //display.fillScreen(BLACK);
     display.clearBuffer();
-    display.setTextSize(1);
     screenUIBorders();
-    display.setCursor(5,88);
+    display.setFont();  // resets to system default (monospace)
+    display.setTextSize(1);
+    display.setCursor(5,(display.height()*5/6));
     display.println(messageText);
     display.display();
   #endif
@@ -474,15 +475,16 @@ void screenValues(float temperature, float humidity)
     #ifdef SCREEN
       //display.fillScreen(BLACK);
       display.clearBuffer();
+      display.setFont(&FreeSans9pt7b);
       display.setTextSize(1);
       screenUIBorders();
-      display.setCursor(5,20);
+      display.setCursor(5,(display.height()/6)); // midpoint of first roundRect
       //display.setTextColor(YELLOW);
       //display.print("Temperature: ");
       display.print(String("Temperature is ") + temperature + "F");
       //display.setTextColor(RED);
       //display.println(temperature);  // will get truncated to 2 decimal places
-      display.setCursor(5,60);
+      display.setCursor(5,(display.height()/2)); // midpoint of second roundRect
       //display.setTextColor(YELLOW);
       //display.print("Humidity: ");
       display.print(String("Humidity is ") + humidity + "%");
@@ -504,18 +506,22 @@ void stopApp()
   }
 }
 
-String ip2CharArray(IPAddress ip) 
-{
-  static char a[16];
-  sprintf(a, "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
-  return a;
-}
+#if defined(WIFI) || defined(RJ45)
+  String ip2CharArray(IPAddress ip) 
+    {
+      static char a[16];
+      sprintf(a, "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
+      return a;
+    }
+#endif
 
 void deepSleep()
 {
   debugMessage(String("Going to sleep for ") + (LOG_INTERVAL/100000) + " seconds");
-  display.powerDown();
-  digitalWrite(EPD_RESET, LOW); // hardware power down mode
+  #ifdef SCREEN
+    display.powerDown();
+    digitalWrite(EPD_RESET, LOW); // hardware power down mode
+  #endif
   esp_sleep_enable_timer_wakeup(LOG_INTERVAL);
   esp_deep_sleep_start();
 }
