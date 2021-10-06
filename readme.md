@@ -89,19 +89,17 @@ Regularly sample and log temperature, humidity
 		- [I][P1]091321: time; "No NTP response" does not reattempt until success
 		- in zuluDateTimeString switch #ifdef NTP for check timeStatus() for timeNotSet
 - screen
-	- [I][P2]111120: screen; Screen is on all the time, which could cause OLED burn in, and in dark environments, is very bright
-	- [I][P2]112820: screen; pin 2 conflict with XXXX? on SH110x, not sure about SSD1306
+	- [I][P3]111120: screen; Screen is on all the time, which could cause OLED burn in, and in dark environments, is very bright
+	- [I][P3]112820: screen; pin 2 conflict with XXXX? on SH110x, not sure about SSD1306
 - wifi
-	- [I][P3]091321: wifi; validate host name is being set via network admin tool
 - log
 	- [I][P2]091321: log; don't think MagTag BSP has LED_BUILTIN defined. No blinking LED on FATAL errors
 		- Pin 13 on MagTag
 - sensor
 	- [I][P2]112820: sensor; Temperature data is off by a few degrees F when inserted into case?
-	- [I][P2]090921: sensor; values coming from standalone AHT20 and Funhouse AHT20 are very different. Calibration issue? See [FR] on this as well.
+	- [I][P3]090921: sensor; values coming from standalone AHT20 and Funhouse AHT20 are very different. Calibration issue? See [FR] on this as well.
 		- 091321 SiH7021 is close to the standalone AHT20 values
 - power
-	- [I][P1]090121: power; Low battery messaging (to MQTT)
 	- [I][P2]091521: power; why is stemmaQT board getting power (LED light is on) in deepsleep()?
 
 ### Feature Requests
@@ -117,16 +115,17 @@ Regularly sample and log temperature, humidity
 - time
 	- [FR][P2]112920: time; Get time from MQTT broker
 - screen
-	- [FR][P3]120220: screen; Add string length checking to screenUpdate()
 	- [FR][P3]091321: screen; local weather (forecast)
 - wifi
-	- [FR][P3]090921: wifi; more diagnostic information at connect in log
 - log
 
 - sensor
 	- [FR][P2]090921: sensor; check calibration before reading and calibrate if needed
+	- [FR][P2]093021: sensor; CO2 readings
 - power
 	- [FR][P2]091521: power; deepsleep for feather board (M0, M4) implementations
+	- [FR][P1]090121: power; Low battery messaging to screen
+	- [FR][P1]090121: power; Low battery messaging to MQTT
 
 ### Questions
 - [Q]120220: screen; Why do I need wire and spi for OLED displays?
@@ -248,3 +247,11 @@ Regularly sample and log temperature, humidity
 	- [FR][P2]090821: wifi; instead of while(1) if unable to connect to WiFi, it would be better to reset -> switched from stopApp() to deepSleep() for WiFi failures at initialization
 	- [I][P1]091321: mqtt; semi-consistently seeing issue where, over WiFI, temp is logging to mqtt properly but room and sometimes humidity is not -> solved by implementing MQTT QoS 1
 	- [FR][P3]100720: mqtt; implement MQTT QoS 1 -> done
+- 100421
+	- [I][P3]091321: wifi; validate host name is being set via network admin tool -> validated
+	- [I][P2]100421: screen; UI indication of clientname -> added
+	- [I][P1]093021: screen; error string is wrapping into time display text -> resolved for MQTT error messages
+	- [I][P1]093021: screen; error string is not being checked to fit on screen -> manually reviewing
+	- Simplified error reporting for MQTT publish issues, as I can look at the data to see the actual problem or error in the server processing code
+	- Reviewing UI changes to add outside temp and humidity plus CO2 display
+	- [FR][P3]090921: wifi; more diagnostic information at connect in log -> now reporting RSSI value

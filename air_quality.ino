@@ -111,10 +111,7 @@ Adafruit_Si7021 sensor = Adafruit_Si7021();
   #define SRAM_CS     -1  // can set to -1 to not use a pin (uses a lot of RAM!)
   #define EPD_BUSY    5  // can set to -1 to not use a pin (will wait a fixed delay)
   ThinkInk_290_Grayscale4_T5 display(EPD_DC, EPD_RESET, EPD_CS, SRAM_CS, EPD_BUSY);
-  // #define COLOR1 EPD_BLACK
-  // #define COLOR2 EPD_LIGHT
-  // #define COLOR3 EPD_DARK
-  bool gray = false;
+  // colors are EPD_WHITE, EPD_BLACK, EPD_RED, EPD_GRAY, EPD_LIGHT, EPD_DARK
 
   // LED, OLED color definitions
   // #define BLACK    0x0000
@@ -140,7 +137,6 @@ void setup()
 {
   // used for fatal error messaging
   pinMode(LED_BUILTIN, OUTPUT);
-  digitalWrite(LED_BUILTIN, LOW);
 
   #ifdef DEBUG
     Serial.begin(115200);
@@ -173,9 +169,8 @@ void setup()
     // // Initialize SSD1306 screen
 
     // Initalize e-ink screen
-    if (gray) display.begin(THINKINK_GRAYSCALE4);
-    else display.begin(THINKINK_MONO);
-    display.setTextColor(EPD_BLACK);
+    display.begin(THINKINK_GRAYSCALE4);
+    // display.begin(THINKINK_MONO);
   #endif
 
   #ifdef WIFI
@@ -205,6 +200,7 @@ void setup()
       tries++;
     }
     debugMessage("WiFi IP address is: " + ip2CharArray(WiFi.localIP()));
+    debugMessage("RSSI is: " + String(WiFi.RSSI()) + " dBm");
   #endif
 
   #ifdef RJ45
@@ -221,19 +217,24 @@ void setup()
     {      
       // identified errors
       if (Ethernet.hardwareStatus() == EthernetNoHardware)
+      {
         debugMessage("Ethernet hardware not found");
+        screenUpdate(0,0,"Ethernet hardware not found");
+      }
       else if (Ethernet.linkStatus() == LinkOFF) 
-        debugMessage("Ethernet cable is not connected");
+      {
+        debugMessage("Ethernet cable not connected");
+        screenUpdate(0,0,"Ethernet cable not connected");
+      }
       else
       {
         // generic error
-        debugMessage("Failed to configure Ethernet using DHCP");
-        screenUpdate(0,0,"Failed to configure Ethernet using DHCP");
-        stopApp();
+        debugMessage("Failed to configure Ethernet");
+        screenUpdate(0,0,"Failed to configure Ethernet");
       }
+      stopApp();
     }
     debugMessage(String("Ethernet IP address is: ") + ip2CharArray(Ethernet.localIP()));
-
   #endif
     
   #ifdef NTP
@@ -251,7 +252,6 @@ void setup()
   // AHTX0
   // sensors_event_t humidity, temp;
   // sensor.getEvent(&humidity, &temp);
-  // SiH7021
 
   // intermediate variable helps moving between sensor APIs easier in code
   // AHTX0
@@ -262,50 +262,23 @@ void setup()
   float temperature = (sensor.readTemperature()*1.8)+32;
   float humidity = sensor.readHumidity();
 
-  screenUpdate(temperature, humidity,zuluDateTimeString());
-
+  screenUpdate(temperature, humidity,(String(MQTT_CLIENT_ID) + " publish at " + zuluDateTimeString()));
+  
   #ifdef MQTTLOG
     MQTT_connect();
-    if (!tempPub.publish(temperature))
+    if ((!tempPub.publish(temperature)) || (!humidityPub.publish(humidity)) || (!roomPub.publish(MQTT_CLIENT_ID)))
     {
-      debugMessage(String(MQTT_PUB_TOPIC1) + " MQTT publish failed at " + zuluDateTimeString());
-      screenUpdate(temperature, humidity, String(MQTT_PUB_TOPIC1) + " publish failed at " + zuluDateTimeString());
+      debugMessage("Part/all of MQTT publish failed at " + zuluDateTimeString());
+      screenUpdate(temperature, humidity, "MQTT publish failed at " + zuluDateTimeString());
     }
-    else 
-    {
-      debugMessage(String("Published ") + temperature + " to MQTT endpoint " + MQTT_PUB_TOPIC1 + " at " + zuluDateTimeString());
-    }
-
-    if (!humidityPub.publish(humidity))
-    {
-      debugMessage(String(MQTT_PUB_TOPIC2) + " MQTT publish failed at " + zuluDateTimeString());
-      screenUpdate(temperature, humidity, String(MQTT_PUB_TOPIC2) + " publish failed at " + zuluDateTimeString());
-    }
-    else 
-    {
-      debugMessage(String("Published ") + humidity + " to MQTT endpoint " + MQTT_PUB_TOPIC2);
-    }
-
-    if (!roomPub.publish(MQTT_CLIENT_ID))
-    {
-      debugMessage(String(MQTT_PUB_TOPIC4) + " MQTT publish failed at " + zuluDateTimeString());
-      screenUpdate(temperature, humidity, String(MQTT_PUB_TOPIC4) + " publish failed at " + zuluDateTimeString());
-    }
-    else 
-    {
-      debugMessage(String("Published ") + MQTT_CLIENT_ID + " to MQTT endpoint " + MQTT_PUB_TOPIC4);
-    }
+    else debugMessage("Published to MQTT: " + zuluDateTimeString() + " , " + MQTT_CLIENT_ID + " , " + temperature + " , " + humidity);
     mqtt.disconnect();
-  #endif
-
-  #ifndef MQTTLOG   // reduces log clutter
-    debugMessage(zuluDateTimeString() + "," + MQTT_CLIENT_ID + "," + temperature + "," + humidity);
   #endif
 
   #ifdef WIFI
     client.stop();
   #endif
-    deepSleep();
+    deepSleep(); 
 }
 
 void loop() 
@@ -450,27 +423,63 @@ void screenUpdate(float temperature, float humidity, String messageText)
 {
   #ifdef SCREEN
     display.clearBuffer();
-    // UI borders
-    display.drawRoundRect(0,0,display.width(),(display.height()/3),10,EPD_BLACK);
-    display.drawRoundRect(0,((display.height()/3)-1),display.width(),(display.height()/3),10, EPD_BLACK);
-    display.drawRoundRect(0,((display.height()*2/3)-3),display.width(),((display.height()/3)+2),10, EPD_BLACK);
-    // temperature and humidity display
+    screenBorders();
+    
+    // Information display
+    // Labels
+    display.setTextColor(EPD_BLACK);
+    display.setCursor(((display.width()/4)-10),((display.height()*1/8)-10));
+    display.print("Here");
+    display.setCursor(((display.width()*3/4)-5),((display.height()*1/8)-10));
+    display.print("Outside");
+
+    // Temperature data
     display.setFont(&FreeSans9pt7b);
     display.setTextSize(1);
-    display.setCursor(5,(display.height()/6)); // midpoint of first roundRect
-    if (temperature>0)
-      display.print(String("Temperature is ") + temperature + "F");
-    else
-      display.print("Temperature is unavailable");
-    display.setCursor(5,(display.height()/2)); // midpoint of second roundRect
-    if (humidity>0)
-      display.print(String("Humidity is ") + humidity + "%");
-    else
-      display.print("Humidity is unavailable");
-    display.setFont();  // resets to system default (monospace)
-    display.setCursor(5,(display.height()*5/6));
-    display.println(messageText);
+    display.setCursor(5,((display.height()*3/8)-10));
+    if (temperature>0) display.print(String("Temp ") + temperature + "F");
+    display.setCursor(((display.width()/2)+5),((display.height()*3/8)-10));
+    // Stub for outside temperature
+    display.print("Temp XXX.xxF");
+
+    // Humidity data
+    display.setCursor(5,((display.height()*5/8)-10));
+    if (temperature>0) display.print(String("Humidity ") + humidity + "%");
+    display.setCursor(((display.width()/2)+5),((display.height()*5/8)-10));
+    // Stub for outside humidity
+    display.print("Humidity YY.yy%");
+
+    // CO2 data
+    display.setCursor(5,((display.height()*7/8)-10));
+    // Stub for outside C02
+    display.print("CO2 ZZZppm");    
+    display.setCursor(((display.width()/2)+5),((display.height()*7/8)-10));
+    // Stub for outside AQM
+    display.print("AQM ZZZppm");    
+
+    // Mesages
+    display.setFont();  // resets to system default monospace font
+    display.setCursor(5,(display.height()-10));
+    display.print(messageText);
     display.display();
+  #endif
+}
+
+void screenBorders()
+{
+  #ifdef SCREEN
+    // ThinkInk 2.9" epd is 296x128 pixels
+    // isolating this function for partial screen redraws
+    // label border
+    display.drawLine(0,(display.height()/8),display.width(),(display.height()/8),EPD_GRAY);
+    // temperature area
+    display.drawLine(0,(display.height()*3/8),display.width(),(display.height()*3/8),EPD_GRAY);
+    // humidity area
+    display.drawLine(0,(display.height()*5/8),display.width(),(display.height()*5/8), EPD_GRAY);
+    // CO2 area
+    display.drawLine(0,(display.height()*7/8),display.width(),(display.height()*7/8), EPD_GRAY);
+    // splitting sensor vs. outside values
+    display.drawLine((display.width()/2),0,(display.width()/2),(display.height()*7/8),EPD_GRAY);
   #endif
 }
 
