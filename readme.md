@@ -18,6 +18,7 @@ Regularly sample and log temperature, humidity
 	- SiH7021 temp/humidity sensor: https://www.adafruit.com/product/3251
 	- DHT11,21 also supported, see code history
 	- SGP30 VO2 partially supported in separate code branch
+	- LC709203F battery voltage monitor: https://www.adafruit.com/product/4712
 - screens
 	- LCD screen supported, see code history
 	- Featherwing OLED (SSD1306, 128x32): https://www.adafruit.com/product/2900
@@ -93,8 +94,6 @@ Regularly sample and log temperature, humidity
 	- [I][P3]112820: screen; pin 2 conflict with XXXX? on SH110x, not sure about SSD1306
 - wifi
 - log
-	- [I][P2]091321: log; don't think MagTag BSP has LED_BUILTIN defined. No blinking LED on FATAL errors
-		- Pin 13 on MagTag
 - sensor
 	- [I][P2]112820: sensor; Temperature data is off by a few degrees F when inserted into case?
 	- [I][P3]090921: sensor; values coming from standalone AHT20 and Funhouse AHT20 are very different. Calibration issue? See [FR] on this as well.
@@ -105,33 +104,28 @@ Regularly sample and log temperature, humidity
 ### Feature Requests
 - mqtt
 	- [FR][P3]111020: mqtt; publish to multiple MQTT brokers
-	- [FR][P2]090921: mqtt; log MQTT server errors https://io.adafruit.com/blog/example/2016/07/06/mqtt-error-reporting/
+	- [FR][P3]090921: mqtt; log MQTT server errors https://io.adafruit.com/blog/example/2016/07/06/mqtt-error-reporting/
 	- [FR][P3]091321: mqtt; inject lat/long into data, other extended fields for adafruit io?
-	- [FR][P3]012421: log; Async blinking of built-in LED for non-FATAL errors (e.g. MQTT publish)
-		- [FR][P3]120620: log; Air Quality messages to MQTT broker
-			- add error field to adafruitIO->airquality
-			- send error messages to MQTT for wait states
-				- timestamp->machine->error message
-- time
-	- [FR][P2]112920: time; Get time from MQTT broker
+	- [FR][P1]090121: mqtt; Low battery messaging to MQTT
+		- timestamp->machine->error message
+	- [FR][P2]112920: time; Get time from MQTT broker: https://io.adafruit.com/blog/feature/2016/06/01/time-utilities/
 - screen
-	- [FR][P3]091321: screen; local weather (forecast)
+	- [FR][P2]091321: screen; local weather (forecast)
 - wifi
 - log
-
+	- [FR][P3]012421: log; Async blinking of built-in LED for non-FATAL errors (e.g. MQTT publish)
 - sensor
 	- [FR][P2]090921: sensor; check calibration before reading and calibrate if needed
 	- [FR][P2]093021: sensor; CO2 readings
 - power
 	- [FR][P2]091521: power; deepsleep for feather board (M0, M4) implementations
-	- [FR][P1]090121: power; Low battery messaging to screen
-	- [FR][P1]090121: power; Low battery messaging to MQTT
 
 ### Questions
 - [Q]120220: screen; Why do I need wire and spi for OLED displays?
 - [Q]082921: time; when do I need to timestamp data bound for MQTT; adafruit.io time stamps for me, does a local server?
 - [Q]090721: I've failed at compressing zuluDateTimeString() twice, what is the issue relative to string buildout?
 - [Q]091321: should I push data to MQTT as JSON?
+- [Q]100621: how did LadyAda calculate battery capacity, as hex values are not on a linear formula though battery capacity is?
 
 ### Revisions
 - 083120: First version based on merged sample code for sensors, SD. Ethernet code NOT working.
@@ -255,3 +249,6 @@ Regularly sample and log temperature, humidity
 	- Simplified error reporting for MQTT publish issues, as I can look at the data to see the actual problem or error in the server processing code
 	- Reviewing UI changes to add outside temp and humidity plus CO2 display
 	- [FR][P3]090921: wifi; more diagnostic information at connect in log -> now reporting RSSI value
+	- [I][P2]091321: log; don't think MagTag BSP has LED_BUILTIN defined. No blinking LED on FATAL errors -> it works, red light on back
+- 100621
+	- [FR][P1]090121: power; Low battery messaging to screen

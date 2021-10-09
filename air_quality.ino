@@ -6,27 +6,33 @@
 */
 
 // Conditional compile flags
-//#define DEBUG         // Output to the serial port
+#define DEBUG         // Output to the serial port
 #define SCREEN        // output sensor data to screen
-#define MQTTLOG        // Output to MQTT broker defined in secrets.h
+//#define MQTTLOG        // Output to MQTT broker defined in secrets.h
 //#define RJ45            // use Ethernet
-#define WIFI          // use WiFi (credentials in secrets.h)
-#define NTP         // query network time server for logging
+//#define WIFI          // use WiFi (credentials in secrets.h)
+//#define NTP         // query network time server for logging
+#define BATTERY
 
 // Gloval variables
 unsigned long syncTime = 0;        // holds millis() [milliseconds] for timing functions 
 
 // AHTX0 (temperature and humidity)
 // #include <Adafruit_AHTX0.h>
-// Adafruit_AHTX0 sensor;
+// Adafruit_AHTX0 th;
 
 // Si7021 (temperature and humidity)
 #include "Adafruit_Si7021.h"
-Adafruit_Si7021 sensor = Adafruit_Si7021();
+Adafruit_Si7021 th = Adafruit_Si7021();
+
+// Battery voltage sensor
+#include "Adafruit_LC709203F.h"
+Adafruit_LC709203F lc;
 
 #ifdef DEBUG
   // microsecond delay for deep sleep
-  #define LOG_INTERVAL 240000000  // debug interval; 240 seconds 
+  //#define LOG_INTERVAL 240000000  // debug interval; 240 seconds
+  #define LOG_INTERVAL 60000000  // debug interval; 60 seconds 
 #else
   #define LOG_INTERVAL 1800000000 // production interval; 1800 seconds
 #endif
@@ -147,14 +153,34 @@ void setup()
     Serial.println("Indoor Air Quality started");
   #endif
 
-  // sensor check
-  if (! sensor.begin())
+  // temp/humidity sensor check
+  if (!th.begin())
   {
     debugMessage("FATAL ERROR: temp/humidity sensor not detected");
     screenUpdate(0,0,"temp/humidity sensor not detected");
     stopApp();
   }
   debugMessage("temp/humidity sensor ready");
+
+  #ifdef BATTERY
+    if (!lc.begin())
+    {
+      debugMessage("Battery and voltage monitor not detected");
+      stopApp();
+    }
+    debugMessage("Battery voltage monitor ready");
+    // required for accurate battert temp reading
+    lc.setThermistorB(3950);
+    lc.setPackSize(LC709203F_APA_2000MAH);
+    // do not know why I need this
+    lc.setAlarmVoltage(3.8);
+    // LC709203F_APA_100MAH = 0x08,
+    // LC709203F_APA_200MAH = 0x0B,
+    // LC709203F_APA_500MAH = 0x10,
+    // LC709203F_APA_1000MAH = 0x19,
+    // LC709203F_APA_2000MAH = 0x2D,
+    // LC709203F_APA_3000MAH = 0x36,
+  #endif
 
   #ifdef SCREEN
     // Initialize ST7789 screen
@@ -251,7 +277,7 @@ void setup()
   // populate temp and humidity objects with fresh data
   // AHTX0
   // sensors_event_t humidity, temp;
-  // sensor.getEvent(&humidity, &temp);
+  // th.getEvent(&humidity, &temp);
 
   // intermediate variable helps moving between sensor APIs easier in code
   // AHTX0
@@ -259,10 +285,8 @@ void setup()
   // float humidity = humidity.relative_humidity;
 
   // SiH7021
-  float temperature = (sensor.readTemperature()*1.8)+32;
-  float humidity = sensor.readHumidity();
-
-  screenUpdate(temperature, humidity,(String(MQTT_CLIENT_ID) + " publish at " + zuluDateTimeString()));
+  float temperature = (th.readTemperature()*1.8)+32;
+  float humidity = th.readHumidity();
   
   #ifdef MQTTLOG
     MQTT_connect();
@@ -271,14 +295,37 @@ void setup()
       debugMessage("Part/all of MQTT publish failed at " + zuluDateTimeString());
       screenUpdate(temperature, humidity, "MQTT publish failed at " + zuluDateTimeString());
     }
-    else debugMessage("Published to MQTT: " + zuluDateTimeString() + " , " + MQTT_CLIENT_ID + " , " + temperature + " , " + humidity);
+    else 
+   {
+      debugMessage("Published to MQTT: " + zuluDateTimeString() + " , " + MQTT_CLIENT_ID + " , " + temperature + " , " + humidity);
+      screenUpdate(temperature, humidity,(String(MQTT_CLIENT_ID) + " publish at " + zuluDateTimeString()));
+    }
     mqtt.disconnect();
+  #else
+  {
+    debugMessage(zuluDateTimeString() + "->" + temperature + "F , " + humidity + "%");
+    screenUpdate(temperature, humidity,"");
+  }
   #endif
 
+  // // done, put device into proper state
+  // #ifdef DEBUG
+  //   // keep the device alive for a window before sleeping for the same interval
+  //   debugMessage("You have " + (LOG_INTERVAL/100000) + "seconds to reflash device"); 
+  //   delay(LOG_INTERVAL);
+  // else
+  // // deep sleep
+  //  #ifdef WIFI
+  //     client.stop();
+  //   #endif
+  //   deepSleep();
+  // #endif 
+
+  // deep sleep
   #ifdef WIFI
     client.stop();
   #endif
-    deepSleep(); 
+  deepSleep();
 }
 
 void loop() 
@@ -424,13 +471,14 @@ void screenUpdate(float temperature, float humidity, String messageText)
   #ifdef SCREEN
     display.clearBuffer();
     screenBorders();
+    screenBatteryStatus();
     
     // Information display
     // Labels
     display.setTextColor(EPD_BLACK);
-    display.setCursor(((display.width()/4)-10),((display.height()*1/8)-10));
+    display.setCursor(((display.width()/4)-10),((display.height()*1/8)-11));
     display.print("Here");
-    display.setCursor(((display.width()*3/4)-5),((display.height()*1/8)-10));
+    display.setCursor(((display.width()*3/4-12)),((display.height()*1/8)-11));
     display.print("Outside");
 
     // Temperature data
@@ -459,8 +507,9 @@ void screenUpdate(float temperature, float humidity, String messageText)
 
     // Mesages
     display.setFont();  // resets to system default monospace font
-    display.setCursor(5,(display.height()-10));
+    display.setCursor(5,(display.height()-8));
     display.print(messageText);
+
     display.display();
   #endif
 }
@@ -481,6 +530,20 @@ void screenBorders()
     // splitting sensor vs. outside values
     display.drawLine((display.width()/2),0,(display.width()/2),(display.height()*7/8),EPD_GRAY);
   #endif
+}
+
+void screenBatteryStatus()
+{
+  #if defined(SCREEN) && defined(BATTERY) 
+    // render battery percentage to screen
+    // 28 pixels wide, 7 pixels/25% battery life? 
+    display.drawRect((display.width()-33),((display.height()*7/8)+3),(display.width()-5),(display.height()-3),EPD_BLACK);
+    //calculate fill
+    display.fillRect((display.width()-32),((display.height()*7/8)+4),((display.width()-32)+(int(lc.cellPercent()*28))),(display.height()-2),EPD_GRAY);
+  #endif
+  debugMessage("Battery: " + String(lc.cellVoltage()) + " v");
+  debugMessage("Battery: " + String(int(lc.cellPercent())) + " %");
+  debugMessage("Battery: " + String(lc.getCellTemperature()) + " F");
 }
 
 void stopApp()
