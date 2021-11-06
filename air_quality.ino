@@ -166,14 +166,14 @@ void setup()
     if (!lc.begin())
     {
       debugMessage("Battery and voltage monitor not detected");
+      screenUpdate(0,0,"battery sensor not detected");
       stopApp();
     }
     debugMessage("Battery voltage monitor ready");
     // required for accurate battert temp reading
-    lc.setThermistorB(3950);
-    lc.setPackSize(LC709203F_APA_2000MAH);
-    // do not know why I need this
-    lc.setAlarmVoltage(3.8);
+    //lc.setThermistorB(3950);
+    lc.setPackSize(LC709203F_APA_1000MAH);
+    //lc.setAlarmVoltage(3.8);
     // LC709203F_APA_100MAH = 0x08,
     // LC709203F_APA_200MAH = 0x0B,
     // LC709203F_APA_500MAH = 0x10,
@@ -536,14 +536,20 @@ void screenBatteryStatus()
 {
   #if defined(SCREEN) && defined(BATTERY) 
     // render battery percentage to screen
-    // 28 pixels wide, 7 pixels/25% battery life? 
-    display.drawRect((display.width()-33),((display.height()*7/8)+3),(display.width()-5),(display.height()-3),EPD_BLACK);
+
+    int barHeight = 10;
+    int barWidth = 28;
+    // stored so we don't call the function too often in routine
+    float percent = lc.cellPercent();
+
     //calculate fill
-    display.fillRect((display.width()-32),((display.height()*7/8)+4),((display.width()-32)+(int(lc.cellPercent()*28))),(display.height()-2),EPD_GRAY);
+    display.fillRect((display.width()-33),((display.height()*7/8)+4),(int((percent/100)*barWidth)),barHeight,EPD_GRAY);
+    // border
+    display.drawRect((display.width()-33),((display.height()*7/8)+4),barWidth,barHeight,EPD_BLACK);
   #endif
-  debugMessage("Battery: " + String(lc.cellVoltage()) + " v");
-  debugMessage("Battery: " + String(int(lc.cellPercent())) + " %");
-  debugMessage("Battery: " + String(lc.getCellTemperature()) + " F");
+  debugMessage("Battery voltage: " + String(lc.cellVoltage()) + " v");
+  debugMessage("Battery is at " + String(int(percent)) + "%");
+  //debugMessage("Battery temperature: " + String(lc.getCellTemperature()) + " F");
 }
 
 void stopApp()

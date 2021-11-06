@@ -250,5 +250,5 @@ Regularly sample and log temperature, humidity
 	- Reviewing UI changes to add outside temp and humidity plus CO2 display
 	- [FR][P3]090921: wifi; more diagnostic information at connect in log -> now reporting RSSI value
 	- [I][P2]091321: log; don't think MagTag BSP has LED_BUILTIN defined. No blinking LED on FATAL errors -> it works, red light on back
-- 100621
+- 110521
 	- [FR][P1]090121: power; Low battery messaging to screen
