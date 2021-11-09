@@ -6,12 +6,12 @@
 */
 
 // Conditional compile flags
-#define DEBUG         // Output to the serial port
+//#define DEBUG         // Output to the serial port
 #define SCREEN        // output sensor data to screen
-//#define MQTTLOG        // Output to MQTT broker defined in secrets.h
+#define MQTTLOG        // Output to MQTT broker defined in secrets.h
 //#define RJ45            // use Ethernet
-//#define WIFI          // use WiFi (credentials in secrets.h)
-//#define NTP         // query network time server for logging
+#define WIFI          // use WiFi (credentials in secrets.h)
+#define NTP         // query network time server for logging
 #define BATTERY
 
 // Gloval variables
@@ -298,7 +298,7 @@ void setup()
     else 
    {
       debugMessage("Published to MQTT: " + zuluDateTimeString() + " , " + MQTT_CLIENT_ID + " , " + temperature + " , " + humidity);
-      screenUpdate(temperature, humidity,(String(MQTT_CLIENT_ID) + " publish at " + zuluDateTimeString()));
+      screenUpdate(temperature, humidity,(String(MQTT_CLIENT_ID) + " pub: " + zuluDateTimeString()));
     }
     mqtt.disconnect();
   #else
@@ -507,7 +507,7 @@ void screenUpdate(float temperature, float humidity, String messageText)
 
     // Mesages
     display.setFont();  // resets to system default monospace font
-    display.setCursor(5,(display.height()-8));
+    display.setCursor(5,(display.height()-10));
     display.print(messageText);
 
     display.display();

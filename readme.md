@@ -91,6 +91,8 @@ Regularly sample and log temperature, humidity
 		- in zuluDateTimeString switch #ifdef NTP for check timeStatus() for timeNotSet
 - screen
 	- [I][P3]111120: screen; Screen is on all the time, which could cause OLED burn in, and in dark environments, is very bright
+		- time based dimming
+		- gesture based dimming
 	- [I][P3]112820: screen; pin 2 conflict with XXXX? on SH110x, not sure about SSD1306
 - wifi
 - log
@@ -109,16 +111,18 @@ Regularly sample and log temperature, humidity
 	- [FR][P1]090121: mqtt; Low battery messaging to MQTT
 		- timestamp->machine->error message
 	- [FR][P2]112920: time; Get time from MQTT broker: https://io.adafruit.com/blog/feature/2016/06/01/time-utilities/
+	- [FR][P1]110621: mqtt; Send all data as JSON object to MQTT
 - screen
 	- [FR][P2]091321: screen; local weather (forecast)
+	- [FR][P2]051021: screen; current time
 - wifi
 - log
 	- [FR][P3]012421: log; Async blinking of built-in LED for non-FATAL errors (e.g. MQTT publish)
 - sensor
 	- [FR][P2]090921: sensor; check calibration before reading and calibrate if needed
-	- [FR][P2]093021: sensor; CO2 readings
+	- [FR][P1]093021: sensor; CO2 readings
 - power
-	- [FR][P2]091521: power; deepsleep for feather board (M0, M4) implementations
+	- [FR][P1]091521: power; deepsleep for feather board (M0, M4) implementations
 
 ### Questions
 - [Q]120220: screen; Why do I need wire and spi for OLED displays?
