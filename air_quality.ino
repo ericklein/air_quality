@@ -1,6 +1,6 @@
 /*
   Project Name:   air_quality
-  Description:    Regularly sample and log temperature, humidity
+  Description:    Regularly sample and log temperature, humidity, and if available, C02 levels
 
   See README.md for target information, revision history, feature requests, etc.
 */
@@ -13,17 +13,35 @@
 #define WIFI          // use WiFi (credentials in secrets.h)
 #define NTP         // query network time server for logging
 #define BATTERY
+#define C02_SENSOR
+#define ONE_TIME
 
 // Gloval variables
-unsigned long syncTime = 0;        // holds millis() [milliseconds] for timing functions 
+#ifndef ONE_TIME
+  unsigned long syncTime = 0;        // holds millis() [milliseconds] for timing functions 
+#endif
 
-// AHTX0 (temperature and humidity)
-// #include <Adafruit_AHTX0.h>
-// Adafruit_AHTX0 th;
+// Temperature, humidity, C02 sensors
+typedef struct
+{
+  float temperature;
+  float humidity;
+  uint16_t c02;
+} envData;
+#ifdef C02_SENSOR
+  // gathers all three values
+  #include <SensirionI2CScd4x.h>
+  SensirionI2CScd4x envSensor;
+#else
+  // temp and humidity only
+  // AHTX0
+  // #include <Adafruit_AHTX0.h>
+  // Adafruit_AHTX0 envSensor;
 
-// Si7021 (temperature and humidity)
-#include "Adafruit_Si7021.h"
-Adafruit_Si7021 th = Adafruit_Si7021();
+  // Si7021
+  #include "Adafruit_Si7021.h"
+  Adafruit_Si7021 envSensor = Adafruit_Si7021();
+#endif
 
 // Battery voltage sensor
 #include "Adafruit_LC709203F.h"
@@ -83,6 +101,9 @@ Adafruit_LC709203F lc;
   Adafruit_MQTT_Client mqtt(&client, MQTT_BROKER, MQTT_PORT, MQTT_CLIENT_ID, MQTT_USER, MQTT_PASS);
   Adafruit_MQTT_Publish tempPub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC1,MQTT_QOS_1);
   Adafruit_MQTT_Publish humidityPub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC2, MQTT_QOS_1);
+  #ifdef C02_SENSOR
+    Adafruit_MQTT_Publish c02Pub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC3, MQTT_QOS_1);
+  #endif
   Adafruit_MQTT_Publish roomPub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC4, MQTT_QOS_1);
 #endif
 
@@ -153,20 +174,44 @@ void setup()
     Serial.println("Indoor Air Quality started");
   #endif
 
-  // temp/humidity sensor check
-  if (!th.begin())
-  {
-    debugMessage("FATAL ERROR: temp/humidity sensor not detected");
-    screenUpdate(0,0,"temp/humidity sensor not detected");
-    stopApp();
-  }
-  debugMessage("temp/humidity sensor ready");
+  // Handle environment sensor
+  #ifdef C02_SENSOR
+    Wire.begin();
+
+    uint16_t error;
+
+    envSensor.begin(Wire);
+
+    // stop potentially previously started measurement
+    error = envSensor.stopPeriodicMeasurement();
+    if (error) 
+    {
+        debugMessage("Error trying to execute stopPeriodicMeasurement(): ");
+    }
+    // Start Measurement
+    error = envSensor.startPeriodicMeasurement();
+    if (error)
+    {
+        debugMessage("Error trying to execute startPeriodicMeasurement(): ");
+    }
+    delay(5000);
+    debugMessage("temp/humidity sensor ready");
+  #else
+    // temp/humidity sensor check
+    if (!envSensor.begin())
+    {
+      debugMessage("FATAL ERROR: temp/humidity sensor not detected");
+      screenUpdate(0,0,0,"temp/humidity sensor not detected");
+      stopApp();
+    }
+    debugMessage("temp/humidity sensor ready");
+  #endif
 
   #ifdef BATTERY
     if (!lc.begin())
     {
       debugMessage("Battery and voltage monitor not detected");
-      screenUpdate(0,0,"battery sensor not detected");
+      screenUpdate(0,0,0,"battery sensor not detected");
       stopApp();
     }
     debugMessage("Battery voltage monitor ready");
@@ -219,7 +264,7 @@ void setup()
       if (tries == MAX_TRIES)
       {
         debugMessage(String("Can not connect to WFii after ") + MAX_TRIES + " attempts");
-        screenUpdate(0,0,String("Can not connect to WiFi after ") + MAX_TRIES + " attempts");
+        screenUpdate(0,0,0,String("Can not connect to WiFi after ") + MAX_TRIES + " attempts");
         //stopApp();
         deepSleep();
       }
@@ -245,18 +290,18 @@ void setup()
       if (Ethernet.hardwareStatus() == EthernetNoHardware)
       {
         debugMessage("Ethernet hardware not found");
-        screenUpdate(0,0,"Ethernet hardware not found");
+        screenUpdate(0,0,0,"Ethernet hardware not found");
       }
       else if (Ethernet.linkStatus() == LinkOFF) 
       {
         debugMessage("Ethernet cable not connected");
-        screenUpdate(0,0,"Ethernet cable not connected");
+        screenUpdate(0,0,0,"Ethernet cable not connected");
       }
       else
       {
         // generic error
         debugMessage("Failed to configure Ethernet");
-        screenUpdate(0,0,"Failed to configure Ethernet");
+        screenUpdate(0,0,0,"Failed to configure Ethernet");
       }
       stopApp();
     }
@@ -273,63 +318,34 @@ void setup()
     debugMessage("NTP time is " + zuluDateTimeString());
   #endif
 
-  // One time run of main logic before sleep
-  // populate temp and humidity objects with fresh data
-  // AHTX0
-  // sensors_event_t humidity, temp;
-  // th.getEvent(&humidity, &temp);
-
-  // intermediate variable helps moving between sensor APIs easier in code
-  // AHTX0
-  // float temperature = (temp.temperature*1.8)+32;
-  // float humidity = humidity.relative_humidity;
-
-  // SiH7021
-  float temperature = (th.readTemperature()*1.8)+32;
-  float humidity = th.readHumidity();
-  
-  #ifdef MQTTLOG
-    MQTT_connect();
-    if ((!tempPub.publish(temperature)) || (!humidityPub.publish(humidity)) || (!roomPub.publish(MQTT_CLIENT_ID)))
-    {
-      debugMessage("Part/all of MQTT publish failed at " + zuluDateTimeString());
-      screenUpdate(temperature, humidity, "MQTT publish failed at " + zuluDateTimeString());
-    }
-    else 
-   {
-      debugMessage("Published to MQTT: " + zuluDateTimeString() + " , " + MQTT_CLIENT_ID + " , " + temperature + " , " + humidity);
-      screenUpdate(temperature, humidity,(String(MQTT_CLIENT_ID) + " pub: " + zuluDateTimeString()));
-    }
-    mqtt.disconnect();
-  #else
-  {
-    debugMessage(zuluDateTimeString() + "->" + temperature + "F , " + humidity + "%");
-    screenUpdate(temperature, humidity,"");
-  }
+  // Handle one time sensor read and information display/storage
+  #ifdef ONE_TIME
+    actionSequence();
+    // deep sleep device, which restarts code when repowered
+    #ifdef WIFI
+      client.stop();
+    #endif
+    deepSleep();
   #endif
-
-  // // done, put device into proper state
-  // #ifdef DEBUG
-  //   // keep the device alive for a window before sleeping for the same interval
-  //   debugMessage("You have " + (LOG_INTERVAL/100000) + "seconds to reflash device"); 
-  //   delay(LOG_INTERVAL);
-  // else
-  // // deep sleep
-  //  #ifdef WIFI
-  //     client.stop();
-  //   #endif
-  //   deepSleep();
-  // #endif 
-
-  // deep sleep
-  #ifdef WIFI
-    client.stop();
-  #endif
-  deepSleep();
 }
 
 void loop() 
 {
+  #ifndef ONE_TIME
+    #ifdef DEBUG
+      // display heartbeat every 20 seconds between sensor reads; depending on client might display >1 message per interval
+      if (((millis() - syncTime) % 20000) == 0)
+      {
+        debugMessage(String(((millis()-syncTime)/1000)) + " seconds elapsed before next read at " + (LOG_INTERVAL/1000) + " seconds");
+      }
+    #endif
+
+    // update display and determine if it is time to read/process sensors
+    if ((millis() - syncTime) < LOG_INTERVAL) return;
+
+    syncTime = millis();
+    actionSequence();
+  #endif
 }
 
 #ifdef NTP
@@ -466,92 +482,6 @@ void debugMessage(String messageText)
   #endif
 }
 
-void screenUpdate(float temperature, float humidity, String messageText)
-{
-  #ifdef SCREEN
-    display.clearBuffer();
-    screenBorders();
-    screenBatteryStatus();
-    
-    // Information display
-    // Labels
-    display.setTextColor(EPD_BLACK);
-    display.setCursor(((display.width()/4)-10),((display.height()*1/8)-11));
-    display.print("Here");
-    display.setCursor(((display.width()*3/4-12)),((display.height()*1/8)-11));
-    display.print("Outside");
-
-    // Temperature data
-    display.setFont(&FreeSans9pt7b);
-    display.setTextSize(1);
-    display.setCursor(5,((display.height()*3/8)-10));
-    if (temperature>0) display.print(String("Temp ") + temperature + "F");
-    display.setCursor(((display.width()/2)+5),((display.height()*3/8)-10));
-    // Stub for outside temperature
-    display.print("Temp XXX.xxF");
-
-    // Humidity data
-    display.setCursor(5,((display.height()*5/8)-10));
-    if (temperature>0) display.print(String("Humidity ") + humidity + "%");
-    display.setCursor(((display.width()/2)+5),((display.height()*5/8)-10));
-    // Stub for outside humidity
-    display.print("Humidity YY.yy%");
-
-    // CO2 data
-    display.setCursor(5,((display.height()*7/8)-10));
-    // Stub for outside C02
-    display.print("CO2 ZZZppm");    
-    display.setCursor(((display.width()/2)+5),((display.height()*7/8)-10));
-    // Stub for outside AQM
-    display.print("AQM ZZZppm");    
-
-    // Mesages
-    display.setFont();  // resets to system default monospace font
-    display.setCursor(5,(display.height()-10));
-    display.print(messageText);
-
-    display.display();
-  #endif
-}
-
-void screenBorders()
-{
-  #ifdef SCREEN
-    // ThinkInk 2.9" epd is 296x128 pixels
-    // isolating this function for partial screen redraws
-    // label border
-    display.drawLine(0,(display.height()/8),display.width(),(display.height()/8),EPD_GRAY);
-    // temperature area
-    display.drawLine(0,(display.height()*3/8),display.width(),(display.height()*3/8),EPD_GRAY);
-    // humidity area
-    display.drawLine(0,(display.height()*5/8),display.width(),(display.height()*5/8), EPD_GRAY);
-    // CO2 area
-    display.drawLine(0,(display.height()*7/8),display.width(),(display.height()*7/8), EPD_GRAY);
-    // splitting sensor vs. outside values
-    display.drawLine((display.width()/2),0,(display.width()/2),(display.height()*7/8),EPD_GRAY);
-  #endif
-}
-
-void screenBatteryStatus()
-{
-  #if defined(SCREEN) && defined(BATTERY) 
-    // render battery percentage to screen
-
-    int barHeight = 10;
-    int barWidth = 28;
-    // stored so we don't call the function too often in routine
-    float percent = lc.cellPercent();
-
-    //calculate fill
-    display.fillRect((display.width()-33),((display.height()*7/8)+4),(int((percent/100)*barWidth)),barHeight,EPD_GRAY);
-    // border
-    display.drawRect((display.width()-33),((display.height()*7/8)+4),barWidth,barHeight,EPD_BLACK);
-  #endif
-  debugMessage("Battery voltage: " + String(lc.cellVoltage()) + " v");
-  debugMessage("Battery is at " + String(int(percent)) + "%");
-  //debugMessage("Battery temperature: " + String(lc.getCellTemperature()) + " F");
-}
-
 void stopApp()
 {
   while(1)
@@ -583,3 +513,148 @@ void deepSleep()
   esp_sleep_enable_timer_wakeup(LOG_INTERVAL);
   esp_deep_sleep_start();
 }
+
+envData readEnvSensor()
+{
+  envData sensorData;
+  uint8_t error;
+  #ifdef C02_SENSOR
+    error = envSensor.readMeasurement(sensorData.c02, sensorData.temperature, sensorData.humidity);
+    if (error) 
+    {
+      debugMessage("Error trying to read environment sensor");
+    }
+    sensorData.temperature = sensorData.temperature*1.8+32;
+  #else
+    // AHTX0
+    // sensors_event_t humidity, temp;
+    // envSensor.getEvent(&humidity, &temp);
+    // sensorData.temperature = (temp.temperature*1.8)+32;
+    // sensorData.humidity = humidity.relative_humidity;
+    // sensorData.c02 = 0;
+
+    // SiH7021
+    sensorData.temperature = (envSensor.readTemperature()*1.8)+32;
+    sensorData.humidity = envSensor.readHumidity();
+    sensorData.c02 = 0;
+  #endif
+  return sensorData;
+}
+
+int mqttUpdate(float temperature, float humidity, uint16_t c02)
+{
+  #ifdef MQTTLOG
+    MQTT_connect();
+    if ((!tempPub.publish(temperature)) || (!humidityPub.publish(humidity)) || (!roomPub.publish(MQTT_CLIENT_ID)) || (!c02Pub.publish(c02)))
+    {
+      debugMessage("Part/all of MQTT publish failed at " + zuluDateTimeString());
+      return 1;
+    }
+    else 
+    {
+      debugMessage("Published to MQTT: " + zuluDateTimeString() + " , " + MQTT_CLIENT_ID + " , " + temperature + " , " + humidity);
+      return 0;
+    }
+    mqtt.disconnect();
+  #endif
+}
+
+void screenUpdate(float temperature, float humidity, uint16_t c02, String messageText)
+{
+  #ifdef SCREEN
+    display.clearBuffer();
+    screenBorders();
+    screenBatteryStatus();
+
+    display.setTextColor(EPD_BLACK);
+    // Labels
+    display.setCursor(((display.width()/4)-10),((display.height()*1/8)-11));
+    display.print("Here");
+    display.setCursor(((display.width()*3/4-12)),((display.height()*1/8)-11));
+    display.print("Outside");
+
+    display.setTextSize(1);
+    display.setFont(&FreeSans9pt7b);
+    // Indoor information
+    // Temperature
+    display.setCursor(5,((display.height()*3/8)-10));
+    if (temperature>0) display.print(String("Temp ") + temperature + "F");
+    // Humidity
+    display.setCursor(5,((display.height()*5/8)-10));
+    if (temperature>0) display.print(String("Humidity ") + humidity + "%");
+    #ifdef C02_SENSOR
+      display.setCursor(5,((display.height()*7/8)-10));
+      display.print(String("C02 ") + c02 + " ppm");
+    #endif
+
+    // Outdoor information
+    // Temperature
+    display.setCursor(((display.width()/2)+5),((display.height()*3/8)-10));
+    display.print("Temp XXX.xxF");
+    // Humidity
+    display.setCursor(((display.width()/2)+5),((display.height()*5/8)-10));
+    display.print("Humidity YY.yy%");
+    // AQM
+    display.setCursor(((display.width()/2)+5),((display.height()*7/8)-10));
+    display.print("AQM ZZZppm");    
+
+    // Mesages
+    display.setFont();  // resets to system default monospace font
+    display.setCursor(5,(display.height()-10));
+    display.print(messageText);
+
+    display.display();
+  #endif
+}
+
+void screenBorders()
+{
+  #ifdef SCREEN
+    // ThinkInk 2.9" epd is 296x128 pixels
+    // isolating this function for partial screen redraws
+    // label border
+    display.drawLine(0,(display.height()/8),display.width(),(display.height()/8),EPD_GRAY);
+    // temperature area
+    display.drawLine(0,(display.height()*3/8),display.width(),(display.height()*3/8),EPD_GRAY);
+    // humidity area
+    display.drawLine(0,(display.height()*5/8),display.width(),(display.height()*5/8), EPD_GRAY);
+    // C02 area
+    display.drawLine(0,(display.height()*7/8),display.width(),(display.height()*7/8), EPD_GRAY);
+    // splitting sensor vs. outside values
+    display.drawLine((display.width()/2),0,(display.width()/2),(display.height()*7/8),EPD_GRAY);
+  #endif
+}
+
+void screenBatteryStatus()
+{
+  #if defined(SCREEN) && defined(BATTERY) 
+    // render battery percentage to screen
+
+    int barHeight = 10;
+    int barWidth = 28;
+    // stored so we don't call the function too often in routine
+    float percent = lc.cellPercent();
+
+    //calculate fill
+    display.fillRect((display.width()-33),((display.height()*7/8)+4),(int((percent/100)*barWidth)),barHeight,EPD_GRAY);
+    // border
+    display.drawRect((display.width()-33),((display.height()*7/8)+4),barWidth,barHeight,EPD_BLACK);
+  #endif
+  debugMessage("Battery voltage: " + String(lc.cellVoltage()) + " v");
+  debugMessage("Battery is at " + String(int(percent)) + "%");
+  //debugMessage("Battery temperature: " + String(lc.getCellTemperature()) + " F");
+}
+
+void actionSequence()
+{
+  debugMessage("actionsequence started");
+  envData sensorData = readEnvSensor();
+  #ifdef MQTTLOG
+    if (mqttUpdate(sensorData.temperature, sensorData.humidity, sensorData.c02))
+      screenUpdate(sensorData.temperature, sensorData.humidity, sensorData.c02,(String(MQTT_CLIENT_ID) + " pub fail: " + zuluDateTimeString()));
+    else
+      screenUpdate(sensorData.temperature, sensorData.humidity, sensorData.c02,(String(MQTT_CLIENT_ID) + " pub: " + zuluDateTimeString()));
+  #else
+    screenUpdate(sensorData.temperature, sensorData.humidity, sensorData.c02,("Last update at " + zuluDateTimeString()));
+  #endif
+  debugMessage(zuluDateTimeString() + "->" + sensorData.temperature + "F , " + sensorData.humidity + "%, " + sensorData.c02 + " ppm");

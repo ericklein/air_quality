@@ -1,11 +1,9 @@
  Air Quality
 
 ### Purpose
-Regularly sample and log temperature, humidity
+Regularly sample and log temperature, humidity, and if available, CO2 levels
 
 ### Contributors
-
-### Software Dependencies not in Arduino Library Manager 
 
 ### known, working BOM parts
 - MCU
@@ -17,8 +15,8 @@ Regularly sample and log temperature, humidity
 	- AHT20 temp/humidity sensor: https://www.adafruit.com/product/4566, https://www.adafruit.com/product/5183
 	- SiH7021 temp/humidity sensor: https://www.adafruit.com/product/3251
 	- DHT11,21 also supported, see code history
-	- SGP30 VO2 partially supported in separate code branch
 	- LC709203F battery voltage monitor: https://www.adafruit.com/product/4712
+	- SCD40 True CO2, Temperature and Humidity Sensor: https://www.adafruit.com/product/5187
 - screens
 	- LCD screen supported, see code history
 	- Featherwing OLED (SSD1306, 128x32): https://www.adafruit.com/product/2900
@@ -107,11 +105,11 @@ Regularly sample and log temperature, humidity
 - mqtt
 	- [FR][P3]111020: mqtt; publish to multiple MQTT brokers
 	- [FR][P3]090921: mqtt; log MQTT server errors https://io.adafruit.com/blog/example/2016/07/06/mqtt-error-reporting/
-	- [FR][P3]091321: mqtt; inject lat/long into data, other extended fields for adafruit io?
+	- [FR][P2]091321: mqtt; inject lat/long into data, other extended fields for adafruit io?
 	- [FR][P1]090121: mqtt; Low battery messaging to MQTT
 		- timestamp->machine->error message
-	- [FR][P2]112920: time; Get time from MQTT broker: https://io.adafruit.com/blog/feature/2016/06/01/time-utilities/
-	- [FR][P1]110621: mqtt; Send all data as JSON object to MQTT
+	- [FR][P3]112920: time; Get time from MQTT broker: https://io.adafruit.com/blog/feature/2016/06/01/time-utilities/
+	- [FR][P1]091321: mqtt; Send all data as JSON object to MQTT
 - screen
 	- [FR][P2]091321: screen; local weather (forecast)
 	- [FR][P2]051021: screen; current time
@@ -119,8 +117,6 @@ Regularly sample and log temperature, humidity
 - log
 	- [FR][P3]012421: log; Async blinking of built-in LED for non-FATAL errors (e.g. MQTT publish)
 - sensor
-	- [FR][P2]090921: sensor; check calibration before reading and calibrate if needed
-	- [FR][P1]093021: sensor; CO2 readings
 - power
 	- [FR][P1]091521: power; deepsleep for feather board (M0, M4) implementations
 
@@ -128,76 +124,61 @@ Regularly sample and log temperature, humidity
 - [Q]120220: screen; Why do I need wire and spi for OLED displays?
 - [Q]082921: time; when do I need to timestamp data bound for MQTT; adafruit.io time stamps for me, does a local server?
 - [Q]090721: I've failed at compressing zuluDateTimeString() twice, what is the issue relative to string buildout?
-- [Q]091321: should I push data to MQTT as JSON?
 - [Q]100621: how did LadyAda calculate battery capacity, as hex values are not on a linear formula though battery capacity is?
+- [Q]110921: does C02 require calibration for SCD40 (direct CO2 read, not eCO2)
 
 ### Revisions
-- 083120: First version based on merged sample code for sensors, SD. Ethernet code NOT working.
-- 090520: Outside code work highlights Ethernet code is likely working, was blocked by failed primary DNS server
-- 090820
-	- Switched to Particle Ethernet Featherwing and Feather M4 Express
-	- Switched to timelib getNtpTime example code
-	- [FR]090120: Conditional compile for network, SD saves, and display
-	- [FR]090120: Switch to ARM SoC for +memory (post conditionals?)
-- 091120
-	- [I]090820: Code is only running for one loop -> setSyncInterval(15) locked code on subsequent loops, also not needed
-	- [I]090820: time is not correct, sample code is -> byproduct of setSyncInterval(15) issue
-	- [FR]090820: Display NTP time when received in DEBUG
-- 091420
-	- [I]091120: Set SYNC_INTERVAL to minimum for AIO and use in main CLOUDLOG -> done
-	- [I]091120: Crashes again after one loop, might be a DHT issue -> DHT moved to pin 11, stopped collision with Ethernet on pin 10 (CS)
-	- [I]091120: main delay(SYNC_INTERVAL) must be factored out, it could be impacting networking -> done
-	- [I]091120: Data not writing to AIO -> side effect of DHT/Ethernet pin conflict
-	- [FR]083120: Upload data to cloud db -> code now working
-	- [FR]090820: After adding cloud db support, try backport to Arduino Ethernet board (enough memory?) -> does not fit, not worth the effort
-	- [FR]090120: Add screen display support
-- 092020
-	- [FR][P2]091420: Switch to M0 Proto board
-	- [FR][P1]091120: Use timedisplay routines for log string
-	- Added DEBUG and production sample rate definitions
-	- [FR][P1]090820: Optimize code
-	- [I]092020: SDLOG doesn't actually write values (code was dropped in previous revision) -> this has been true since initial Github checkin; fixed
-- 100120
-	- partial refactoring for WIFI
-	- added initial MQTT support
-	- updated credential items in secrets.h
-	- moved network feed locations out of secrets.h
-- 111020
-	- added conditional for CO2 sensor read
-	- [FR][P2]100120: re-factor CLOUDLOG?, RJ45, and [i]092020 to add WiFi support -> WiFi code changes inherited from cub2bed_mqtt code base, though not addressing [i]092020 yet
-	- [FR][P3]091420: Try and move Adafruit IO feeds to another group -> implemented for master_bedroom as test
-	- [FR][P2]110920: Add LiPo battery so if power goes out we have redundant power supply for some period -> added to both deployed rooms
-	- [I][P1]100220: MQTT code previously has only updating every 10 minutes and then would stop. Code changes implemented to MQTT code, check for reliability -> resolved with tested MQTT code path from cub2bed_mqtt code base
-	- [FR][P1]091320: Insert detectable (-1) data points into data feed when sensors error during read or create out of parameter values (see code in loop()) -> Added support for read failures, not out of bounds conditions
-	- [I][P3]100220: leading zero problem on day in timestring() -> Added a leading zero for day()<10
--111120
-	- [FR][P2]111020: combine MQTT publish code blocks for AdafruitIO MQTT and generic MQTT, append username to the secrets.h MQTT_PUB_TOPIC[x] -> completed
-	- [I][P1]102420: Need an error indicator and better handling for non-DEBUG, while(1) errors, MQTT connection errors -> MQTT connection and SGP30 sensor init while(1) have better handling
-	- [FR][P3]111020: is #if defined(SDLOG) || defined(SCREEN) needed, because screen has its own output format? -> bug, fixed as #if defined(SDLOG) || defined(DEBUG)
--111420
-	- [FR][P1]111420: Add WiFi and Ethernet hostnames -> Added for WiFi but Ethernet not supported in library.
-	- [FR][P1]100120: refactor NTP time code into monolithic block, only used by SDLOG and DEBUG -> conditional #define NTPTIME
-	- [I][P1] 111020: Display something on screen while waiting for first sensor read. If the device can't get to the MQTT broker on its initial boot, as an example, the screen will never be initialized. -> display text added
-	- [I][P1] 111120: Review WiFi wait until connect that leaves device hung with no visible indicators -> WiFi connect now has 10 attempts then error handling and messaging
--112820
-	- Added rudimentary support for SH110x OLED screen
-	- Extracted TimeString from NTP conditional compile
-	- Modified TimeString to return a value if NTP not defined
-	- Tested SCREEN + DEBUG code path
-	- Added untested support for TARGET_ANNE_OFFICE
-- 120120
-	- Tested RJ45 + MQTT code path
-- 123120
-	- Standardized while (1) error handling for WiFi, RJ45, and MQTT_Connect
-	- Partial support for proximity based activation of the screen. Should have been on a branch...
-- 012421
-	- [FR][P2]123120: Add error blink codes to onboard LED for while (1) -> Adding BUILT_IN_LED blinking matching the fatal error code, aligning with new code in air_quality
-	- [I][P2]111120: Disable board lights on Feather Huzzah -> Built-in LED is supressed at startup then used only for fatal error messages
-	- [I][P3]112820: if DHT pin not assigned properly, code crashes -> Just tested where DHT was pinned for Huzzah and compiled for M0. Code properly reported -1 for sensor read.
-- 082521
-	- changing room into a parameter of uploaded data
-	- [I][P2]112920: Anonymize TARGET_XXX defines
-	- proximity code removed as it is now in a branch. This branch has all proximity code removed, master had code in main() still
+- 111121
+	- [FR][P1]093021: sensor; indoor C02 levels -> added support for SCD40 which measures temp, humidity, and CO2 level
+	- refactor code to support #define ONE_TIME, which allows the code to run one time then sleep (e.g. ESP hardware), or loop continuously (e.g. RJ45)
+- 110521
+	- [FR][P1]090121: power; Low battery messaging to screen ->added
+- 100421
+	- [I][P3]091321: wifi; validate host name is being set via network admin tool -> validated
+	- [I][P2]100421: screen; UI indication of clientname -> added
+	- [I][P1]093021: screen; error string is wrapping into time display text -> resolved for MQTT error messages
+	- [I][P1]093021: screen; error string is not being checked to fit on screen -> manually reviewing
+	- Simplified error reporting for MQTT publish issues, as I can look at the data to see the actual problem or error in the server processing code
+	- Reviewing UI changes to add outside temp and humidity plus CO2 display
+	- [FR][P3]090921: wifi; more diagnostic information at connect in log -> now reporting RSSI value
+	- [I][P2]091321: log; don't think MagTag BSP has LED_BUILTIN defined. No blinking LED on FATAL errors -> it works, red light on back
+- 091621
+	- [I][P1]091521: screen; can't call screenMessage after screenValues because the latter will overwrite the screen -> compressed all screen routines into a single screenUpdate function
+	- [FR][P1]112920: screen; time display -> injected as messageText when displaying temperature and humidity
+	- [Q]100120: mqtt; Can I just publish to the higher level topic in connectToBroker() to get all the subs -> no
+	- [I][P2]091021: wifi; If WiFi comes down for an extended period, functionality does not recover in non-deepsleep code branches -> switched from stopApp() to deepSleep() for WiFi failures at initialization
+	- [FR][P2]090821: wifi; instead of while(1) if unable to connect to WiFi, it would be better to reset -> switched from stopApp() to deepSleep() for WiFi failures at initialization
+	- [I][P1]091321: mqtt; semi-consistently seeing issue where, over WiFI, temp is logging to mqtt properly but room and sometimes humidity is not -> solved by implementing MQTT QoS 1
+	- [FR][P3]100720: mqtt; implement MQTT QoS 1 -> done
+- 091521
+	- validated code paths for only DEBUG and only DEBUG and SCREEN
+	- [FR][P3]091321: screen; convert pixel coordinates in screen draws to offsets of display.width, display.height -> done
+	- [I][P1]091321: mqtt; should I be using a mqtt.disconnect() during the sleep process? -> added
+	- [I][P1]091321: screen; is the deepsleep function for EPD causing the screen to grey out? -> significant debugging, fixed by changing EPD_BUSY from -1 (default in all Adafruit code) to 5 (from Magtag pinout)
+- 091321
+	- [FR][P2]090121: power; Deep sleep between sensor reads to lower battery consumption -> Sleep support for ESP32; moving from loop() to singular runs of setup()
+	- Moving temp/humidity display to separate function
+	- UI elements function
+	- screenMessage updated to call UI element function
+- 091021
+	- e-ink support for the Adafruit Magtag
+	- support for Adafruit SiH7021: https://www.adafruit.com/product/3251, temporary until I get more AHTx0 parts
+- 090921
+	- bug fixes in #define WiFi, MQTT code
+	- log improvements in #define WiFi, MQTT code
+	- moved #define SDLOG code to branch as this code is not being used
+- 090721
+	- #define SCREEN work (untested)
+		- integrate Adafruit Funhouse screen support
+		- added screenMessage wrapper for Adafruit GFX xxx.print related to #define SCREEN
+		- removed LCD code from #define SCREEN, not expecting to use again
+		- general cleanup
+	- implemented debugMessage wrapper for previous #define DEBUG serial messages
+	- general bug fixes
+- 090321
+	- switching to AHT20 (temp/humidity) for i2c connectivity and future proofing
+- 090121
+	- moving CO2 measurement to private branch, as it doesn't work
 - 083021
 	- removed while(1) for mqttconnect()
 	- #DEBUG log formatting fixes
@@ -208,51 +189,67 @@ Regularly sample and log temperature, humidity
 		- [I][P3]092020: time; If time isn't set by NTP, DEBUG and SDLOG have errors -> zuluDateTimeString inserts "time not set" instead of UTC time if NTP not defined
 	- [I][P2]112820: sdlog; data logged to SDLOG is not uniquely identified -> room and UTC time attached to readings
 	- [Q]090820: We are generating humidity, heat index, and absolute humidity? -> dropping heat index support, absolute humidity required to calibrate eCO2 reading
-- 090121
-	- moving CO2 measurement to private branch, as it doesn't work
-- 090321
-	- switching to AHT20 (temp/humidity) for i2c connectivity and future proofing
-- 090721
-	- #define SCREEN work (untested)
-		- integrate Adafruit Funhouse screen support
-		- added screenMessage wrapper for Adafruit GFX xxx.print related to #define SCREEN
-		- removed LCD code from #define SCREEN, not expecting to use again
-		- general cleanup
-	- implemented debugMessage wrapper for previous #define DEBUG serial messages
-	- general bug fixes
-- 090921
-	- bug fixes in #define WiFi, MQTT code
-	- log improvements in #define WiFi, MQTT code
-	- moved #define SDLOG code to branch as this code is not being used
-- 091021
-	- e-ink support for the Adafruit Magtag
-	- support for Adafruit SiH7021: https://www.adafruit.com/product/3251, temporary until I get more AHTx0 parts
-- 091321
-	- [FR][P2]090121: power; Deep sleep between sensor reads to lower battery consumption -> Sleep support for ESP32; moving from loop() to singular runs of setup()
-	- Moving temp/humidity display to separate function
-	- UI elements function
-	- screenMessage updated to call UI element function
-- 091521
-	- validated code paths for only DEBUG and only DEBUG and SCREEN
-	- [FR][P3]091321: screen; convert pixel coordinates in screen draws to offsets of display.width, display.height -> done
-	- [I][P1]091321: mqtt; should I be using a mqtt.disconnect() during the sleep process? -> added
-	- [I][P1]091321: screen; is the deepsleep function for EPD causing the screen to grey out? -> significant debugging, fixed by changing EPD_BUSY from -1 (default in all Adafruit code) to 5 (from Magtag pinout)
-- 091621
-	- [I][P1]091521: screen; can't call screenMessage after screenValues because the latter will overwrite the screen -> compressed all screen routines into a single screenUpdate function
-	- [FR][P1]112920: screen; time display -> injected as messageText when displaying temperature and humidity
-	- [Q]100120: mqtt; Can I just publish to the higher level topic in connectToBroker() to get all the subs -> no
-	- [I][P2]091021: wifi; If WiFi comes down for an extended period, functionality does not recover in non-deepsleep code branches -> switched from stopApp() to deepSleep() for WiFi failures at initialization
-	- [FR][P2]090821: wifi; instead of while(1) if unable to connect to WiFi, it would be better to reset -> switched from stopApp() to deepSleep() for WiFi failures at initialization
-	- [I][P1]091321: mqtt; semi-consistently seeing issue where, over WiFI, temp is logging to mqtt properly but room and sometimes humidity is not -> solved by implementing MQTT QoS 1
-	- [FR][P3]100720: mqtt; implement MQTT QoS 1 -> done
-- 100421
-	- [I][P3]091321: wifi; validate host name is being set via network admin tool -> validated
-	- [I][P2]100421: screen; UI indication of clientname -> added
-	- [I][P1]093021: screen; error string is wrapping into time display text -> resolved for MQTT error messages
-	- [I][P1]093021: screen; error string is not being checked to fit on screen -> manually reviewing
-	- Simplified error reporting for MQTT publish issues, as I can look at the data to see the actual problem or error in the server processing code
-	- Reviewing UI changes to add outside temp and humidity plus CO2 display
-	- [FR][P3]090921: wifi; more diagnostic information at connect in log -> now reporting RSSI value
-	- [I][P2]091321: log; don't think MagTag BSP has LED_BUILTIN defined. No blinking LED on FATAL errors -> it works, red light on back
-- 110521
-	- [FR][P1]090121: power; Low battery messaging to screen
+- 082521
+	- changing room into a parameter of uploaded data
+	- [I][P2]112920: Anonymize TARGET_XXX defines
+	- proximity code removed as it is now in a branch. This branch has all proximity code removed, master had code in main() still
+- 012421
+	- [FR][P2]123120: Add error blink codes to onboard LED for while (1) -> Adding BUILT_IN_LED blinking matching the fatal error code, aligning with new code in air_quality
+	- [I][P2]111120: Disable board lights on Feather Huzzah -> Built-in LED is supressed at startup then used only for fatal error messages
+	- [I][P3]112820: if DHT pin not assigned properly, code crashes -> Just tested where DHT was pinned for Huzzah and compiled for M0. Code properly reported -1 for sensor read.
+- 123120
+	- Standardized while (1) error handling for WiFi, RJ45, and MQTT_Connect
+	- Partial support for proximity based activation of the screen. Should have been on a branch...
+- 120120
+	- Tested RJ45 + MQTT code path
+- 112820
+	- Added rudimentary support for SH110x OLED screen
+	- Extracted TimeString from NTP conditional compile
+	- Modified TimeString to return a value if NTP not defined
+	- Tested SCREEN + DEBUG code path
+	- Added untested support for TARGET_ANNE_OFFICE
+- 111420
+	- [FR][P1]111420: Add WiFi and Ethernet hostnames -> Added for WiFi but Ethernet not supported in library.
+	- [FR][P1]100120: refactor NTP time code into monolithic block, only used by SDLOG and DEBUG -> conditional #define NTPTIME
+	- [I][P1] 111020: Display something on screen while waiting for first sensor read. If the device can't get to the MQTT broker on its initial boot, as an example, the screen will never be initialized. -> display text added
+	- [I][P1] 111120: Review WiFi wait until connect that leaves device hung with no visible indicators -> WiFi connect now has 10 attempts then error handling and messaging
+- 111020
+	- added conditional for CO2 sensor read
+	- [FR][P2]100120: re-factor CLOUDLOG?, RJ45, and [i]092020 to add WiFi support -> WiFi code changes inherited from cub2bed_mqtt code base, though not addressing [i]092020 yet
+	- [FR][P3]091420: Try and move Adafruit IO feeds to another group -> implemented for master_bedroom as test
+	- [FR][P2]110920: Add LiPo battery so if power goes out we have redundant power supply for some period -> added to both deployed rooms
+	- [I][P1]100220: MQTT code previously has only updating every 10 minutes and then would stop. Code changes implemented to MQTT code, check for reliability -> resolved with tested MQTT code path from cub2bed_mqtt code base
+	- [FR][P1]091320: Insert detectable (-1) data points into data feed when sensors error during read or create out of parameter values (see code in loop()) -> Added support for read failures, not out of bounds conditions
+	- [I][P3]100220: leading zero problem on day in timestring() -> Added a leading zero for day()<10
+- 100120
+	- partial refactoring for WIFI
+	- added initial MQTT support
+	- updated credential items in secrets.h
+	- moved network feed locations out of secrets.h
+- 092020
+	- [FR][P2]091420: Switch to M0 Proto board
+	- [FR][P1]091120: Use timedisplay routines for log string
+	- Added DEBUG and production sample rate definitions
+	- [FR][P1]090820: Optimize code
+	- [I]092020: SDLOG doesn't actually write values (code was dropped in previous revision) -> this has been true since initial Github checkin; fixed
+- 091420
+	- [I]091120: Set SYNC_INTERVAL to minimum for AIO and use in main CLOUDLOG -> done
+	- [I]091120: Crashes again after one loop, might be a DHT issue -> DHT moved to pin 11, stopped collision with Ethernet on pin 10 (CS)
+	- [I]091120: main delay(SYNC_INTERVAL) must be factored out, it could be impacting networking -> done
+	- [I]091120: Data not writing to AIO -> side effect of DHT/Ethernet pin conflict
+	- [FR]083120: Upload data to cloud db -> code now working
+	- [FR]090820: After adding cloud db support, try backport to Arduino Ethernet board (enough memory?) -> does not fit, not worth the effort
+	- [FR]090120: Add screen display support
+- 091120
+	- [I]090820: Code is only running for one loop -> setSyncInterval(15) locked code on subsequent loops, also not needed
+	- [I]090820: time is not correct, sample code is -> byproduct of setSyncInterval(15) issue
+	- [FR]090820: Display NTP time when received in DEBUG	
+- 090820
+	- Switched to Particle Ethernet Featherwing and Feather M4 Express
+	- Switched to timelib getNtpTime example code
+	- [FR]090120: Conditional compile for network, SD saves, and display
+	- [FR]090120: Switch to ARM SoC for +memory (post conditionals?)
+- 090520
+	- Outside code work highlights Ethernet code is likely working, was blocked by failed primary DNS server
+- 083120
+	- First version based on merged sample code for sensors, SD. Ethernet code NOT working.
