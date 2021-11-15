@@ -1,7 +1,7 @@
  Air Quality
 
 ### Purpose
-Regularly sample and log temperature, humidity, and if available, CO2 levels
+Regularly sample and log temperature, humidity, and if available, co2 levels
 
 ### Contributors
 
@@ -85,7 +85,7 @@ Regularly sample and log temperature, humidity, and if available, CO2 levels
 	- [I][P2]111420: time; Review NTP while until data
 		- See Q about MQTT local server time stamping inbound data?
 		- add code to let NTP fail through rather than while waiting
-		- [I][P1]091321: time; "No NTP response" does not reattempt until success
+		- [I][P2]091321: time; "No NTP response" does not reattempt until success
 		- in zuluDateTimeString switch #ifdef NTP for check timeStatus() for timeNotSet
 - screen
 	- [I][P3]111120: screen; Screen is on all the time, which could cause OLED burn in, and in dark environments, is very bright
@@ -118,7 +118,8 @@ Regularly sample and log temperature, humidity, and if available, CO2 levels
 	- [FR][P3]012421: log; Async blinking of built-in LED for non-FATAL errors (e.g. MQTT publish)
 - sensor
 - power
-	- [FR][P1]091521: power; deepsleep for feather board (M0, M4) implementations
+	- [FR][P2]091521: power; deepsleep for feather board (M0, M4) implementations
+	- [FR][P1]111321: power; move battery configuration setting to secrets.h
 
 ### Questions
 - [Q]120220: screen; Why do I need wire and spi for OLED displays?

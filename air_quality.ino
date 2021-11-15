@@ -1,20 +1,20 @@
 /*
   Project Name:   air_quality
-  Description:    Regularly sample and log temperature, humidity, and if available, C02 levels
+  Description:    Regularly sample and log temperature, humidity, and if available, co2 levels
 
   See README.md for target information, revision history, feature requests, etc.
 */
 
 // Conditional compile flags
 //#define DEBUG         // Output to the serial port
-#define SCREEN        // output sensor data to screen
+//#define SCREEN        // output sensor data to screen
 #define MQTTLOG        // Output to MQTT broker defined in secrets.h
-//#define RJ45            // use Ethernet
-#define WIFI          // use WiFi (credentials in secrets.h)
+#define RJ45            // use Ethernet
+//#define WIFI          // use WiFi (credentials in secrets.h)
 #define NTP         // query network time server for logging
-#define BATTERY
-#define C02_SENSOR
-#define ONE_TIME
+//#define BATTERY
+//#define CO2_SENSOR
+//#define ONE_TIME
 
 // Gloval variables
 #ifndef ONE_TIME
@@ -26,21 +26,21 @@ typedef struct
 {
   float temperature;
   float humidity;
-  uint16_t c02;
+  uint16_t co2;
 } envData;
-#ifdef C02_SENSOR
+#ifdef CO2_SENSOR
   // gathers all three values
   #include <SensirionI2CScd4x.h>
   SensirionI2CScd4x envSensor;
 #else
   // temp and humidity only
-  // AHTX0
-  // #include <Adafruit_AHTX0.h>
-  // Adafruit_AHTX0 envSensor;
+  //AHTX0
+  #include <Adafruit_AHTX0.h>
+  Adafruit_AHTX0 envSensor;
 
   // Si7021
-  #include "Adafruit_Si7021.h"
-  Adafruit_Si7021 envSensor = Adafruit_Si7021();
+  // #include "Adafruit_Si7021.h"
+  // Adafruit_Si7021 envSensor = Adafruit_Si7021();
 #endif
 
 // Battery voltage sensor
@@ -48,11 +48,24 @@ typedef struct
 Adafruit_LC709203F lc;
 
 #ifdef DEBUG
-  // microsecond delay for deep sleep
-  //#define LOG_INTERVAL 240000000  // debug interval; 240 seconds
-  #define LOG_INTERVAL 60000000  // debug interval; 60 seconds 
+  // debug log intervals
+  #ifdef ONE_TIME
+    // MICROsecond delay for ESP deep sleep
+    #define LOG_INTERVAL 60000000  // debug interval; 1 minute
+  #else
+    // millisecond delay for ARM
+    //#define LOG_INTERVAL 240000  // debug interval; 240 seconds
+    #define LOG_INTERVAL 60000  // debug interval
+  #endif
 #else
-  #define LOG_INTERVAL 1800000000 // production interval; 1800 seconds
+  // production log intervals
+  #ifdef ONE_TIME
+    // MICROsecond delay for ESP deep sleep
+    #define LOG_INTERVAL 1800000000  // debug interval; 30 minutes
+  #else
+    // MILLIsecond delay for ARM
+    #define LOG_INTERVAL 1800000
+  #endif
 #endif
 
 // MQTT credentials and network IDs
@@ -101,8 +114,8 @@ Adafruit_LC709203F lc;
   Adafruit_MQTT_Client mqtt(&client, MQTT_BROKER, MQTT_PORT, MQTT_CLIENT_ID, MQTT_USER, MQTT_PASS);
   Adafruit_MQTT_Publish tempPub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC1,MQTT_QOS_1);
   Adafruit_MQTT_Publish humidityPub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC2, MQTT_QOS_1);
-  #ifdef C02_SENSOR
-    Adafruit_MQTT_Publish c02Pub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC3, MQTT_QOS_1);
+  #ifdef CO2_SENSOR
+    Adafruit_MQTT_Publish co2Pub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC3, MQTT_QOS_1);
   #endif
   Adafruit_MQTT_Publish roomPub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC4, MQTT_QOS_1);
 #endif
@@ -175,7 +188,7 @@ void setup()
   #endif
 
   // Handle environment sensor
-  #ifdef C02_SENSOR
+  #ifdef CO2_SENSOR
     Wire.begin();
 
     uint16_t error;
@@ -217,7 +230,7 @@ void setup()
     debugMessage("Battery voltage monitor ready");
     // required for accurate battert temp reading
     //lc.setThermistorB(3950);
-    lc.setPackSize(LC709203F_APA_1000MAH);
+    lc.setPackSize(LC709203F_APA_2000MAH);
     //lc.setAlarmVoltage(3.8);
     // LC709203F_APA_100MAH = 0x08,
     // LC709203F_APA_200MAH = 0x0B,
@@ -503,23 +516,25 @@ void stopApp()
     }
 #endif
 
-void deepSleep()
-{
-  debugMessage(String("Going to sleep for ") + (LOG_INTERVAL/100000) + " seconds");
-  #ifdef SCREEN
-    display.powerDown();
-    digitalWrite(EPD_RESET, LOW); // hardware power down mode
-  #endif
-  esp_sleep_enable_timer_wakeup(LOG_INTERVAL);
-  esp_deep_sleep_start();
-}
+#ifdef ONE_TIME
+  void deepSleep()
+  {
+    debugMessage(String("Going to sleep for ") + (LOG_INTERVAL/100000) + " seconds");
+    #ifdef SCREEN
+      display.powerDown();
+      digitalWrite(EPD_RESET, LOW); // hardware power down mode
+    #endif
+    esp_sleep_enable_timer_wakeup(LOG_INTERVAL);
+    esp_deep_sleep_start();
+  }
+#endif
 
 envData readEnvSensor()
 {
   envData sensorData;
   uint8_t error;
-  #ifdef C02_SENSOR
-    error = envSensor.readMeasurement(sensorData.c02, sensorData.temperature, sensorData.humidity);
+  #ifdef CO2_SENSOR
+    error = envSensor.readMeasurement(sensorData.co2, sensorData.temperature, sensorData.humidity);
     if (error) 
     {
       debugMessage("Error trying to read environment sensor");
@@ -527,39 +542,48 @@ envData readEnvSensor()
     sensorData.temperature = sensorData.temperature*1.8+32;
   #else
     // AHTX0
-    // sensors_event_t humidity, temp;
-    // envSensor.getEvent(&humidity, &temp);
-    // sensorData.temperature = (temp.temperature*1.8)+32;
-    // sensorData.humidity = humidity.relative_humidity;
-    // sensorData.c02 = 0;
+    sensors_event_t humidity, temp;
+    envSensor.getEvent(&humidity, &temp);
+    sensorData.temperature = (temp.temperature*1.8)+32;
+    sensorData.humidity = humidity.relative_humidity;
+    sensorData.co2 = 0;
 
     // SiH7021
-    sensorData.temperature = (envSensor.readTemperature()*1.8)+32;
-    sensorData.humidity = envSensor.readHumidity();
-    sensorData.c02 = 0;
+    // sensorData.temperature = (envSensor.readTemperature()*1.8)+32;
+    // sensorData.humidity = envSensor.readHumidity();
+    // sensorData.co2 = 0;
   #endif
   return sensorData;
 }
 
-int mqttUpdate(float temperature, float humidity, uint16_t c02)
+int mqttUpdate(float temperature, float humidity, uint16_t co2)
 {
   #ifdef MQTTLOG
     MQTT_connect();
-    if ((!tempPub.publish(temperature)) || (!humidityPub.publish(humidity)) || (!roomPub.publish(MQTT_CLIENT_ID)) || (!c02Pub.publish(c02)))
+    #ifdef CO2_SENSOR
+      if ((!tempPub.publish(temperature)) || (!humidityPub.publish(humidity)) || (!roomPub.publish(MQTT_CLIENT_ID)) || (!co2Pub.publish(co2)))
+    #else
+      if ((!tempPub.publish(temperature)) || (!humidityPub.publish(humidity)) || (!roomPub.publish(MQTT_CLIENT_ID)))
+    #endif
     {
       debugMessage("Part/all of MQTT publish failed at " + zuluDateTimeString());
+      mqtt.disconnect();
       return 1;
     }
     else 
     {
-      debugMessage("Published to MQTT: " + zuluDateTimeString() + " , " + MQTT_CLIENT_ID + " , " + temperature + " , " + humidity);
+      #ifdef CO2_SENSOR
+        debugMessage("Published to MQTT: " + zuluDateTimeString() + " , " + MQTT_CLIENT_ID + " , " + temperature + " , " + humidity + " , " + co2);
+      #else
+        debugMessage("Published to MQTT: " + zuluDateTimeString() + " , " + MQTT_CLIENT_ID + " , " + temperature + " , " + humidity);
+      #endif
+      mqtt.disconnect();
       return 0;
     }
-    mqtt.disconnect();
   #endif
 }
 
-void screenUpdate(float temperature, float humidity, uint16_t c02, String messageText)
+void screenUpdate(float temperature, float humidity, uint16_t co2, String messageText)
 {
   #ifdef SCREEN
     display.clearBuffer();
@@ -582,9 +606,9 @@ void screenUpdate(float temperature, float humidity, uint16_t c02, String messag
     // Humidity
     display.setCursor(5,((display.height()*5/8)-10));
     if (temperature>0) display.print(String("Humidity ") + humidity + "%");
-    #ifdef C02_SENSOR
+    #ifdef CO2_SENSOR
       display.setCursor(5,((display.height()*7/8)-10));
-      display.print(String("C02 ") + c02 + " ppm");
+      display.print(String("C02 ") + co2 + " ppm");
     #endif
 
     // Outdoor information
@@ -639,10 +663,11 @@ void screenBatteryStatus()
     display.fillRect((display.width()-33),((display.height()*7/8)+4),(int((percent/100)*barWidth)),barHeight,EPD_GRAY);
     // border
     display.drawRect((display.width()-33),((display.height()*7/8)+4),barWidth,barHeight,EPD_BLACK);
+    debugMessage("Battery voltage: " + String(lc.cellVoltage()) + " v");
+    debugMessage("Battery is at " + String(int(percent)) + "%");
+    //debugMessage("Battery temperature: " + String(lc.getCellTemperature()) + " F");
   #endif
-  debugMessage("Battery voltage: " + String(lc.cellVoltage()) + " v");
-  debugMessage("Battery is at " + String(int(percent)) + "%");
-  //debugMessage("Battery temperature: " + String(lc.getCellTemperature()) + " F");
+
 }
 
 void actionSequence()
@@ -650,11 +675,12 @@ void actionSequence()
   debugMessage("actionsequence started");
   envData sensorData = readEnvSensor();
   #ifdef MQTTLOG
-    if (mqttUpdate(sensorData.temperature, sensorData.humidity, sensorData.c02))
-      screenUpdate(sensorData.temperature, sensorData.humidity, sensorData.c02,(String(MQTT_CLIENT_ID) + " pub fail: " + zuluDateTimeString()));
+    if (mqttUpdate(sensorData.temperature, sensorData.humidity, sensorData.co2))
+      screenUpdate(sensorData.temperature, sensorData.humidity, sensorData.co2,(String(MQTT_CLIENT_ID) + " pub fail:" + zuluDateTimeString()));
     else
-      screenUpdate(sensorData.temperature, sensorData.humidity, sensorData.c02,(String(MQTT_CLIENT_ID) + " pub: " + zuluDateTimeString()));
+      screenUpdate(sensorData.temperature, sensorData.humidity, sensorData.co2,(String(MQTT_CLIENT_ID) + " pub:" + zuluDateTimeString()));
   #else
-    screenUpdate(sensorData.temperature, sensorData.humidity, sensorData.c02,("Last update at " + zuluDateTimeString()));
+    screenUpdate(sensorData.temperature, sensorData.humidity, sensorData.co2,("Last update at " + zuluDateTimeString()));
   #endif
-  debugMessage(zuluDateTimeString() + "->" + sensorData.temperature + "F , " + sensorData.humidity + "%, " + sensorData.c02 + " ppm");
+  debugMessage(zuluDateTimeString() + "->" + sensorData.temperature + "F , " + sensorData.humidity + "%, " + sensorData.co2 + " ppm");
+}
