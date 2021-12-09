@@ -111,8 +111,6 @@ Regularly sample and log temperature, humidity, and if available, co2 levels
 	- [FR][P3]112920: time; Get time from Adafruit IO: https://io.adafruit.com/blog/feature/2016/06/01/time-utilities/
 	- [FR][P3]090921: mqtt; handle MQTT broker errors https://io.adafruit.com/blog/example/2016/07/06/mqtt-error-reporting/
 - screen
-	- [FR][P2]091321: screen; local weather (forecast) from API or Adafruit IO
-	- [FR][P2]051021: screen; current time
 - wifi
 - log
 	- [FR][P3]012421: log; Async blinking of built-in LED for non-FATAL errors (e.g. MQTT publish)
@@ -128,6 +126,9 @@ Regularly sample and log temperature, humidity, and if available, co2 levels
 - [Q]110921: does C02 require calibration for SCD40 (direct CO2 read, not eCO2)
 
 ### Revisions
+- 120821
+	- [FR][P2]051021: screen; current time -> closed to conserve battery as primary screen type is eInk on a ONETIME loop
+	- [FR][P2]091321: screen; local weather (forecast) from API or Adafruit IO -> weather via Adafruit IO added
 - 120721
 	- [FR][P1]090121: mqtt; Low battery messaging to MQTT -> added
 	- Changed MQTT publishing to per room feeds

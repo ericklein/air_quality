@@ -15,19 +15,27 @@
 //#define BATTERY
 //#define CO2_SENSOR
 //#define ONE_TIME
+#define WEATHER
 
 // Gloval variables
 #ifndef ONE_TIME
   unsigned long syncTime = 0;   // stores millis() for timing functions 
 #endif
 
-// Temperature, humidity, C02 sensors
+// internal and outside environmental conditions
 typedef struct
 {
-  float temperature;
-  float humidity;
+  float intTemperature;
+  float intHumidity;
   uint16_t co2;
+  float extTemperature;
+  float extHumidity;
 } envData;
+
+#ifdef WEATHER 
+  #include <ArduinoJson.h>
+#endif
+
 #ifdef CO2_SENSOR
   // gathers all three values
   #include <SensirionI2CScd4x.h>
@@ -116,10 +124,11 @@ typedef struct
   Adafruit_MQTT_Client mqtt(&client, MQTT_BROKER, MQTT_PORT, MQTT_CLIENT_ID, MQTT_USER, MQTT_PASS);
   Adafruit_MQTT_Publish tempPub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC1,MQTT_QOS_1);
   Adafruit_MQTT_Publish humidityPub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC2, MQTT_QOS_1);
+  Adafruit_MQTT_Publish errMsgPub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC5, MQTT_QOS_1);
   #ifdef CO2_SENSOR
     Adafruit_MQTT_Publish co2Pub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC3, MQTT_QOS_1);
   #endif
-  Adafruit_MQTT_Publish errMsgPub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC5, MQTT_QOS_1);
+  Adafruit_MQTT_Subscribe weatherSub = Adafruit_MQTT_Subscribe(&mqtt, AIO_WEATHER_TOPIC);
 #endif
 
 #ifdef NTP
@@ -523,6 +532,15 @@ void stopApp()
 
 #ifdef ONE_TIME
   void deepSleep()
+
+  // pinMode(NEOPIXEL_POWER, OUTPUT);
+  // pinMode(SPEAKER_SHUTDOWN, OUTPUT);
+  // digitalWrite(SPEAKER_SHUTDOWN, LOW); // off
+  // digitalWrite(NEOPIXEL_POWER, HIGH); // off
+  // digitalWrite(EPD_RESET, LOW); // off (yes required to save a few mA)
+  // pinMode(13, OUTPUT);
+  // digitalWrite(13, LOW);
+
   {
     debugMessage(String("Going to sleep for ") + (LOG_INTERVAL/100000) + " seconds");
     #ifdef SCREEN
@@ -534,30 +552,39 @@ void stopApp()
   }
 #endif
 
-envData readEnvSensor()
+envData readEnvironment()
 {
   envData sensorData;
+  
+  //internal conditions
   uint8_t error;
   #ifdef CO2_SENSOR
-    error = envSensor.readMeasurement(sensorData.co2, sensorData.temperature, sensorData.humidity);
+    error = envSensor.readMeasurement(sensorData.co2, sensorData.intTemperature, sensorData.intHumidity);
     if (error) 
     {
       debugMessage("Error trying to read environment sensor");
     }
-    sensorData.temperature = sensorData.temperature*1.8+32;
   #else
     // AHTX0
     sensors_event_t humidity, temp;
     envSensor.getEvent(&humidity, &temp);
-    sensorData.temperature = (temp.temperature*1.8)+32;
-    sensorData.humidity = humidity.relative_humidity;
+    sensorData.intTemperature = temp.temperature;
+    sensorData.intHumidity = humidity.relative_humidity;
     sensorData.co2 = 0;
 
     // SiH7021
-    // sensorData.temperature = (envSensor.readTemperature()*1.8)+32;
-    // sensorData.humidity = envSensor.readHumidity();
+    // sensorData.intTemperature = (envSensor.readTemperature()*1.8)+32;
+    // sensorData.intHumidity = envSensor.readHumidity();
     // sensorData.co2 = 0;
   #endif
+  // convert C to F
+  sensorData.intTemperature = sensorData.intTemperature*1.8+32;
+
+  // external conditions
+  #ifdef WEATHER
+
+  #endif
+
   return sensorData;
 }
 
@@ -645,15 +672,17 @@ void screenUpdate(float temperature, float humidity, uint16_t co2, String messag
     #endif
 
     // Outdoor information
+    #ifdef WEATHER
     // Temperature
-    display.setCursor(((display.width()/2)+5),((display.height()*3/8)-10));
-    display.print("Temp XXX.xxF");
-    // Humidity
-    display.setCursor(((display.width()/2)+5),((display.height()*5/8)-10));
-    display.print("Humidity YY.yy%");
-    // AQM
-    display.setCursor(((display.width()/2)+5),((display.height()*7/8)-10));
-    display.print("AQM ZZZppm");    
+      display.setCursor(((display.width()/2)+5),((display.height()*3/8)-10));
+      display.print("Temp XXX.xxF");
+      // Humidity
+      display.setCursor(((display.width()/2)+5),((display.height()*5/8)-10));
+      display.print("Humidity YY.yy%");
+      // AQM
+      display.setCursor(((display.width()/2)+5),((display.height()*7/8)-10));
+      display.print("AQM ZZZppm");
+    #endif
 
     // Mesages
     display.setFont();  // resets to system default monospace font
@@ -707,7 +736,7 @@ void screenBatteryStatus()
 void actionSequence()
 {
   debugMessage("actionsequence started");
-  envData sensorData = readEnvSensor();
+  envData sensorData = readEnvironment();
   #ifdef MQTTLOG
     if (mqttSensorUpdate(sensorData.temperature, sensorData.humidity, sensorData.co2))
       screenUpdate(sensorData.temperature, sensorData.humidity, sensorData.co2,(String(MQTT_CLIENT_ID) + " pub fail:" + zuluDateTimeString()));
