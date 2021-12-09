@@ -18,7 +18,7 @@
 
 // Gloval variables
 #ifndef ONE_TIME
-  unsigned long syncTime = 0;        // holds millis() [milliseconds] for timing functions 
+  unsigned long syncTime = 0;   // stores millis() for timing functions 
 #endif
 
 // Temperature, humidity, C02 sensors
@@ -44,8 +44,10 @@ typedef struct
 #endif
 
 // Battery voltage sensor
-#include "Adafruit_LC709203F.h"
-Adafruit_LC709203F lc;
+#ifdef BATTERY
+  #include "Adafruit_LC709203F.h"
+  Adafruit_LC709203F lc;
+#endif
 
 #ifdef DEBUG
   // debug log intervals
@@ -53,7 +55,7 @@ Adafruit_LC709203F lc;
     // MICROsecond delay for ESP deep sleep
     #define LOG_INTERVAL 60000000  // debug interval; 1 minute
   #else
-    // millisecond delay for ARM
+    // MILLIsecond delay for ARM
     //#define LOG_INTERVAL 240000  // debug interval; 240 seconds
     #define LOG_INTERVAL 60000  // debug interval
   #endif
@@ -117,7 +119,7 @@ Adafruit_LC709203F lc;
   #ifdef CO2_SENSOR
     Adafruit_MQTT_Publish co2Pub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC3, MQTT_QOS_1);
   #endif
-  Adafruit_MQTT_Publish roomPub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC4, MQTT_QOS_1);
+  Adafruit_MQTT_Publish errMsgPub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC5, MQTT_QOS_1);
 #endif
 
 #ifdef NTP
@@ -208,7 +210,7 @@ void setup()
         debugMessage("Error trying to execute startPeriodicMeasurement(): ");
     }
     delay(5000);
-    debugMessage("temp/humidity sensor ready");
+    debugMessage("temp/humidity/CO2 sensor ready");
   #else
     // temp/humidity sensor check
     if (!envSensor.begin())
@@ -278,8 +280,11 @@ void setup()
       {
         debugMessage(String("Can not connect to WFii after ") + MAX_TRIES + " attempts");
         screenUpdate(0,0,0,String("Can not connect to WiFi after ") + MAX_TRIES + " attempts");
-        //stopApp();
-        deepSleep();
+        #ifdef ONE_TIME
+          deepSleep();
+        #else
+          stopApp();
+        #endif
       }
       tries++;
     }
@@ -556,14 +561,42 @@ envData readEnvSensor()
   return sensorData;
 }
 
-int mqttUpdate(float temperature, float humidity, uint16_t co2)
+void mqttBatteryAlert(int percent)
+{
+  #ifdef MQTTLOG
+    // msg to backend if battery is running low
+    if (percent<20)
+    {
+      String errMessage = String(MQTT_CLIENT_ID) + " battery at " + percent + " percent at " + zuluDateTimeString();  
+      MQTT_connect();
+
+
+    int charArrayLength = errMessage.length()+1;
+    char textInChars[charArrayLength];
+    errMessage.toCharArray(textInChars, charArrayLength);
+
+      if (!errMsgPub.publish(textInChars))
+      //if (!errMsgPub.publish(errMessage))
+      {
+        debugMessage("MQTT low battery publish failed at " + zuluDateTimeString());
+      }
+      else 
+      {
+        debugMessage("MQTT publish: " + errMessage);
+      }
+      mqtt.disconnect();
+    }
+  #endif
+}
+
+int mqttSensorUpdate(float temperature, float humidity, uint16_t co2)
 {
   #ifdef MQTTLOG
     MQTT_connect();
     #ifdef CO2_SENSOR
-      if ((!tempPub.publish(temperature)) || (!humidityPub.publish(humidity)) || (!roomPub.publish(MQTT_CLIENT_ID)) || (!co2Pub.publish(co2)))
+      if ((!tempPub.publish(temperature)) || (!humidityPub.publish(humidity)) || (!co2Pub.publish(co2)))
     #else
-      if ((!tempPub.publish(temperature)) || (!humidityPub.publish(humidity)) || (!roomPub.publish(MQTT_CLIENT_ID)))
+      if ((!tempPub.publish(temperature)) || (!humidityPub.publish(humidity)))
     #endif
     {
       debugMessage("Part/all of MQTT publish failed at " + zuluDateTimeString());
@@ -656,16 +689,17 @@ void screenBatteryStatus()
 
     int barHeight = 10;
     int barWidth = 28;
-    // stored so we don't call the function too often in routine
+    // stored so we don't call the function twice in the routine
     float percent = lc.cellPercent();
+    debugMessage("Battery is at " + String(percent) + " percent capacity");
+    debugMessage("Battery voltage: " + String(lc.cellVoltage()) + " v");
+    //debugMessage("Battery temperature: " + String(lc.getCellTemperature()) + " F");
 
     //calculate fill
     display.fillRect((display.width()-33),((display.height()*7/8)+4),(int((percent/100)*barWidth)),barHeight,EPD_GRAY);
     // border
     display.drawRect((display.width()-33),((display.height()*7/8)+4),barWidth,barHeight,EPD_BLACK);
-    debugMessage("Battery voltage: " + String(lc.cellVoltage()) + " v");
-    debugMessage("Battery is at " + String(int(percent)) + "%");
-    //debugMessage("Battery temperature: " + String(lc.getCellTemperature()) + " F");
+    mqttBatteryAlert(int(percent));
   #endif
 
 }
@@ -675,12 +709,14 @@ void actionSequence()
   debugMessage("actionsequence started");
   envData sensorData = readEnvSensor();
   #ifdef MQTTLOG
-    if (mqttUpdate(sensorData.temperature, sensorData.humidity, sensorData.co2))
+    if (mqttSensorUpdate(sensorData.temperature, sensorData.humidity, sensorData.co2))
       screenUpdate(sensorData.temperature, sensorData.humidity, sensorData.co2,(String(MQTT_CLIENT_ID) + " pub fail:" + zuluDateTimeString()));
     else
       screenUpdate(sensorData.temperature, sensorData.humidity, sensorData.co2,(String(MQTT_CLIENT_ID) + " pub:" + zuluDateTimeString()));
   #else
     screenUpdate(sensorData.temperature, sensorData.humidity, sensorData.co2,("Last update at " + zuluDateTimeString()));
   #endif
-  debugMessage(zuluDateTimeString() + "->" + sensorData.temperature + "F , " + sensorData.humidity + "%, " + sensorData.co2 + " ppm");
+  #ifndef MQTTLOG
+    debugMessage(zuluDateTimeString() + "->" + sensorData.temperature + "F , " + sensorData.humidity + "%, " + sensorData.co2 + " ppm");
+  #endif
 }

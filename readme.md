@@ -3,7 +3,12 @@
 ### Purpose
 Regularly sample and log temperature, humidity, and if available, co2 levels
 
-### Contributors
+### Configuring targets
+- Set parameters in secrets.h
+- Set appropriate conditional compile flags in air_quality.ino
+- Switch screen types in SCREEN routines in air_quality.ino
+- Switch sensor types if needed in/near CO2_SENSOR in air_quality.ino
+- Select battery pack size in BATTERY setup() in air_quality.ino
 
 ### known, working BOM parts
 - MCU
@@ -88,7 +93,7 @@ Regularly sample and log temperature, humidity, and if available, co2 levels
 		- [I][P2]091321: time; "No NTP response" does not reattempt until success
 		- in zuluDateTimeString switch #ifdef NTP for check timeStatus() for timeNotSet
 - screen
-	- [I][P3]111120: screen; Screen is on all the time, which could cause OLED burn in, and in dark environments, is very bright
+	- [I][P3]111120: screen; OLED screen is on all the time, which could cause OLED burn in, and in dark environments, is very bright
 		- time based dimming
 		- gesture based dimming
 	- [I][P3]112820: screen; pin 2 conflict with XXXX? on SH110x, not sure about SSD1306
@@ -99,27 +104,21 @@ Regularly sample and log temperature, humidity, and if available, co2 levels
 	- [I][P3]090921: sensor; values coming from standalone AHT20 and Funhouse AHT20 are very different. Calibration issue? See [FR] on this as well.
 		- 091321 SiH7021 is close to the standalone AHT20 values
 - power
-	- [I][P2]091521: power; why is stemmaQT board getting power (LED light is on) in deepsleep()?
 
 ### Feature Requests
 - mqtt
 	- [FR][P3]111020: mqtt; publish to multiple MQTT brokers
-	- [FR][P3]090921: mqtt; log MQTT server errors https://io.adafruit.com/blog/example/2016/07/06/mqtt-error-reporting/
-	- [FR][P2]091321: mqtt; inject lat/long into data, other extended fields for adafruit io?
-	- [FR][P1]090121: mqtt; Low battery messaging to MQTT
-		- timestamp->machine->error message
-	- [FR][P3]112920: time; Get time from MQTT broker: https://io.adafruit.com/blog/feature/2016/06/01/time-utilities/
-	- [FR][P1]091321: mqtt; Send all data as JSON object to MQTT
+	- [FR][P3]112920: time; Get time from Adafruit IO: https://io.adafruit.com/blog/feature/2016/06/01/time-utilities/
+	- [FR][P3]090921: mqtt; handle MQTT broker errors https://io.adafruit.com/blog/example/2016/07/06/mqtt-error-reporting/
 - screen
-	- [FR][P2]091321: screen; local weather (forecast)
+	- [FR][P2]091321: screen; local weather (forecast) from API or Adafruit IO
 	- [FR][P2]051021: screen; current time
 - wifi
 - log
 	- [FR][P3]012421: log; Async blinking of built-in LED for non-FATAL errors (e.g. MQTT publish)
 - sensor
 - power
-	- [FR][P2]091521: power; deepsleep for feather board (M0, M4) implementations
-	- [FR][P1]111321: power; move battery configuration setting to secrets.h
+	- [FR][P3]091521: power; deepsleep for feather board (M0, M4) implementations
 
 ### Questions
 - [Q]120220: screen; Why do I need wire and spi for OLED displays?
@@ -129,6 +128,11 @@ Regularly sample and log temperature, humidity, and if available, co2 levels
 - [Q]110921: does C02 require calibration for SCD40 (direct CO2 read, not eCO2)
 
 ### Revisions
+- 120721
+	- [FR][P1]090121: mqtt; Low battery messaging to MQTT -> added
+	- Changed MQTT publishing to per room feeds
+	- [I][P2]091521: power; why is stemmaQT board getting power (LED light is on) in deepsleep()? -> closed because I'm cutting the trace bridge for these LEDs
+
 - 111121
 	- [FR][P1]093021: sensor; indoor C02 levels -> added support for SCD40 which measures temp, humidity, and CO2 level
 	- refactor code to support #define ONE_TIME, which allows the code to run one time then sleep (e.g. ESP hardware), or loop continuously (e.g. RJ45)
