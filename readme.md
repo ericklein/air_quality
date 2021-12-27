@@ -50,10 +50,6 @@ Regularly sample and log temperature, humidity, and if available, co2 levels
 - CAUTION
 	- ERR 10: Can not connect to MQTT broker
 
-### to change hardware build target
-- change #defines in air_quality.ino
-- change appropriates values in secrets.h
-
 ### Information Sources
 - SD card
 	- https://github.com/adafruit/Light-and-Temp-logger/blob/master/lighttemplogger.ino
@@ -82,41 +78,10 @@ Regularly sample and log temperature, humidity, and if available, co2 levels
 - 111420: There is no way to set Ethernet hostname in official library. One could edit dhcp.cpp and dhcp.h to change the six character host name, but...
 
 ### Issues
-- mqtt
-	- [I][P3]102420: mqtt; Move local MQTT server to DNS named entry instead of IP address so DNS can resolve it if IP address changes
-	- [I][P3]111420: mqtt; MQTT publish (to Adafruit IO?) requires NTP to be defined?! No idea why.
-- time
-	- [I][P3]112820: time; NTP is dependent to WiFi or Ethernet due to IPAddress
-	- [I][P2]111420: time; Review NTP while until data
-		- See Q about MQTT local server time stamping inbound data?
-		- add code to let NTP fail through rather than while waiting
-		- [I][P2]091321: time; "No NTP response" does not reattempt until success
-		- in zuluDateTimeString switch #ifdef NTP for check timeStatus() for timeNotSet
-- screen
-	- [I][P3]111120: screen; OLED screen is on all the time, which could cause OLED burn in, and in dark environments, is very bright
-		- time based dimming
-		- gesture based dimming
-	- [I][P3]112820: screen; pin 2 conflict with XXXX? on SH110x, not sure about SSD1306
-- wifi
-- log
-- sensor
-	- [I][P2]112820: sensor; Temperature data is off by a few degrees F when inserted into case?
-	- [I][P3]090921: sensor; values coming from standalone AHT20 and Funhouse AHT20 are very different. Calibration issue? See [FR] on this as well.
-		- 091321 SiH7021 is close to the standalone AHT20 values
-- power
+- See GitHub Issues for project
 
 ### Feature Requests
-- mqtt
-	- [FR][P3]111020: mqtt; publish to multiple MQTT brokers
-	- [FR][P3]112920: time; Get time from Adafruit IO: https://io.adafruit.com/blog/feature/2016/06/01/time-utilities/
-	- [FR][P3]090921: mqtt; handle MQTT broker errors https://io.adafruit.com/blog/example/2016/07/06/mqtt-error-reporting/
-- screen
-- wifi
-- log
-	- [FR][P3]012421: log; Async blinking of built-in LED for non-FATAL errors (e.g. MQTT publish)
-- sensor
-- power
-	- [FR][P3]091521: power; deepsleep for feather board (M0, M4) implementations
+- See GitHub Issues for project
 
 ### Questions
 - [Q]120220: screen; Why do I need wire and spi for OLED displays?
@@ -128,7 +93,7 @@ Regularly sample and log temperature, humidity, and if available, co2 levels
 ### Revisions
 - 120821
 	- [FR][P2]051021: screen; current time -> closed to conserve battery as primary screen type is eInk on a ONETIME loop
-	- [FR][P2]091321: screen; local weather (forecast) from API or Adafruit IO -> weather via Adafruit IO added
+	- Moving FR and Issues to Github from readme.md
 - 120721
 	- [FR][P1]090121: mqtt; Low battery messaging to MQTT -> added
 	- Changed MQTT publishing to per room feeds
