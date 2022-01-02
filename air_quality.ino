@@ -6,7 +6,7 @@
 */
 
 // Conditional compile flags
-#define DEBUG         // Output to the serial port
+//#define DEBUG         // Output to the serial port
 #define SCREEN        // output sensor data to screen
 #define MQTTLOG        // Output to MQTT broker defined in secrets.h
 //#define RJ45            // use Ethernet
@@ -58,6 +58,10 @@ typedef struct
   #include "Adafruit_LC709203F.h"
   Adafruit_LC709203F lc;
 #endif
+
+// #define uS_TO_S_FACTOR 1000000 /* Conversion factor for micro seconds to seconds */ 
+// #define TIME_TO_SLEEP 5 /* Time ESP32 will go to sleep (in seconds) */
+
 
 #ifdef DEBUG
   // debug log intervals
@@ -351,9 +355,6 @@ void setup()
   #ifdef ONE_TIME
     actionSequence();
     // deep sleep device, which restarts code when repowered
-    #ifdef WIFI
-      client.stop();
-    #endif
     deepSleep();
   #endif
 }
@@ -534,20 +535,22 @@ void stopApp()
 
 #ifdef ONE_TIME
   void deepSleep()
-
-  // pinMode(NEOPIXEL_POWER, OUTPUT);
-  // pinMode(SPEAKER_SHUTDOWN, OUTPUT);
-  // digitalWrite(SPEAKER_SHUTDOWN, LOW); // off
-  // digitalWrite(NEOPIXEL_POWER, HIGH); // off
-  // digitalWrite(EPD_RESET, LOW); // off (yes required to save a few mA)
-  // pinMode(13, OUTPUT);
-  // digitalWrite(13, LOW);
-
   {
+    // I don't think these needed as I never enable them
+    // pinMode(NEOPIXEL_POWER, OUTPUT);
+    // pinMode(SPEAKER_SHUTDOWN, OUTPUT);
+    // digitalWrite(SPEAKER_SHUTDOWN, LOW); // off
+    // digitalWrite(NEOPIXEL_POWER, HIGH); // off
+
     debugMessage(String("Going to sleep for ") + (LOG_INTERVAL/100000) + " seconds");
     #ifdef SCREEN
       display.powerDown();
       digitalWrite(EPD_RESET, LOW); // hardware power down mode
+    #endif
+    digitalWrite(LED_BUILTIN, LOW);
+    #ifdef WIFI
+      client.stop();
+      // esp_wifi_stop();
     #endif
     esp_sleep_enable_timer_wakeup(LOG_INTERVAL);
     esp_deep_sleep_start();

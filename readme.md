@@ -1,7 +1,5 @@
- Air Quality
-
 ### Purpose
-Regularly sample and log temperature, humidity, and if available, co2 levels
+Air Quality regularly sample and log temperature, humidity, and if sensor available, co2 levels
 
 ### Configuring targets
 - Set parameters in secrets.h
@@ -91,6 +89,10 @@ Regularly sample and log temperature, humidity, and if available, co2 levels
 - [Q]110921: does C02 require calibration for SCD40 (direct CO2 read, not eCO2)
 
 ### Revisions
+- 010222
+	- Modifications to the deepSleep() routine, trying to fix the rapid battery depletion issue that has emerged
+- 122721
+	- Added initial version of outside weather support
 - 120821
 	- [FR][P2]051021: screen; current time -> closed to conserve battery as primary screen type is eInk on a ONETIME loop
 	- Moving FR and Issues to Github from readme.md
