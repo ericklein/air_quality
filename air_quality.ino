@@ -552,6 +552,9 @@ void stopApp()
       client.stop();
       // esp_wifi_stop();
     #endif
+    #ifdef CO2_SENSOR
+      envSensor.stopPeriodicMeasurement();
+    #endif
     esp_sleep_enable_timer_wakeup(LOG_INTERVAL);
     esp_deep_sleep_start();
   }

@@ -1,5 +1,5 @@
 ### Purpose
-Air Quality regularly sample and log temperature, humidity, and if sensor available, co2 levels
+Air Quality regularly samples and logs temperature, humidity, and if sensor available, co2 levels
 
 ### Configuring targets
 - Set parameters in secrets.h
