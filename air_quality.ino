@@ -7,27 +7,37 @@
 
 // Conditional compile flags
 //#define DEBUG         // Output to the serial port
-//#define SCREEN        // output sensor data to screen
+#define SCREEN        // output sensor data to screen
 #define MQTTLOG        // Output to MQTT broker defined in secrets.h
-#define RJ45            // use Ethernet
-//#define WIFI          // use WiFi (credentials in secrets.h)
+//#define RJ45            // use Ethernet
+#define WIFI          // use WiFi (credentials in secrets.h)
 #define NTP         // query network time server for logging
-//#define BATTERY
-//#define CO2_SENSOR
-//#define ONE_TIME
+#define BATTERY
+#define CO2_SENSOR
+#define ONE_TIME
+#define WEATHER
 
 // Gloval variables
 #ifndef ONE_TIME
   unsigned long syncTime = 0;   // stores millis() for timing functions 
 #endif
 
-// Temperature, humidity, C02 sensors
+// internal and outside environmental conditions
 typedef struct
 {
-  float temperature;
-  float humidity;
+  float intTemperature;
+  float intHumidity;
   uint16_t co2;
+  uint16_t extTemperature;
+  uint16_t extHumidity;
 } envData;
+
+#ifdef WEATHER 
+  #include <HTTPClient.h> 
+  #include <Arduino_JSON.h>
+  String jsonBuffer;
+#endif
+
 #ifdef CO2_SENSOR
   // gathers all three values
   #include <SensirionI2CScd4x.h>
@@ -48,6 +58,10 @@ typedef struct
   #include "Adafruit_LC709203F.h"
   Adafruit_LC709203F lc;
 #endif
+
+// #define uS_TO_S_FACTOR 1000000 /* Conversion factor for micro seconds to seconds */ 
+// #define TIME_TO_SLEEP 5 /* Time ESP32 will go to sleep (in seconds) */
+
 
 #ifdef DEBUG
   // debug log intervals
@@ -116,10 +130,11 @@ typedef struct
   Adafruit_MQTT_Client mqtt(&client, MQTT_BROKER, MQTT_PORT, MQTT_CLIENT_ID, MQTT_USER, MQTT_PASS);
   Adafruit_MQTT_Publish tempPub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC1,MQTT_QOS_1);
   Adafruit_MQTT_Publish humidityPub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC2, MQTT_QOS_1);
+  Adafruit_MQTT_Publish errMsgPub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC5, MQTT_QOS_1);
   #ifdef CO2_SENSOR
     Adafruit_MQTT_Publish co2Pub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC3, MQTT_QOS_1);
   #endif
-  Adafruit_MQTT_Publish errMsgPub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC5, MQTT_QOS_1);
+  //Adafruit_MQTT_Subscribe weatherSub = Adafruit_MQTT_Subscribe(&mqtt, AIO_WEATHER_TOPIC);
 #endif
 
 #ifdef NTP
@@ -216,7 +231,7 @@ void setup()
     if (!envSensor.begin())
     {
       debugMessage("FATAL ERROR: temp/humidity sensor not detected");
-      screenUpdate(0,0,0,"temp/humidity sensor not detected");
+      screenUpdate(0,0,0,0,0,"temp/humidity sensor not detected");
       stopApp();
     }
     debugMessage("temp/humidity sensor ready");
@@ -226,7 +241,7 @@ void setup()
     if (!lc.begin())
     {
       debugMessage("Battery and voltage monitor not detected");
-      screenUpdate(0,0,0,"battery sensor not detected");
+      screenUpdate(0,0,0,0,0,"battery sensor not detected");
       stopApp();
     }
     debugMessage("Battery voltage monitor ready");
@@ -279,7 +294,7 @@ void setup()
       if (tries == MAX_TRIES)
       {
         debugMessage(String("Can not connect to WFii after ") + MAX_TRIES + " attempts");
-        screenUpdate(0,0,0,String("Can not connect to WiFi after ") + MAX_TRIES + " attempts");
+        screenUpdate(0,0,0,0,0,String("Can not connect to WiFi after ") + MAX_TRIES + " attempts");
         #ifdef ONE_TIME
           deepSleep();
         #else
@@ -308,18 +323,18 @@ void setup()
       if (Ethernet.hardwareStatus() == EthernetNoHardware)
       {
         debugMessage("Ethernet hardware not found");
-        screenUpdate(0,0,0,"Ethernet hardware not found");
+        screenUpdate(0,0,0,0,0,"Ethernet hardware not found");
       }
       else if (Ethernet.linkStatus() == LinkOFF) 
       {
         debugMessage("Ethernet cable not connected");
-        screenUpdate(0,0,0,"Ethernet cable not connected");
+        screenUpdate(0,0,0,0,0,"Ethernet cable not connected");
       }
       else
       {
         // generic error
         debugMessage("Failed to configure Ethernet");
-        screenUpdate(0,0,0,"Failed to configure Ethernet");
+        screenUpdate(0,0,0,0,0,"Failed to configure Ethernet");
       }
       stopApp();
     }
@@ -340,9 +355,6 @@ void setup()
   #ifdef ONE_TIME
     actionSequence();
     // deep sleep device, which restarts code when repowered
-    #ifdef WIFI
-      client.stop();
-    #endif
     deepSleep();
   #endif
 }
@@ -524,40 +536,79 @@ void stopApp()
 #ifdef ONE_TIME
   void deepSleep()
   {
+    // I don't think these needed as I never enable them
+    // pinMode(NEOPIXEL_POWER, OUTPUT);
+    // pinMode(SPEAKER_SHUTDOWN, OUTPUT);
+    // digitalWrite(SPEAKER_SHUTDOWN, LOW); // off
+    // digitalWrite(NEOPIXEL_POWER, HIGH); // off
+
     debugMessage(String("Going to sleep for ") + (LOG_INTERVAL/100000) + " seconds");
     #ifdef SCREEN
       display.powerDown();
       digitalWrite(EPD_RESET, LOW); // hardware power down mode
+    #endif
+    digitalWrite(LED_BUILTIN, LOW);
+    #ifdef WIFI
+      client.stop();
+      // esp_wifi_stop();
+    #endif
+    #ifdef CO2_SENSOR
+      envSensor.stopPeriodicMeasurement();
     #endif
     esp_sleep_enable_timer_wakeup(LOG_INTERVAL);
     esp_deep_sleep_start();
   }
 #endif
 
-envData readEnvSensor()
+envData readEnvironment()
 {
   envData sensorData;
+  
+  //internal conditions
   uint8_t error;
   #ifdef CO2_SENSOR
-    error = envSensor.readMeasurement(sensorData.co2, sensorData.temperature, sensorData.humidity);
+    error = envSensor.readMeasurement(sensorData.co2, sensorData.intTemperature, sensorData.intHumidity);
     if (error) 
     {
       debugMessage("Error trying to read environment sensor");
     }
-    sensorData.temperature = sensorData.temperature*1.8+32;
   #else
     // AHTX0
     sensors_event_t humidity, temp;
     envSensor.getEvent(&humidity, &temp);
-    sensorData.temperature = (temp.temperature*1.8)+32;
-    sensorData.humidity = humidity.relative_humidity;
+    sensorData.intTemperature = temp.temperature;
+    sensorData.intHumidity = humidity.relative_humidity;
     sensorData.co2 = 0;
 
     // SiH7021
-    // sensorData.temperature = (envSensor.readTemperature()*1.8)+32;
-    // sensorData.humidity = envSensor.readHumidity();
+    // sensorData.intTemperature = (envSensor.readTemperature()*1.8)+32;
+    // sensorData.intHumidity = envSensor.readHumidity();
     // sensorData.co2 = 0;
   #endif
+  // convert C to F
+  sensorData.intTemperature = sensorData.intTemperature*1.8+32;
+
+  // external conditions
+  #ifdef WEATHER
+    String serverPath = String(OWM_SERVER) + OWM_CITY + "," + OWM_COUNTRY + "&units=imperial" + "&APPID=" + OWM_KEY;
+      
+    jsonBuffer = httpGETRequest(serverPath.c_str());
+    #ifdef DEBUG
+      Serial.println(jsonBuffer);
+    #endif
+    JSONVar myObject = JSON.parse(jsonBuffer);
+
+    // JSON.typeof(jsonVar) can be used to get the type of the var
+    if (JSON.typeof(myObject) == "undefined")
+    {
+      Serial.println("Parsing input failed!");
+      sensorData.extTemperature = 0;
+      sensorData.extHumidity = 0;
+    }
+    sensorData.extTemperature = (int) myObject["main"]["temp"];
+    sensorData.extHumidity = (int) myObject["main"]["humidity"];
+  #endif
+
   return sensorData;
 }
 
@@ -616,7 +667,7 @@ int mqttSensorUpdate(float temperature, float humidity, uint16_t co2)
   #endif
 }
 
-void screenUpdate(float temperature, float humidity, uint16_t co2, String messageText)
+void screenUpdate(float temperature, float humidity, uint16_t co2, uint16_t extTemperature, uint16_t extHumidity, String messageText)
 {
   #ifdef SCREEN
     display.clearBuffer();
@@ -645,15 +696,17 @@ void screenUpdate(float temperature, float humidity, uint16_t co2, String messag
     #endif
 
     // Outdoor information
+    #ifdef WEATHER
     // Temperature
-    display.setCursor(((display.width()/2)+5),((display.height()*3/8)-10));
-    display.print("Temp XXX.xxF");
-    // Humidity
-    display.setCursor(((display.width()/2)+5),((display.height()*5/8)-10));
-    display.print("Humidity YY.yy%");
-    // AQM
-    display.setCursor(((display.width()/2)+5),((display.height()*7/8)-10));
-    display.print("AQM ZZZppm");    
+      display.setCursor(((display.width()/2)+5),((display.height()*3/8)-10));
+      display.print(String("Temp ") + extTemperature + "F");
+      // Humidity
+      display.setCursor(((display.width()/2)+5),((display.height()*5/8)-10));
+      display.print(String("Humidity ") + extHumidity +"%");
+      // AQM
+      display.setCursor(((display.width()/2)+5),((display.height()*7/8)-10));
+      display.print("AQM ZZZppm");
+    #endif
 
     // Mesages
     display.setFont();  // resets to system default monospace font
@@ -707,16 +760,44 @@ void screenBatteryStatus()
 void actionSequence()
 {
   debugMessage("actionsequence started");
-  envData sensorData = readEnvSensor();
+  envData sensorData = readEnvironment();
   #ifdef MQTTLOG
-    if (mqttSensorUpdate(sensorData.temperature, sensorData.humidity, sensorData.co2))
-      screenUpdate(sensorData.temperature, sensorData.humidity, sensorData.co2,(String(MQTT_CLIENT_ID) + " pub fail:" + zuluDateTimeString()));
+    if (mqttSensorUpdate(sensorData.intTemperature, sensorData.intHumidity, sensorData.co2))
+      screenUpdate(sensorData.intTemperature, sensorData.intHumidity, sensorData.co2, sensorData.extTemperature, sensorData.extHumidity, (String(MQTT_CLIENT_ID) + " pub fail:" + zuluDateTimeString()));
     else
-      screenUpdate(sensorData.temperature, sensorData.humidity, sensorData.co2,(String(MQTT_CLIENT_ID) + " pub:" + zuluDateTimeString()));
+      screenUpdate(sensorData.intTemperature, sensorData.intHumidity, sensorData.co2, sensorData.extTemperature, sensorData.extHumidity,(String(MQTT_CLIENT_ID) + " pub:" + zuluDateTimeString()));
   #else
-    screenUpdate(sensorData.temperature, sensorData.humidity, sensorData.co2,("Last update at " + zuluDateTimeString()));
+    screenUpdate(sensorData.IntTemperature, sensorData.intHumidity, sensorData.co2, sensorData.extTemperature, sensorData.extHumidity,("Last update at " + zuluDateTimeString()));
   #endif
   #ifndef MQTTLOG
-    debugMessage(zuluDateTimeString() + "->" + sensorData.temperature + "F , " + sensorData.humidity + "%, " + sensorData.co2 + " ppm");
+    debugMessage(zuluDateTimeString() + "->" + sensorData.intTemperature + "F , " + sensorData.intHumidity + "%, " + sensorData.co2 + " ppm");
   #endif
+}
+
+String httpGETRequest(const char* serverName) 
+{
+  WiFiClient client;
+  HTTPClient http;
+    
+  // Your Domain name with URL path or IP address with path
+  http.begin(client, serverName);
+  
+  // Send HTTP POST request
+  int httpResponseCode = http.GET();
+  
+  String payload = "{}"; 
+  
+  if (httpResponseCode>0) {
+    Serial.print("HTTP Response code: ");
+    Serial.println(httpResponseCode);
+    payload = http.getString();
+  }
+  else {
+    Serial.print("Error code: ");
+    Serial.println(httpResponseCode);
+  }
+  // Free resources
+  http.end();
+
+  return payload;
 }
