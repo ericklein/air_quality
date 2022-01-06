@@ -25,17 +25,17 @@
 // internal and outside environmental conditions
 typedef struct
 {
-  float intTemperature;
-  float intHumidity;
-  uint16_t co2;
+  int internalTemp;
+  int internalHumidity;
+  uint16_t internalCO2;
   uint16_t extTemperature;
   uint16_t extHumidity;
+  uint16_t extAQM;
 } envData;
 
 #ifdef WEATHER 
   #include <HTTPClient.h> 
-  #include <Arduino_JSON.h>
-  String jsonBuffer;
+#include "ArduinoJson.h"
 #endif
 
 #ifdef CO2_SENSOR
@@ -231,7 +231,7 @@ void setup()
     if (!envSensor.begin())
     {
       debugMessage("FATAL ERROR: temp/humidity sensor not detected");
-      screenUpdate(0,0,0,0,0,"temp/humidity sensor not detected");
+      screenUpdate(0,0,0,0,0,0,"temp/humidity sensor not detected");
       stopApp();
     }
     debugMessage("temp/humidity sensor ready");
@@ -241,7 +241,7 @@ void setup()
     if (!lc.begin())
     {
       debugMessage("Battery and voltage monitor not detected");
-      screenUpdate(0,0,0,0,0,"battery sensor not detected");
+      screenUpdate(0,0,0,0,0,0,"battery sensor not detected");
       stopApp();
     }
     debugMessage("Battery voltage monitor ready");
@@ -294,7 +294,7 @@ void setup()
       if (tries == MAX_TRIES)
       {
         debugMessage(String("Can not connect to WFii after ") + MAX_TRIES + " attempts");
-        screenUpdate(0,0,0,0,0,String("Can not connect to WiFi after ") + MAX_TRIES + " attempts");
+        screenUpdate(0,0,0,0,0,0, String("Can not connect to WiFi after ") + MAX_TRIES + " attempts");
         #ifdef ONE_TIME
           deepSleep();
         #else
@@ -323,18 +323,18 @@ void setup()
       if (Ethernet.hardwareStatus() == EthernetNoHardware)
       {
         debugMessage("Ethernet hardware not found");
-        screenUpdate(0,0,0,0,0,"Ethernet hardware not found");
+        screenUpdate(0,0,0,0,0,0,"Ethernet hardware not found");
       }
       else if (Ethernet.linkStatus() == LinkOFF) 
       {
         debugMessage("Ethernet cable not connected");
-        screenUpdate(0,0,0,0,0,"Ethernet cable not connected");
+        screenUpdate(0,0,0,0,0,0,"Ethernet cable not connected");
       }
       else
       {
         // generic error
         debugMessage("Failed to configure Ethernet");
-        screenUpdate(0,0,0,0,0,"Failed to configure Ethernet");
+        screenUpdate(0,0,0,0,0,0, "Failed to configure Ethernet");
       }
       stopApp();
     }
@@ -566,47 +566,142 @@ envData readEnvironment()
   
   //internal conditions
   uint8_t error;
+  float sensorTemp;
+  float sensorHumidity;
+
   #ifdef CO2_SENSOR
-    error = envSensor.readMeasurement(sensorData.co2, sensorData.intTemperature, sensorData.intHumidity);
+    error = envSensor.readMeasurement(sensorData.internalCO2, sensorTemp, sensorHumidity);
     if (error) 
     {
-      debugMessage("Error trying to read environment sensor");
+      debugMessage("Error trying to read temp/humidity/CO2 sensor");
+      sensorData.internalCO2 = 0;
+      sensorData.internalTemp = 0;
+      sensorData.internalHumidity = 0;
     }
+    // convert C to F for temp, round to int
+    sensorData.internalTemp = (int) sensorTemp*1.8+32+.5;
+    sensorData.internalHumidity = (int) sensorHumidity + .5;
   #else
     // AHTX0
     sensors_event_t humidity, temp;
     envSensor.getEvent(&humidity, &temp);
-    sensorData.intTemperature = temp.temperature;
-    sensorData.intHumidity = humidity.relative_humidity;
-    sensorData.co2 = 0;
+    // no error handling?!
+    sensorData.internalTemp = (int) temp.temperature+.5;
+    sensorData.internalHumidity = (int) humidity.relative_humidity+.5;
+    sensorData.internalCO2 = 0;
 
     // SiH7021
-    // sensorData.intTemperature = (envSensor.readTemperature()*1.8)+32;
-    // sensorData.intHumidity = envSensor.readHumidity();
-    // sensorData.co2 = 0;
+    // sensorData.internalTemp = (int) (envSensor.readTemperature()*1.8)+32;
+    // sensorData.internalHumidity = (int) envSensor.readHumidity();
+    // sensorData.internalCO2 = 0;
   #endif
-  // convert C to F
-  sensorData.intTemperature = sensorData.intTemperature*1.8+32;
 
   // external conditions
   #ifdef WEATHER
-    String serverPath = String(OWM_SERVER) + OWM_CITY + "," + OWM_COUNTRY + "&units=imperial" + "&APPID=" + OWM_KEY;
+    String jsonBuffer;
+
+    // Get local temp and humidity
+    String serverPath = String(OWM_SERVER) + OWM_WEATHER_PATH + OWM_LAT_LONG + "&units=imperial" + "&APPID=" + OWM_KEY;
       
     jsonBuffer = httpGETRequest(serverPath.c_str());
-    #ifdef DEBUG
-      Serial.println(jsonBuffer);
-    #endif
-    JSONVar myObject = JSON.parse(jsonBuffer);
+    debugMessage(jsonBuffer);
+    
+    StaticJsonDocument<1024> doc;
 
-    // JSON.typeof(jsonVar) can be used to get the type of the var
-    if (JSON.typeof(myObject) == "undefined")
+    DeserializationError httpError = deserializeJson(doc, jsonBuffer);
+
+    if (httpError)
     {
-      Serial.println("Parsing input failed!");
+      debugMessage("Unable to parse weather JSON object");
+      Serial.println(httpError.c_str());
       sensorData.extTemperature = 0;
       sensorData.extHumidity = 0;
+      return sensorData;
     }
-    sensorData.extTemperature = (int) myObject["main"]["temp"];
-    sensorData.extHumidity = (int) myObject["main"]["humidity"];
+
+    // double coord_lon = doc["coord"]["lon"]; // -122.2221
+    // float coord_lat = doc["coord"]["lat"]; // 47.5706
+
+    //JsonObject weather_0 = doc["weather"][0];
+    // int weather_0_id = weather_0["id"]; // 804
+    // const char* weather_0_main = weather_0["main"]; // "Clouds"
+    // const char* weather_0_description = weather_0["description"]; // "overcast clouds"
+    // const char* weather_0_icon = weather_0["icon"]; // "04n"
+
+    // const char* base = doc["base"]; // "stations"
+
+    JsonObject main = doc["main"];
+    sensorData.extTemperature = main["temp"];
+    // float main_feels_like = main["feels_like"]; // 21.31
+    // float main_temp_min = main["temp_min"]; // 18.64
+    // float main_temp_max = main["temp_max"]; // 23.79
+    // int main_pressure = main["pressure"]; // 1010
+    sensorData.extHumidity = main["humidity"]; // 81
+
+    // int visibility = doc["visibility"]; // 10000
+
+    // JsonObject wind = doc["wind"];
+    // float wind_speed = wind["speed"]; // 1.99
+    // int wind_deg = wind["deg"]; // 150
+    // float wind_gust = wind["gust"]; // 5.99
+
+    // int clouds_all = doc["clouds"]["all"]; // 90
+
+    // long dt = doc["dt"]; // 1640657831
+
+    // JsonObject sys = doc["sys"];
+    // int sys_type = sys["type"]; // 2
+    // long sys_id = sys["id"]; // 2030051
+    // const char* sys_country = sys["country"]; // "US"
+    // long sys_sunrise = sys["sunrise"]; // 1640620588
+    // long sys_sunset = sys["sunset"]; // 1640651017
+
+    // int timezone = doc["timezone"]; // -28800
+    // long id = doc["id"]; // 5803139
+    // const char* name = doc["name"]; // "Mercer Island"
+    // int cod = doc["cod"]; // 200
+
+    debugMessage(String("Ext temp is ")+sensorData.extTemperature+" F");
+    debugMessage(String("Ext humidity is ")+sensorData.extHumidity+" %");
+
+    // Get local AQM data
+    serverPath = String(OWM_SERVER) + OWM_AQM_PATH + OWM_LAT_LONG + "&APPID=" + OWM_KEY;
+      
+    jsonBuffer = httpGETRequest(serverPath.c_str());
+    debugMessage(jsonBuffer);
+    
+    StaticJsonDocument<384> doc1;
+
+    httpError = deserializeJson(doc1, jsonBuffer);
+
+    if (httpError)
+    {
+      debugMessage("Unable to parse air quality JSON object");
+      Serial.println(httpError.c_str());
+      sensorData.extAQM = 0;
+      return sensorData;
+    }
+
+    // double coord_lon = doc1["coord"]["lon"]; // -122.2221
+    // float coord_lat = doc1["coord"]["lat"]; // 47.5707
+
+    JsonObject list_0 = doc1["list"][0];
+
+    sensorData.extAQM = list_0["main"]["aqi"]; // 2
+
+    // JsonObject list_0_components = list_0["components"];
+    // float list_0_components_co = list_0_components["co"]; // 453.95
+    // float list_0_components_no = list_0_components["no"]; // 0.47
+    // float list_0_components_no2 = list_0_components["no2"]; // 52.09
+    // float list_0_components_o3 = list_0_components["o3"]; // 17.17
+    // float list_0_components_so2 = list_0_components["so2"]; // 7.51
+    // float list_0_components_pm2_5 = list_0_components["pm2_5"]; // 8.04
+    // float list_0_components_pm10 = list_0_components["pm10"]; // 9.96
+    // float list_0_components_nh3 = list_0_components["nh3"]; // 0.86
+
+    // long list_0_dt = list_0["dt"]; // 1641434400
+
+    debugMessage(String("Ext AQM is ")+sensorData.extAQM);
   #endif
 
   return sensorData;
@@ -667,7 +762,7 @@ int mqttSensorUpdate(float temperature, float humidity, uint16_t co2)
   #endif
 }
 
-void screenUpdate(float temperature, float humidity, uint16_t co2, uint16_t extTemperature, uint16_t extHumidity, String messageText)
+void screenUpdate(int temperature, int humidity, uint16_t co2, uint16_t extTemperature, uint16_t extHumidity, uint16_t extAQM, String messageText)
 {
   #ifdef SCREEN
     display.clearBuffer();
@@ -705,7 +800,28 @@ void screenUpdate(float temperature, float humidity, uint16_t co2, uint16_t extT
       display.print(String("Humidity ") + extHumidity +"%");
       // AQM
       display.setCursor(((display.width()/2)+5),((display.height()*7/8)-10));
-      display.print("AQM ZZZppm");
+      display.print("AQM: ");
+      switch (extAQM)
+      {
+        case 1:
+          display.print("Good");
+          break;
+        case 2:
+          display.print("Fair");
+          break;
+        case 3:
+          display.print("Moderate");
+          break;
+        case 4:
+          display.print("Poor");
+          break;
+        case 5:
+          display.print("Very Poor");
+          break;
+        default:
+          display.print("???");
+          break;        
+      }
     #endif
 
     // Mesages
@@ -762,21 +878,20 @@ void actionSequence()
   debugMessage("actionsequence started");
   envData sensorData = readEnvironment();
   #ifdef MQTTLOG
-    if (mqttSensorUpdate(sensorData.intTemperature, sensorData.intHumidity, sensorData.co2))
-      screenUpdate(sensorData.intTemperature, sensorData.intHumidity, sensorData.co2, sensorData.extTemperature, sensorData.extHumidity, (String(MQTT_CLIENT_ID) + " pub fail:" + zuluDateTimeString()));
+    if (mqttSensorUpdate(sensorData.internalTemp, sensorData.internalHumidity, sensorData.internalCO2))
+      screenUpdate(sensorData.internalTemp, sensorData.internalHumidity, sensorData.internalCO2, sensorData.extTemperature, sensorData.extHumidity, sensorData.extAQM, (String(MQTT_CLIENT_ID) + " pub fail:" + zuluDateTimeString()));
     else
-      screenUpdate(sensorData.intTemperature, sensorData.intHumidity, sensorData.co2, sensorData.extTemperature, sensorData.extHumidity,(String(MQTT_CLIENT_ID) + " pub:" + zuluDateTimeString()));
+      screenUpdate(sensorData.internalTemp, sensorData.internalHumidity, sensorData.internalCO2, sensorData.extTemperature, sensorData.extHumidity, sensorData.extAQM, (String(MQTT_CLIENT_ID) + " pub:" + zuluDateTimeString()));
   #else
-    screenUpdate(sensorData.IntTemperature, sensorData.intHumidity, sensorData.co2, sensorData.extTemperature, sensorData.extHumidity,("Last update at " + zuluDateTimeString()));
+    screenUpdate(sensorData.IntTemperature, sensorData.internalHumidity, sensorData.internalCO2, sensorData.extTemperature, sensorData.extHumidity, sensorData.extAQM,("Last update at " + zuluDateTimeString()));
   #endif
   #ifndef MQTTLOG
-    debugMessage(zuluDateTimeString() + "->" + sensorData.intTemperature + "F , " + sensorData.intHumidity + "%, " + sensorData.co2 + " ppm");
+    debugMessage(zuluDateTimeString() + "->" + sensorData.internalTemp + "F , " + sensorData.internalHumidity + "%, " + sensorData.internalCO2 + " ppm");
   #endif
 }
 
 String httpGETRequest(const char* serverName) 
 {
-  WiFiClient client;
   HTTPClient http;
     
   // Your Domain name with URL path or IP address with path

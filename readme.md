@@ -82,17 +82,16 @@ Air Quality regularly samples and logs temperature, humidity, and if sensor avai
 - See GitHub Issues for project
 
 ### Questions
-- [Q]120220: screen; Why do I need wire and spi for OLED displays?
-- [Q]082921: time; when do I need to timestamp data bound for MQTT; adafruit.io time stamps for me, does a local server?
 - [Q]090721: I've failed at compressing zuluDateTimeString() twice, what is the issue relative to string buildout?
 - [Q]100621: how did LadyAda calculate battery capacity, as hex values are not on a linear formula though battery capacity is?
-- [Q]110921: does C02 require calibration for SCD40 (direct CO2 read, not eCO2)
 
 ### Revisions
+- 010622
+	- initial version of AQM (air quality) support via OpenWeatherMap
 - 010222
 	- Modifications to the deepSleep() routine, trying to fix the rapid battery depletion issue that has emerged
 - 122721
-	- Added initial version of outside weather support
+	- initial version of outside weather support via OpenWeatherMap
 - 120821
 	- [FR][P2]051021: screen; current time -> closed to conserve battery as primary screen type is eInk on a ONETIME loop
 	- Moving FR and Issues to Github from readme.md
@@ -100,7 +99,6 @@ Air Quality regularly samples and logs temperature, humidity, and if sensor avai
 	- [FR][P1]090121: mqtt; Low battery messaging to MQTT -> added
 	- Changed MQTT publishing to per room feeds
 	- [I][P2]091521: power; why is stemmaQT board getting power (LED light is on) in deepsleep()? -> closed because I'm cutting the trace bridge for these LEDs
-
 - 111121
 	- [FR][P1]093021: sensor; indoor C02 levels -> added support for SCD40 which measures temp, humidity, and CO2 level
 	- refactor code to support #define ONE_TIME, which allows the code to run one time then sleep (e.g. ESP hardware), or loop continuously (e.g. RJ45)
