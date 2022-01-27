@@ -2,20 +2,11 @@
   Project Name:   air_quality
   Description:    Regularly sample and log temperature, humidity, and if available, co2 levels
 
-  See README.md for target information, revision history, feature requests, etc.
+  See README.md for target information and revision history
 */
 
-// Conditional compile flags
-//#define DEBUG         // Output to the serial port
-#define SCREEN        // output sensor data to screen
-#define MQTTLOG        // Output to MQTT broker defined in secrets.h
-//#define RJ45            // use Ethernet
-#define WIFI          // use WiFi (credentials in secrets.h)
-#define NTP         // query network time server for logging
-#define BATTERY
-#define CO2_SENSOR
-#define ONE_TIME
-#define WEATHER
+// hardware and internet service configuration parameters
+#include "config.h"
 
 // Gloval variables
 #ifndef ONE_TIME
@@ -25,8 +16,8 @@
 // internal and outside environmental conditions
 typedef struct
 {
-  int internalTemp;
-  int internalHumidity;
+  uint16_t internalTemp;
+  uint16_t internalHumidity;
   uint16_t internalCO2;
   uint16_t extTemperature;
   uint16_t extHumidity;
@@ -35,15 +26,15 @@ typedef struct
 
 #ifdef WEATHER 
   #include <HTTPClient.h> 
-#include "ArduinoJson.h"
+  #include "ArduinoJson.h"
 #endif
 
 #ifdef CO2_SENSOR
-  // gathers all three values
+  // temp, humidity, and CO2
   #include <SensirionI2CScd4x.h>
   SensirionI2CScd4x envSensor;
 #else
-  // temp and humidity only
+  // temp, humidity
   //AHTX0
   #include <Adafruit_AHTX0.h>
   Adafruit_AHTX0 envSensor;
@@ -57,31 +48,6 @@ typedef struct
 #ifdef BATTERY
   #include "Adafruit_LC709203F.h"
   Adafruit_LC709203F lc;
-#endif
-
-// #define uS_TO_S_FACTOR 1000000 /* Conversion factor for micro seconds to seconds */ 
-// #define TIME_TO_SLEEP 5 /* Time ESP32 will go to sleep (in seconds) */
-
-
-#ifdef DEBUG
-  // debug log intervals
-  #ifdef ONE_TIME
-    // MICROsecond delay for ESP deep sleep
-    #define LOG_INTERVAL 60000000  // debug interval; 1 minute
-  #else
-    // MILLIsecond delay for ARM
-    //#define LOG_INTERVAL 240000  // debug interval; 240 seconds
-    #define LOG_INTERVAL 60000  // debug interval
-  #endif
-#else
-  // production log intervals
-  #ifdef ONE_TIME
-    // MICROsecond delay for ESP deep sleep
-    #define LOG_INTERVAL 1800000000  // debug interval; 30 minutes
-  #else
-    // MILLIsecond delay for ARM
-    #define LOG_INTERVAL 1800000
-  #endif
 #endif
 
 // MQTT credentials and network IDs
@@ -245,16 +211,11 @@ void setup()
       stopApp();
     }
     debugMessage("Battery voltage monitor ready");
-    // required for accurate battert temp reading
+    lc.setPackSize(BATTERYSIZE);
+    // optional thermistor added on board for accurate battery temp reading
     //lc.setThermistorB(3950);
-    lc.setPackSize(LC709203F_APA_2000MAH);
+
     //lc.setAlarmVoltage(3.8);
-    // LC709203F_APA_100MAH = 0x08,
-    // LC709203F_APA_200MAH = 0x0B,
-    // LC709203F_APA_500MAH = 0x10,
-    // LC709203F_APA_1000MAH = 0x19,
-    // LC709203F_APA_2000MAH = 0x2D,
-    // LC709203F_APA_3000MAH = 0x36,
   #endif
 
   #ifdef SCREEN
@@ -366,12 +327,12 @@ void loop()
       // display heartbeat every 20 seconds between sensor reads; depending on client might display >1 message per interval
       if (((millis() - syncTime) % 20000) == 0)
       {
-        debugMessage(String(((millis()-syncTime)/1000)) + " seconds elapsed before next read at " + (LOG_INTERVAL/1000) + " seconds");
+        debugMessage(String(((millis()-syncTime)/1000)) + " seconds elapsed before next read at " + (LOG_INTERVAL*60) + " seconds");
       }
     #endif
 
     // update display and determine if it is time to read/process sensors
-    if ((millis() - syncTime) < LOG_INTERVAL) return;
+    if ((millis() - syncTime) < LOG_INTERVAL*LOG_INTERVAL_MS_MODIFIER) return;
 
     syncTime = millis();
     actionSequence();
@@ -542,7 +503,7 @@ void stopApp()
     // digitalWrite(SPEAKER_SHUTDOWN, LOW); // off
     // digitalWrite(NEOPIXEL_POWER, HIGH); // off
 
-    debugMessage(String("Going to sleep for ") + (LOG_INTERVAL/100000) + " seconds");
+    debugMessage(String("Going to sleep for ") + LOG_INTERVAL + " minutes");
     #ifdef SCREEN
       display.powerDown();
       digitalWrite(EPD_RESET, LOW); // hardware power down mode
@@ -555,7 +516,7 @@ void stopApp()
     #ifdef CO2_SENSOR
       envSensor.stopPeriodicMeasurement();
     #endif
-    esp_sleep_enable_timer_wakeup(LOG_INTERVAL);
+    esp_sleep_enable_timer_wakeup(LOG_INTERVAL*LOG_INTERVAL_US_MODIFIER);
     esp_deep_sleep_start();
   }
 #endif
@@ -564,33 +525,35 @@ envData readEnvironment()
 {
   envData sensorData;
   
-  //internal conditions
-  uint8_t error;
-  float sensorTemp;
-  float sensorHumidity;
+  //sensor (room) measurement
 
   #ifdef CO2_SENSOR
+    uint8_t error;
+    float sensorTemp;
+    float sensorHumidity;
+
     error = envSensor.readMeasurement(sensorData.internalCO2, sensorTemp, sensorHumidity);
     if (error) 
     {
       debugMessage("Error trying to read temp/humidity/CO2 sensor");
-      sensorData.internalCO2 = 0;
-      sensorData.internalTemp = 0;
-      sensorData.internalHumidity = 0;
+      sensorData.internalCO2 = 10000;
+      sensorData.internalTemp = 10000;
+      sensorData.internalHumidity = 10000;
     }
     // convert C to F for temp, round to int
-    sensorData.internalTemp = (int) sensorTemp*1.8+32+.5;
-    sensorData.internalHumidity = (int) sensorHumidity + .5;
+    sensorData.internalTemp = (int) sensorTemp*1.8+32+0.5;
+    sensorData.internalHumidity = (int) sensorHumidity + 0.5;
   #else
     // AHTX0
-    sensors_event_t humidity, temp;
-    envSensor.getEvent(&humidity, &temp);
+    sensors_event_t sensorHumidity, sensorTemp;
+    envSensor.getEvent(&sensorHumidity, &sensorTemp);
     // no error handling?!
-    sensorData.internalTemp = (int) temp.temperature+.5;
-    sensorData.internalHumidity = (int) humidity.relative_humidity+.5;
+    sensorData.internalTemp = (int) sensorTemp.temperature+.5;
+    sensorData.internalHumidity = (int) sensorHumidity.relative_humidity+.5;
     sensorData.internalCO2 = 0;
 
     // SiH7021
+    // no earror handling?
     // sensorData.internalTemp = (int) (envSensor.readTemperature()*1.8)+32;
     // sensorData.internalHumidity = (int) envSensor.readHumidity();
     // sensorData.internalCO2 = 0;
@@ -800,7 +763,7 @@ void screenUpdate(int temperature, int humidity, uint16_t co2, uint16_t extTempe
       display.print(String("Humidity ") + extHumidity +"%");
       // AQM
       display.setCursor(((display.width()/2)+5),((display.height()*7/8)-10));
-      display.print("AQM: ");
+      display.print("AQI ");
       switch (extAQM)
       {
         case 1:
