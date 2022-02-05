@@ -2,11 +2,10 @@
 Air Quality regularly samples and logs temperature, humidity, and if sensor available, co2 levels
 
 ### Configuring targets
-- Set parameters in secrets.h
-- Set appropriate conditional compile flags in air_quality.ino
+- Set parameters in secrets.h (see config.h for list of required parameters)
+- Set parameters in config.h
 - Switch screen types in SCREEN routines in air_quality.ino
 - Switch sensor types if needed in/near CO2_SENSOR in air_quality.ino
-- Select battery pack size in BATTERY setup() in air_quality.ino
 
 ### known, working BOM parts
 - MCU
@@ -29,7 +28,7 @@ Air Quality regularly samples and logs temperature, humidity, and if sensor avai
 	- Adafruit Funhouse (ST7789, 240x240): https://www.adafruit.com/product/4985
 	- Adafruit MagTag (EPD): https://www.adafruit.com/product/4800
 - battery
-	= Adafruit 2000mA battery: https://www.adafruit.com/product/2011
+	- Adafruit 2000mA battery: https://www.adafruit.com/product/2011
 
 ### Pinouts
 - Particle Ethernet Featherwing
@@ -91,6 +90,9 @@ Air Quality regularly samples and logs temperature, humidity, and if sensor avai
 - [Q]012622: does SparkFun or Adafruit have a sensor measurement API that is consistent across temp/humidity sensors? [readEnvironment]
 
 ### Revisions
+- 020522
+	- added untested BME280 support
+	- bug fixes for #define config parameters combinations
 - 012622
 	- splitting secrets.h
 		- private information in secrets.h

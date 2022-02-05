@@ -36,12 +36,20 @@ typedef struct
 #else
   // temp, humidity
   //AHTX0
-  #include <Adafruit_AHTX0.h>
-  Adafruit_AHTX0 envSensor;
+  //#include <Adafruit_AHTX0.h>
+  //Adafruit_AHTX0 envSensor;
 
   // Si7021
   // #include "Adafruit_Si7021.h"
   // Adafruit_Si7021 envSensor = Adafruit_Si7021();
+
+  // BME680
+  #include <Adafruit_Sensor.h>
+  #include <Adafruit_BME280.h>
+
+  #define SEALEVELPRESSURE_HPA (1013.25)
+
+  Adafruit_BME280 envSensor;
 #endif
 
 // Battery voltage sensor
@@ -93,7 +101,7 @@ typedef struct
   unsigned long previousMQTTPingTime = 0;
   #include "Adafruit_MQTT.h"
   #include "Adafruit_MQTT_Client.h"
-  Adafruit_MQTT_Client mqtt(&client, MQTT_BROKER, MQTT_PORT, MQTT_CLIENT_ID, MQTT_USER, MQTT_PASS);
+  Adafruit_MQTT_Client mqtt(&client, MQTT_BROKER, MQTT_PORT, CLIENT_ID, MQTT_USER, MQTT_PASS);
   Adafruit_MQTT_Publish tempPub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC1,MQTT_QOS_1);
   Adafruit_MQTT_Publish humidityPub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC2, MQTT_QOS_1);
   Adafruit_MQTT_Publish errMsgPub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC5, MQTT_QOS_1);
@@ -167,28 +175,27 @@ void setup()
     {
       // wait for serial port
     }
-    Serial.println("Indoor Air Quality started");
+    debugMessage("Air Quality started");
   #endif
 
   // Handle environment sensor
   #ifdef CO2_SENSOR
-    Wire.begin();
-
     uint16_t error;
 
+    Wire.begin();
     envSensor.begin(Wire);
 
     // stop potentially previously started measurement
     error = envSensor.stopPeriodicMeasurement();
     if (error) 
     {
-        debugMessage("Error trying to execute stopPeriodicMeasurement(): ");
+      debugMessage("Error trying to execute stopPeriodicMeasurement(): ");
     }
     // Start Measurement
     error = envSensor.startPeriodicMeasurement();
     if (error)
     {
-        debugMessage("Error trying to execute startPeriodicMeasurement(): ");
+      debugMessage("Error trying to execute startPeriodicMeasurement(): ");
     }
     delay(5000);
     debugMessage("temp/humidity/CO2 sensor ready");
@@ -240,8 +247,8 @@ void setup()
     #define MAX_TRIES 5
 
     // set hostname has to come before WiFi.begin
-    WiFi.hostname(MQTT_CLIENT_ID);
-    // WiFi.setHostname(MQTT_CLIENT_ID); //for WiFiNINA
+    WiFi.hostname(CLIENT_ID);
+    // WiFi.setHostname(CLIENT_ID); //for WiFiNINA
     WiFi.begin(WIFI_SSID, WIFI_PASS);
 
     while (WiFi.status() != WL_CONNECTED) 
@@ -545,15 +552,20 @@ envData readEnvironment()
     sensorData.internalHumidity = (int) sensorHumidity + 0.5;
   #else
     // AHTX0
-    sensors_event_t sensorHumidity, sensorTemp;
-    envSensor.getEvent(&sensorHumidity, &sensorTemp);
-    // no error handling?!
-    sensorData.internalTemp = (int) sensorTemp.temperature+.5;
-    sensorData.internalHumidity = (int) sensorHumidity.relative_humidity+.5;
+    // sensors_event_t sensorHumidity, sensorTemp;
+    // envSensor.getEvent(&sensorHumidity, &sensorTemp);
+    // // no error handling?!
+    // sensorData.internalTemp = (int) sensorTemp.temperature+.5;
+    // sensorData.internalHumidity = (int) sensorHumidity.relative_humidity+.5;
+    // sensorData.internalCO2 = 0;
+
+    // bme280, SiH7021
+    sensorData.internalTemp = (int) (envSensor.readTemperature()*1.8)+32;
+    sensorData.internalHumidity = (int) envSensor.readHumidity();
     sensorData.internalCO2 = 0;
 
     // SiH7021
-    // no earror handling?
+    // no error handling?
     // sensorData.internalTemp = (int) (envSensor.readTemperature()*1.8)+32;
     // sensorData.internalHumidity = (int) envSensor.readHumidity();
     // sensorData.internalCO2 = 0;
@@ -676,7 +688,7 @@ void mqttBatteryAlert(int percent)
     // msg to backend if battery is running low
     if (percent<20)
     {
-      String errMessage = String(MQTT_CLIENT_ID) + " battery at " + percent + " percent at " + zuluDateTimeString();  
+      String errMessage = String(CLIENT_ID) + " battery at " + percent + " percent at " + zuluDateTimeString();  
       MQTT_connect();
 
 
@@ -715,14 +727,15 @@ int mqttSensorUpdate(float temperature, float humidity, uint16_t co2)
     else 
     {
       #ifdef CO2_SENSOR
-        debugMessage("Published to MQTT: " + zuluDateTimeString() + " , " + MQTT_CLIENT_ID + " , " + temperature + " , " + humidity + " , " + co2);
+        debugMessage("Published to MQTT: " + zuluDateTimeString() + " , " + CLIENT_ID + " , " + temperature + " , " + humidity + " , " + co2);
       #else
-        debugMessage("Published to MQTT: " + zuluDateTimeString() + " , " + MQTT_CLIENT_ID + " , " + temperature + " , " + humidity);
+        debugMessage("Published to MQTT: " + zuluDateTimeString() + " , " + CLIENT_ID + " , " + temperature + " , " + humidity);
       #endif
       mqtt.disconnect();
       return 0;
     }
   #endif
+  return 1;
 }
 
 void screenUpdate(int temperature, int humidity, uint16_t co2, uint16_t extTemperature, uint16_t extHumidity, uint16_t extAQM, String messageText)
@@ -842,40 +855,40 @@ void actionSequence()
   envData sensorData = readEnvironment();
   #ifdef MQTTLOG
     if (mqttSensorUpdate(sensorData.internalTemp, sensorData.internalHumidity, sensorData.internalCO2))
-      screenUpdate(sensorData.internalTemp, sensorData.internalHumidity, sensorData.internalCO2, sensorData.extTemperature, sensorData.extHumidity, sensorData.extAQM, (String(MQTT_CLIENT_ID) + " pub fail:" + zuluDateTimeString()));
+      screenUpdate(sensorData.internalTemp, sensorData.internalHumidity, sensorData.internalCO2, sensorData.extTemperature, sensorData.extHumidity, sensorData.extAQM, (String(CLIENT_ID) + " pub fail:" + zuluDateTimeString()));
     else
-      screenUpdate(sensorData.internalTemp, sensorData.internalHumidity, sensorData.internalCO2, sensorData.extTemperature, sensorData.extHumidity, sensorData.extAQM, (String(MQTT_CLIENT_ID) + " pub:" + zuluDateTimeString()));
+      screenUpdate(sensorData.internalTemp, sensorData.internalHumidity, sensorData.internalCO2, sensorData.extTemperature, sensorData.extHumidity, sensorData.extAQM, (String(CLIENT_ID) + " pub:" + zuluDateTimeString()));
   #else
-    screenUpdate(sensorData.IntTemperature, sensorData.internalHumidity, sensorData.internalCO2, sensorData.extTemperature, sensorData.extHumidity, sensorData.extAQM,("Last update at " + zuluDateTimeString()));
-  #endif
-  #ifndef MQTTLOG
+    screenUpdate(sensorData.internalTemp, sensorData.internalHumidity, sensorData.internalCO2, sensorData.extTemperature, sensorData.extHumidity, sensorData.extAQM,("Last update at " + zuluDateTimeString()));
     debugMessage(zuluDateTimeString() + "->" + sensorData.internalTemp + "F , " + sensorData.internalHumidity + "%, " + sensorData.internalCO2 + " ppm");
   #endif
 }
 
-String httpGETRequest(const char* serverName) 
-{
-  HTTPClient http;
+#ifdef WEATHER
+  String httpGETRequest(const char* serverName) 
+  {
+    HTTPClient http;
+      
+    // Your Domain name with URL path or IP address with path
+    http.begin(client, serverName);
     
-  // Your Domain name with URL path or IP address with path
-  http.begin(client, serverName);
-  
-  // Send HTTP POST request
-  int httpResponseCode = http.GET();
-  
-  String payload = "{}"; 
-  
-  if (httpResponseCode>0) {
-    Serial.print("HTTP Response code: ");
-    Serial.println(httpResponseCode);
-    payload = http.getString();
-  }
-  else {
-    Serial.print("Error code: ");
-    Serial.println(httpResponseCode);
-  }
-  // Free resources
-  http.end();
+    // Send HTTP POST request
+    int httpResponseCode = http.GET();
+    
+    String payload = "{}"; 
+    
+    if (httpResponseCode>0) {
+      Serial.print("HTTP Response code: ");
+      Serial.println(httpResponseCode);
+      payload = http.getString();
+    }
+    else {
+      Serial.print("Error code: ");
+      Serial.println(httpResponseCode);
+    }
+    // Free resources
+    http.end();
 
-  return payload;
-}
+    return payload;
+  }
+#endif
