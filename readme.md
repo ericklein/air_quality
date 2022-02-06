@@ -2,30 +2,33 @@
 Air Quality regularly samples and logs temperature, humidity, and if sensor available, co2 levels
 
 ### Configuring targets
-- Set parameters in secrets.h
-- Set appropriate conditional compile flags in air_quality.ino
+- Set parameters in secrets.h (see config.h for list of required parameters)
+- Set parameters in config.h
 - Switch screen types in SCREEN routines in air_quality.ino
 - Switch sensor types if needed in/near CO2_SENSOR in air_quality.ino
-- Select battery pack size in BATTERY setup() in air_quality.ino
 
 ### known, working BOM parts
 - MCU
 	- tested on ESP32S2, ESP8266, ARM(m0,m4)
-- networking
+- Ethernet
 	- Particle Ethernet Featherwing: https://www.adafruit.com/product/4003
 	- Silicognition PoE Featherwing: https://www.crowdsupply.com/silicognition/poe-featherwing
+- WiFi
+	- esp32s2 boards
 - sensors
 	- AHT20 temp/humidity sensor: https://www.adafruit.com/product/4566, https://www.adafruit.com/product/5183
 	- SiH7021 temp/humidity sensor: https://www.adafruit.com/product/3251
 	- DHT11,21 also supported, see code history
 	- LC709203F battery voltage monitor: https://www.adafruit.com/product/4712
 	- SCD40 True CO2, Temperature and Humidity Sensor: https://www.adafruit.com/product/5187
-- screens
+- screen
 	- LCD screen supported, see code history
 	- Featherwing OLED (SSD1306, 128x32): https://www.adafruit.com/product/2900
 	- Featherwing OLED (SH110X, 128x64): https://www.adafruit.com/product/4650
 	- Adafruit Funhouse (ST7789, 240x240): https://www.adafruit.com/product/4985
 	- Adafruit MagTag (EPD): https://www.adafruit.com/product/4800
+- battery
+	- Adafruit 2000mA battery: https://www.adafruit.com/product/2011
 
 ### Pinouts
 - Particle Ethernet Featherwing
@@ -84,8 +87,18 @@ Air Quality regularly samples and logs temperature, humidity, and if sensor avai
 ### Questions
 - [Q]090721: I've failed at compressing zuluDateTimeString() twice, what is the issue relative to string buildout?
 - [Q]100621: how did LadyAda calculate battery capacity, as hex values are not on a linear formula though battery capacity is?
+- [Q]012622: does SparkFun or Adafruit have a sensor measurement API that is consistent across temp/humidity sensors? [readEnvironment]
 
 ### Revisions
+- 020522
+	- added untested BME280 support
+	- bug fixes for #define config parameters combinations
+- 012622
+	- splitting secrets.h
+		- private information in secrets.h
+		- config information moved to config.h
+	- moved battery size parameter to config.h
+	- moved log_interval and conversions to config.h
 - 010622
 	- initial version of AQM (air quality) support via OpenWeatherMap
 - 010222
