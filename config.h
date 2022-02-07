@@ -1,15 +1,16 @@
 // conditional compile flags
 
-#define DEBUG     // Output to serial port
+//#define DEBUG     // Output to serial port
 #define SCREEN      // output to screen
 //#define MQTTLOG     // Output to MQTT broker
 //#define RJ45      // use Ethernet
-//#define WIFI        // use WiFi
-//#define NTP         // query network time server
-#define BATTERY		// use battery monitoring hardware
+#define WIFI        // use WiFi
+#define NTP         // query network time server
+//#define BATTERY		// use battery monitoring hardware
 #define CO2_SENSOR	// CO2, temp, humidity sensor instead of temp, humidity sensor
 #define ONE_TIME	// run every x minutes and sleep
-//#define WEATHER  	// query weather sensor for outside conditions
+#define WEATHER  	// query weather sensor for outside conditions
+#define DWEET     // Post sensor readings to dweet.io
 
 // logging interval in minutes
 #ifdef DEBUG
@@ -70,6 +71,14 @@
     #define BATTERYSIZE LC709203F_APA_1000MAH // 0x19
 	  // #define BATTERYSIZE LC709203F_APA_2000MAH // 0x2D
     // #define BATTERYSIZE LC709203F_APA_3000MAH // 0x36
+#endif
+
+// Post data to the internet via dweet.io.  Set DWEET_DEVICE to be a
+// unique name you want associated with this reporting device, allowing
+// data to be easily retrieved through the web or Dweet's REST API.
+#ifdef DWEET
+  #define DWEET_HOST "dweet.io"   // Typically dweet.io
+  #define DWEET_DEVICE "makerhour-airquality"  // Must be unique across all of dweet.io
 #endif
 
 // the following parameters are defined in secrets.h

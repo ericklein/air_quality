@@ -8,6 +8,9 @@
 // hardware and internet service configuration parameters
 #include "config.h"
 
+// MQTT credentials and network IDs
+#include "secrets.h"
+
 // Gloval variables
 #ifndef ONE_TIME
   unsigned long syncTime = 0;   // stores millis() for timing functions 
@@ -57,9 +60,6 @@ typedef struct
   #include "Adafruit_LC709203F.h"
   Adafruit_LC709203F lc;
 #endif
-
-// MQTT credentials and network IDs
-#include "secrets.h"
 
 #ifdef WIFI
   #if defined(ARDUINO_SAMD_MKRWIFI1010) || defined(ARDUINO_SAMD_NANO_33_IOT) || defined(ARDUINO_AVR_UNO_WIFI_REV2)
@@ -175,6 +175,12 @@ void setup()
     {
       // wait for serial port
     }
+    // Confirm key site configuration parameters
+    debugMessage("Log interval: " + String(LOG_INTERVAL));
+    debugMessage("Site lat/long: " + String(OWM_LAT_LONG));
+    debugMessage("Client ID: " + String(CLIENT_ID));
+    debugMessage("Dweet device: " + String(DWEET_DEVICE));
+    
     debugMessage("Air Quality started");
   #endif
 
@@ -862,6 +868,10 @@ void actionSequence()
     screenUpdate(sensorData.internalTemp, sensorData.internalHumidity, sensorData.internalCO2, sensorData.extTemperature, sensorData.extHumidity, sensorData.extAQM,("Last update at " + zuluDateTimeString()));
     debugMessage(zuluDateTimeString() + "->" + sensorData.internalTemp + "F , " + sensorData.internalHumidity + "%, " + sensorData.internalCO2 + " ppm");
   #endif
+
+  #ifdef DWEET
+    post_dweet(sensorData.internalCO2, sensorData.internalTemp, sensorData.internalHumidity);
+  #endif
 }
 
 #ifdef WEATHER
@@ -891,4 +901,54 @@ void actionSequence()
 
     return payload;
   }
+#endif
+
+
+#ifdef DWEET
+// Post a dweet to report the various sensor reading.  This routine blocks while
+// talking to the network, so may take a while to execute.
+void post_dweet(uint16_t co2, float tempF, float humidity)
+{
+  
+  if(WiFi.status() != WL_CONNECTED) {
+    debugMessage("Lost network connection to '" + String(WIFI_SSID) + "'!");
+    // show_disconnected();  / Future feature to display state of network connectivity (LED?)
+    return;
+  }
+  
+  debugMessage("connecting to " + String(DWEET_HOST));
+      
+  // Use WiFiClient class to create TCP connections
+  WiFiClient client;
+  const int httpPort = 80;
+  if (!client.connect(DWEET_HOST, httpPort)) {
+    debugMessage("connection failed: " + String(DWEET_HOST));
+    return;
+  }
+
+  // Use HTTP post and send a data payload as JSON
+  String postdata = "{\"rssi\":\""        + String(WiFi.RSSI())     + "\"," +
+                     "\"ipaddr\":\""      + WiFi.localIP().toString()  + "\"," +
+                     "\"co2\":\""         + String(co2)             + "\"," +
+                     "\"temperature\":\"" + String(tempF,2)         + "\"," +
+                     "\"humidity\":\""    + String(humidity,2)      + "\"}";
+  client.println("POST /dweet/for/" + String(DWEET_DEVICE) + " HTTP/1.1");
+  client.println("Host: dweet.io");
+  client.println("Cache-Control: no-cache");
+  client.println("Content-Type: application/json");
+  client.print("Content-Length: ");
+  client.println(postdata.length());
+  client.println();
+  client.println(postdata);
+  debugMessage(postdata);
+  delay(1500);
+    
+  // Read all the lines of the reply from server (if any) and print them as debug
+  while(client.available()){
+    String line = client.readStringUntil('\r');
+    debugMessage(line);
+  }
+  client.stop();   
+  debugMessage("closing connection for dweeting");
+}
 #endif
