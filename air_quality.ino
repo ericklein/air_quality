@@ -24,9 +24,9 @@ typedef struct
 // global for air characteristics
 envData sensorData;
 
-bool screenAvailable;
-bool batteryAvailable;
-bool internetAvailable;
+bool screenAvailable=false;
+bool batteryAvailable=false;
+bool internetAvailable=false;
 
 // used to retreive weather information
 #include <HTTPClient.h> 
@@ -177,7 +177,7 @@ void setup()
   }
   else
   {
-    debugMessage("Battery and voltage monitor not detected");
+    debugMessage("Battery voltage monitor not detected");
     batteryAvailable = false;
   }
 
@@ -192,7 +192,6 @@ void setup()
 
     while (WiFi.status() != WL_CONNECTED) 
     {
-      // Error handler - WiFi does not initially connect
       debugMessage(String("Connection attempt ") + tries + " of " + MAX_TRIES + " to " + WIFI_SSID + " in " + (tries*10) + " seconds");
       // use of delay OK as this is initialization code
       delay(tries*10000);
@@ -307,7 +306,7 @@ time_t getNtpTime()
     }
   }
   debugMessage("No NTP response");
-  return 0; // return 0 if unable to get the time
+  return 0;
 }
 
 // send an NTP request to the time server at the given address
@@ -503,7 +502,7 @@ void mqttConnect()
     return;
   }
 
-  // Useful if device is always on and log gaps between reads
+  // Useful if device is always on and long gaps between reads
   // if (WiFi.status() != WL_CONNECTED)
   // {
   //   return;
@@ -565,6 +564,7 @@ void mqttBatteryAlert()
       debugMessage("MQTT publish: " + errMessage);
     }
     mqtt.disconnect();
+  }
 }
 
 int mqttSensorUpdate()
@@ -665,14 +665,14 @@ void infoScreen(String messageText)
   if (!sensorData.extHumidity==10000)
   {
     display.setCursor(((display.width()/2)+5),((display.height()*5/8)-10));
-    display.print(String("Humidity ") + extHumidity +"%");
+    display.print(String("Humidity ") + sensorData.extHumidity +"%");
   }
   // air quality index (AQI)
   if (!sensorData.extAQI==10000)
   {
     display.setCursor(((display.width()/2)+5),((display.height()*7/8)-10));
     display.print("AQI ");
-    switch (extAQI)
+    switch (sensorData.extAQI)
     {
     case 1:
       display.print("Good");
@@ -707,7 +707,7 @@ void infoScreen(String messageText)
 void screenBatteryStatus()
 // Displays remaining battery % as graphic in lower right of screen
 {
-  if batteryAvailable
+  if (batteryAvailable)
   {
     // render battery percentage to screen
 
@@ -729,7 +729,7 @@ void screenBatteryStatus()
 int initSensor()
 {
   //SCD40
-  uint16_t error;
+  //uint16_t error;
 
   Wire.begin();
   envSensor.begin(Wire);

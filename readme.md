@@ -1,5 +1,5 @@
 ### Purpose
-Air Quality regularly samples and logs temperature, humidity, and if sensor available, co2 levels
+Air Quality samples and logs temperature, humidity, and if sensor available, co2 levels
 
 ### Configuring targets
 - Set parameters in secrets.h (see config.h for list of required parameters)
@@ -36,17 +36,6 @@ Air Quality regularly samples and logs temperature, humidity, and if sensor avai
 	- LCD and OLED screens -> see code history before 02/2022
 - battery
 	- Adafruit 2000mA battery: https://www.adafruit.com/product/2011
-
-### Pinouts
-
-### Error codes
-- FATAL
-	- Always throws a DEBUG message and blinks built-in LED at 1 second intervals
-	- ERR 01: Can not connect to temp/humidity sensor
-	- ERR 02: Can not connect to Ethernet. Device must be restarted to proceed unless SDLOG enabled.
-	- ERR 03: Can not connect to WiFi. Device must be restarted to proceed unless SDLOG enabled.
-- CAUTION
-	- ERR 10: Can not connect to MQTT broker
 
 ### Information Sources
 - SD card

@@ -68,15 +68,10 @@
 // 	#define WIFI_PASS       
 // #endif
 
-// #ifdef WEATHER
 // 	// open weather map key
 // 	#define OWM_KEY
-// #endif
 
-// #ifdef MQTTLOG
 // 	#define MQTT_PORT
 // 	#define MQTT_USER
-
 // 	#define MQTT_BROKER
 // 	#define MQTT_PASS
-// #endif
