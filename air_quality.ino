@@ -460,7 +460,7 @@ void loop()
     if (sensorData.internalCO2==10000)
     // temperature and humidity only to publish
     {
-      if ((tempPub.publish(sensorData.internalTemp)) || (humidityPub.publish(sensorData.internalHumidity)))
+      if ((tempPub.publish(sensorData.internalTemp)) && (humidityPub.publish(sensorData.internalHumidity)))
       {
         debugMessage("MQTT publish at  " + zuluDateTimeString() + " , " + CLIENT_ID + " , " + sensorData.internalTemp + " , " + sensorData.internalHumidity);
         mqtt.disconnect();
@@ -476,9 +476,9 @@ void loop()
     else
     // temperature, humidity, and CO2 to publish
     {
-      if ((tempPub.publish(sensorData.internalTemp)) || (humidityPub.publish(sensorData.internalHumidity)) || (co2Pub.publish(sensorData.internalCO2)))
+      if ((tempPub.publish(sensorData.internalTemp)) && (humidityPub.publish(sensorData.internalHumidity)) && (co2Pub.publish(sensorData.internalCO2)))
       {
-        debugMessage("MQTT publish at  " + zuluDateTimeString() + " , " + CLIENT_ID + " , " + sensorData.internalTemp + " , " + sensorData.internalHumidity + " , " + sensorData.internalCO2);
+        debugMessage("MQTT publish at " + zuluDateTimeString() + "->" + CLIENT_ID + "," + sensorData.internalTemp + "," + sensorData.internalHumidity + "," + sensorData.internalCO2);
         mqtt.disconnect();
         return 1;
       }
