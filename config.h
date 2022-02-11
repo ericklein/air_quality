@@ -3,7 +3,7 @@
 //#define RJ45    // use Ethernet
 #define WIFI    // use WiFi
 
-// logging interval in minutes
+// set logging interval in minutes
 #ifdef DEBUG
 	#define LOG_INTERVAL 1
 #else
@@ -15,16 +15,23 @@
 // microsecond modifier to minutes for logging interval (ESP)
 #define LOG_INTERVAL_US_MODIFIER 60000000
 
-// device ID used for MQTTLOG and logging
+// set device ID; used by mqtt and screen
 #define CLIENT_ID "test_room"
 
 // open weather map parameters
-#define OWM_SERVER 			"http://api.openweathermap.org/data/2.5/"
+#define OWM_SERVER 			  "http://api.openweathermap.org/data/2.5/"
 #define OWM_WEATHER_PATH	"weather?"
-#define OWM_AQM_PATH		"air_pollution?"
-#define OWM_LAT_LONG		"lat=47.5707&lon=-122.2221"
+#define OWM_AQM_PATH		  "air_pollution?"
+#define OWM_LAT_LONG		  "lat=47.5707&lon=-122.2221"
 
-// MQTT parameters
+// select time zone
+//const int timeZone = 0;  	// UTC
+//const int timeZone = -5;  // USA EST
+//const int timeZone = -4;  // USA EDT
+const int timeZone = -8;  // USA PST
+//const int timeZone = -7;  // USA PDT
+
+// set MQTT parameters
 // #define MQTT_KEEP_ALIVE 	300 // needed?
 #define MQTT_ATTEMPT_LIMIT 	3 	// number of connection attempts for MQTT broker
 
