@@ -98,16 +98,6 @@ ThinkInk_290_Grayscale4_T5 display(EPD_DC, EPD_RESET, EPD_CS, SRAM_CS, EPD_BUSY)
 #endif
 
 #if defined(WIFI) || defined(RJ45)
-  // MQTT setup
-  #include "Adafruit_MQTT.h"
-  #include "Adafruit_MQTT_Client.h"
-  Adafruit_MQTT_Client mqtt(&client, MQTT_BROKER, MQTT_PORT, CLIENT_ID, MQTT_USER, MQTT_PASS);
-
-  Adafruit_MQTT_Publish tempPub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC1,MQTT_QOS_1);
-  Adafruit_MQTT_Publish humidityPub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC2, MQTT_QOS_1);
-  Adafruit_MQTT_Publish co2Pub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC3, MQTT_QOS_1);
-  Adafruit_MQTT_Publish errMsgPub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC4, MQTT_QOS_1);
-
   // NTP setup
   unsigned int localPort = 8888;       // local port to listen for UDP packets
 
@@ -123,6 +113,18 @@ ThinkInk_290_Grayscale4_T5 display(EPD_DC, EPD_RESET, EPD_CS, SRAM_CS, EPD_BUSY)
   // used to retreive weather information
   #include <HTTPClient.h> 
   #include "ArduinoJson.h"
+
+  #ifdef MQTTLOG
+    // MQTT setup
+    #include "Adafruit_MQTT.h"
+    #include "Adafruit_MQTT_Client.h"
+    Adafruit_MQTT_Client mqtt(&client, MQTT_BROKER, MQTT_PORT, CLIENT_ID, MQTT_USER, MQTT_PASS);
+
+    Adafruit_MQTT_Publish tempPub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC1,MQTT_QOS_1);
+    Adafruit_MQTT_Publish humidityPub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC2, MQTT_QOS_1);
+    Adafruit_MQTT_Publish co2Pub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC3, MQTT_QOS_1);
+    Adafruit_MQTT_Publish errMsgPub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC4, MQTT_QOS_1);
+  #endif
 #endif
 
 void setup()
@@ -259,7 +261,7 @@ void setup()
 
   getWeather();
 
-#if defined(WIFI) || defined(RJ45)
+#if ((defined(WIFI) || defined(RJ45)) && defined(MQTTLOG))
 // if there is a network interface (so it will compile)
   if (internetAvailable)
     // update mqtt broker and screen
@@ -283,7 +285,7 @@ void setup()
     }
     deepSleep();
 #else
-  // no internet, update screen only
+  // no internet and/or mqtt, update screen only
   infoScreen("Last update at " + zuluDateTimeString());
   deepSleep();
 #endif
@@ -345,6 +347,35 @@ void loop()
       return a;
     }
 
+  String httpGETRequest(const char* serverName) 
+  {
+    HTTPClient http;
+      
+    // servername is domain name w/URL path or IP address w/URL path
+    http.begin(client, serverName);
+    
+    // Send HTTP POST request
+    int httpResponseCode = http.GET();
+    
+    String payload = "{}"; 
+    
+    if (httpResponseCode>0)
+    {
+      debugMessage("HTTP Response code: " + httpResponseCode);
+      payload = http.getString();
+    }
+    else
+    {
+      debugMessage("Error code: " + httpResponseCode);
+    }
+    // free resources
+    http.end();
+
+    return payload;
+  }
+#endif
+
+#if ((defined(WIFI) || defined(RJ45)) && defined(MQTTLOG))
   void mqttConnect()
   // Connects and reconnects to MQTT broker, call from loop() to maintain connection
   {
@@ -458,33 +489,6 @@ void loop()
         return 0;
       }
     }
-  }
-
-  String httpGETRequest(const char* serverName) 
-  {
-    HTTPClient http;
-      
-    // servername is domain name w/URL path or IP address w/URL path
-    http.begin(client, serverName);
-    
-    // Send HTTP POST request
-    int httpResponseCode = http.GET();
-    
-    String payload = "{}"; 
-    
-    if (httpResponseCode>0)
-    {
-      debugMessage("HTTP Response code: " + httpResponseCode);
-      payload = http.getString();
-    }
-    else
-    {
-      debugMessage("Error code: " + httpResponseCode);
-    }
-    // free resources
-    http.end();
-
-    return payload;
   }
 #endif
 
@@ -646,8 +650,6 @@ void getWeather()
 #endif
   debugMessage(String("OWM->") + sensorData.extTemperature + "F," + sensorData.extHumidity + "%, " + sensorData.extAQI + " AQI");
 }
-
-
 
 int initScreen()
 {
