@@ -1,8 +1,9 @@
 // conditional compile flags
-#define DEBUG     // Output to serial port
+//#define DEBUG     // Output to serial port
 //#define RJ45    // use Ethernet
 #define WIFI    // use WiFi
 #define MQTTLOG // log sensor data to MQTT broker
+#define DWEET     // Post sensor readings to dweet.io
 
 // set logging interval in minutes
 #ifdef DEBUG
@@ -65,9 +66,20 @@ const int timeZone = -8;  // USA PST
 // #define BATTERYSIZE LC709203F_APA_100MAH // 0x08
 // #define BATTERYSIZE LC709203F_APA_200MAH // 0x0B
 // #define BATTERYSIZE LC709203F_APA_500MAH	// 0x10
-#define BATTERYSIZE LC709203F_APA_1000MAH // 0x19
+// #define BATTERYSIZE LC709203F_APA_1000MAH // 0x19
 // #define BATTERYSIZE LC709203F_APA_2000MAH // 0x2D
 // #define BATTERYSIZE LC709203F_APA_3000MAH // 0x36
+
+#define BATTERY_APA 0x1D // 1200 mAH per LC709203F datasheet
+#define BATTERY_ALERT_PCT 20  // Threshold for low battery alert (MQTT)
+
+// Post data to the internet via dweet.io.  Set DWEET_DEVICE to be a
+// unique name you want associated with this reporting device, allowing
+// data to be easily retrieved through the web or Dweet's REST API.
+#ifdef DWEET
+  #define DWEET_HOST "dweet.io"   // Typically dweet.io
+  #define DWEET_DEVICE "makerhour-airquality"  // Must be unique across all of dweet.io
+#endif
 
 // the following parameters are defined in secrets.h
 // #ifdef WIFI

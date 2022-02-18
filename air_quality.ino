@@ -136,29 +136,36 @@ void setup()
     {
       // wait for serial port
     }
+    // Confirm key site configuration parameters
+    debugMessage("Log interval: " + String(LOG_INTERVAL));
+    debugMessage("Site lat/long: " + String(OWM_LAT_LONG));
+    debugMessage("Client ID: " + String(CLIENT_ID));
+    debugMessage("Dweet device: " + String(DWEET_DEVICE));
+    debugMessage("---------------------------------");
     debugMessage("Air Quality started");
+    
   #endif
 
   if (initScreen())
   {
-    debugMessage("screen initialized");
+    debugMessage("Screen initialized");
     screenAvailable = true;
   }
   else
   {
-    debugMessage("screen not detected");
+    debugMessage("Screen not detected");
     screenAvailable = false;
   }
 
   if (initSensor())
   {
-    debugMessage("environment sensor initialized");
+    debugMessage("Environment sensor initialized");
   }
   else
   {
-    debugMessage("environment sensor failed to initialize, going to sleep");
+    debugMessage("Environment sensor failed to initialize, going to sleep");
     if (screenAvailable)
-      alertScreen("environment sensor failure");
+      alertScreen("Environment sensor failure");
     deepSleep();
   }
 
@@ -170,7 +177,8 @@ void setup()
   if (lc.begin())
   {
     debugMessage("Battery voltage monitor ready");
-    lc.setPackSize(BATTERYSIZE);
+    // lc.setPackSize(BATTERYSIZE);
+    lc.setPackAPA(BATTERY_APA);
     batteryAvailable = true;
   }
   else
@@ -180,32 +188,36 @@ void setup()
   }
 
   #ifdef WIFI
-    uint8_t tries = 1;
+    uint8_t tries;
     #define MAX_TRIES 5
 
     // set hostname has to come before WiFi.begin
     WiFi.hostname(CLIENT_ID);
     // WiFi.setHostname(CLIENT_ID); //for WiFiNINA
+    
+    // Connect to WiFi.  Prepared to wait a reasonable interval for the connection to
+    // succeed, but not forever.  Will check status and, if not connected, delay an
+    // increasing amount of time up to a maximum of MAX_TRIES delay intervals. 
+    internetAvailable = false;
     WiFi.begin(WIFI_SSID, WIFI_PASS);
-
-    while (WiFi.status() != WL_CONNECTED) 
-    {
+    
+    for(tries=1;tries<=MAX_TRIES;tries++) {
       debugMessage(String("Connection attempt ") + tries + " of " + MAX_TRIES + " to " + WIFI_SSID + " in " + (tries*10) + " seconds");
-      // use of delay OK as this is initialization code
-      delay(tries*10000);
-
-      if (tries == MAX_TRIES)
-      {
-        debugMessage(String("Can not connect to WFii after ") + MAX_TRIES + " attempts");
-        internetAvailable = false;
+      if(WiFi.status() == WL_CONNECTED) {
+        // Successful connection!
+        internetAvailable = true;
+        break;
       }
-      tries++;
+      // use of delay OK as this is initialization code
+      delay(tries*10000);   // Waiting longer each time we check for status
     }
-    if (tries<MAX_TRIES) // we connected successfully
-    {
+    if(internetAvailable) {
       debugMessage("WiFi IP address is: " + ip2CharArray(WiFi.localIP()));
-      debugMessage("RSSI is: " + String(WiFi.RSSI()) + " dBm");
-      internetAvailable = true;
+      debugMessage("RSSI is: " + String(WiFi.RSSI()) + " dBm");  
+    }
+    else {
+      // Couldn't connect, alas
+      debugMessage(String("Can not connect to WFii after ") + MAX_TRIES + " attempts");   
     }
   #endif
 
@@ -243,9 +255,16 @@ void setup()
       internetAvailable = true;
     }
   #endif
-    
+
+  // Implement a variety of internet services, if networking hardware is present and the
+  // network is connected.  Services supported include:
+  //
+  //  NTP to get date and time information
+  //  Open Weather Map (OWM) to get local weather and AQI info
+  //  MQTT to publish data to an MQTT broker on specified topics
+ 
   #if defined(WIFI) || defined(RJ45)
-  // if there is a network interface (so it will compile)
+  // if there is a network interface (so networking code will compile)
     if (internetAvailable)
     // and internet is verified
     {
@@ -256,39 +275,47 @@ void setup()
       // wait until the time is set by the sync provider
       while(timeStatus()== timeNotSet);
       debugMessage("NTP time is " + zuluDateTimeString());
-    }
-  #endif
 
-  getWeather();
 
-#if ((defined(WIFI) || defined(RJ45)) && defined(MQTTLOG))
-// if there is a network interface (so it will compile)
-  if (internetAvailable)
-    // update mqtt broker and screen
-    {
-      if (mqttSensorUpdate())
-      {
-        infoScreen(String(CLIENT_ID) + " pub:" + zuluDateTimeString());
-        
-      }
-      else
-      {
-        infoScreen(String(CLIENT_ID) + " pub fail:" + zuluDateTimeString());
-      }
-      // if battery low, update mqtt broker
-      mqttBatteryAlert();
-    }
+      // Get local weather and AQI info
+      getWeather();
+
+
+      // MQTT Service interface, if defined.  Uses different status line to
+      // reflect whether MQTT publish succeeded or not
+      #ifdef MQTTLOG
+        if (mqttSensorUpdate())
+        {
+          infoScreen(String(CLIENT_ID) + " pub:" + zuluDateTimeString());     
+        }
+        else
+        {
+          infoScreen(String(CLIENT_ID) + " pub fail:" + zuluDateTimeString());
+        }
+        // if battery low, update mqtt broker
+        mqttBatteryAlert();
+      #else
+        // No MQTT, so just do the standard screen update.
+        infoScreen("Updated: " + zuluDateTimeString());
+      #endif
+
+      #ifdef DWEET
+        post_dweet(sensorData.internalCO2, sensorData.internalTemp, sensorData.internalHumidity);
+      #endif
+
+    } // End of internetAvailble 
     else
     {
-      // no internet, update screen only
-      infoScreen("Last update at " + zuluDateTimeString());
+      // no internet connection, update screen only
+      infoScreen("Updated: " + zuluDateTimeString());
     }
     deepSleep();
-#else
-  // no internet and/or mqtt, update screen only
-  infoScreen("Last update at " + zuluDateTimeString());
-  deepSleep();
-#endif
+    
+  #else
+    // no internet hardware present so update screen only
+    infoScreen("Last update at " + zuluDateTimeString());
+    deepSleep();
+  #endif
 }
 
 void loop()
@@ -377,7 +404,7 @@ void loop()
 
 #if ((defined(WIFI) || defined(RJ45)) && defined(MQTTLOG))
   void mqttConnect()
-  // Connects and reconnects to MQTT broker, call from loop() to maintain connection
+  // Connects and reconnects to MQTT broker, call as needed to maintain connection
   {
     int8_t mqttErr;
     int8_t tries = 1;
@@ -426,7 +453,7 @@ void loop()
     // stored so we don't call the function twice in the routine
     float percent = lc.cellPercent();
 
-    if ((batteryAvailable) && (percent<20))
+    if ((batteryAvailable) && (percent < BATTERY_ALERT_PCT))
     {
       String errMessage = String(CLIENT_ID) + " battery at " + percent + " percent at " + zuluDateTimeString();  
       mqttConnect();
@@ -860,5 +887,64 @@ void readSensor()
   // sensorData.internalHumidity = (int) envSensor.readHumidity();
   // sensorData.internalCO2 = 10000;
 
-  debugMessage(String("sensor->") + sensorData.internalTemp + "F," + sensorData.internalHumidity + "%," + sensorData.internalCO2 + " ppm");
+  debugMessage(String("Sensor->") + sensorData.internalTemp + "F," + sensorData.internalHumidity + "%," + sensorData.internalCO2 + " ppm");
 }
+
+#ifdef DWEET
+// Post a dweet to report the various sensor reading.  This routine blocks while
+// talking to the network, so may take a while to execute.
+void post_dweet(uint16_t co2, float tempF, float humidity)
+{
+  
+  if(WiFi.status() != WL_CONNECTED) {
+    debugMessage("Lost network connection to '" + String(WIFI_SSID) + "'!");
+    // show_disconnected();  / Future feature to display state of network connectivity (LED?)
+    return;
+  }
+  
+  debugMessage("connecting to " + String(DWEET_HOST));
+      
+  // Use WiFiClient class to create TCP connections
+  WiFiClient dweet_client;
+  const int httpPort = 80;
+  if (!dweet_client.connect(DWEET_HOST, httpPort)) {
+    debugMessage("connection failed: " + String(DWEET_HOST));
+    return;
+  }
+
+  // Use HTTP post and send a data payload as JSON
+  String device_info = "{\"rssi\":\""   + String(WiFi.RSSI())        + "\"," +
+                       "\"ipaddr\":\"" + WiFi.localIP().toString()  + "\",";                      
+  String battery_info;
+  if(batteryAvailable) {
+    battery_info = "\"battery_percent\":\"" + String(lc.cellPercent()) + "\"," +
+                   "\"battery_voltage\":\"" + String(lc.cellVoltage()) + "\",";
+  }
+  else {
+    battery_info = "";
+  }
+  String sensor_info = "\"co2\":\""         + String(co2)             + "\"," +
+                       "\"temperature\":\"" + String(tempF,2)         + "\"," +
+                       "\"humidity\":\""    + String(humidity,2)      + "\"}";
+ 
+  String postdata = device_info + battery_info + sensor_info;
+  dweet_client.println("POST /dweet/for/" + String(DWEET_DEVICE) + " HTTP/1.1");
+  dweet_client.println("Host: dweet.io");
+  dweet_client.println("Cache-Control: no-cache");
+  dweet_client.println("Content-Type: application/json");
+  dweet_client.print("Content-Length: ");
+  dweet_client.println(postdata.length());
+  dweet_client.println();
+  dweet_client.println(postdata);
+  debugMessage(postdata);
+  delay(1500);
+    
+  // Fetch any reply from server and print as debug messages
+  while(dweet_client.available()) {
+    String line = dweet_client.readStringUntil('\r');
+    debugMessage(line);
+  }
+  dweet_client.stop();
+  debugMessage("closing connection for dweeting");
+}
+#endif
