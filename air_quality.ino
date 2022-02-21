@@ -177,8 +177,8 @@ void setup()
   if (lc.begin())
   {
     debugMessage("Battery voltage monitor ready");
-    // lc.setPackSize(BATTERYSIZE);
-    lc.setPackAPA(BATTERY_APA);
+    lc.setPackSize(BATTERYSIZE);   // If library version 1.1.0 or earlier
+    // lc.setPackAPA(BATTERY_APA); // Uses new library API. See comments in config.h
     batteryAvailable = true;
   }
   else
