@@ -4,6 +4,7 @@
 #define WIFI    // use WiFi
 #define MQTTLOG // log sensor data to MQTT broker
 #define DWEET     // Post sensor readings to dweet.io
+#define INFLUX  // Log data to remote InfluxDB server
 
 // set logging interval in minutes
 #ifdef DEBUG
@@ -62,16 +63,24 @@ const int timeZone = -8;  // USA PST
 #define MQTT_PUB_TOPIC3		"sircoolio/feeds/test-room.co2"
 #define MQTT_PUB_TOPIC4		"sircoolio/feeds/test-room.errmessage"
 
-// select battery size closest to used
+// Current version of Adafruit LC709203F library sets battery size (APA value) 
+// using a fixed, limited set of defined values enumerated in LC709203F.h.  
+// Select the one closest to the battery size being used
 // #define BATTERYSIZE LC709203F_APA_100MAH // 0x08
 // #define BATTERYSIZE LC709203F_APA_200MAH // 0x0B
 // #define BATTERYSIZE LC709203F_APA_500MAH	// 0x10
-// #define BATTERYSIZE LC709203F_APA_1000MAH // 0x19
+#define BATTERYSIZE LC709203F_APA_1000MAH // 0x19
 // #define BATTERYSIZE LC709203F_APA_2000MAH // 0x2D
 // #define BATTERYSIZE LC709203F_APA_3000MAH // 0x36
 
-#define BATTERY_APA 0x1D // 1200 mAH per LC709203F datasheet
-#define BATTERY_ALERT_PCT 20  // Threshold for low battery alert (MQTT)
+// A pending update to the Adafruit LC709203F library adds a new function that
+// allows setitng battery APA value directly, based on a settings curve in the
+// LC709203F datasheet.  Once that version becomes available we'll switch, which
+// will require a differernt #define scheme.
+// #define BATTERY_APA 0x1D // 1200 mAH per LC709203F datasheet
+
+// Set the threshold for generating a low-battery alert via MQTT
+#define BATTERY_ALERT_PCT 20  // Low battery alert at or below 20% charge
 
 // Post data to the internet via dweet.io.  Set DWEET_DEVICE to be a
 // unique name you want associated with this reporting device, allowing
@@ -80,6 +89,23 @@ const int timeZone = -8;  // USA PST
   #define DWEET_HOST "dweet.io"   // Typically dweet.io
   #define DWEET_DEVICE "makerhour-airquality"  // Must be unique across all of dweet.io
 #endif
+
+#ifdef INFLUX
+  // InfluxDB server url using name or IP address (not localhost)
+  #define INFLUXDB_URL "http://jakku.local:8086"
+  // InfluxDB v1 database name 
+  #define INFLUXDB_DB_NAME "home"
+  // InfluxDB v1 user name
+  #define INFLUXDB_USER "grafana"
+  // InfluxDB v1 user password
+  #define INFLUXDB_PASSWORD "anafarg1729"
+  
+  // Tags values for InfluxDB data points
+  #define DEVICE_NAME "airquality"
+  #define DEVICE_LOCATION "dining room"
+  #define DEVICE_SITE "indoor"
+#endif
+
 
 // the following parameters are defined in secrets.h
 // #ifdef WIFI
