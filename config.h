@@ -4,6 +4,7 @@
 #define WIFI    // use WiFi
 #define MQTTLOG // log sensor data to MQTT broker
 #define DWEET     // Post sensor readings to dweet.io
+//#define INFLUX  // Log data to remote InfluxDB server
 
 // set logging interval in minutes
 #ifdef DEBUG
@@ -67,7 +68,7 @@ const int timeZone = -8;  // USA PST
 // Select the one closest to the battery size being used
 // #define BATTERYSIZE LC709203F_APA_100MAH // 0x08
 // #define BATTERYSIZE LC709203F_APA_200MAH // 0x0B
-// #define BATTERYSIZE LC709203F_APA_500MAH  // 0x10
+// #define BATTERYSIZE LC709203F_APA_500MAH	// 0x10
 #define BATTERYSIZE LC709203F_APA_1000MAH // 0x19
 // #define BATTERYSIZE LC709203F_APA_2000MAH // 0x2D
 // #define BATTERYSIZE LC709203F_APA_3000MAH // 0x36
@@ -89,7 +90,16 @@ const int timeZone = -8;  // USA PST
   #define DWEET_DEVICE "makerhour-airquality"  // Must be unique across all of dweet.io
 #endif
 
-// the following parameters are defined in secrets.h
+#ifdef INFLUX
+  // Tags values for InfluxDB data points.  Should be customized to match your 
+  // InfluxDB data model, and can add more here and in post_influx.cpp if desired
+  #define DEVICE_NAME "airquality"
+  #define DEVICE_LOCATION "dining room"
+  #define DEVICE_SITE "indoor"
+#endif
+
+
+// The following parameters are defined in secrets.h
 // #ifdef WIFI
 // 	// WiFi credentials
 // 	#define WIFI_SSID
@@ -103,3 +113,9 @@ const int timeZone = -8;  // USA PST
 // 	#define MQTT_USER
 // 	#define MQTT_BROKER
 // 	#define MQTT_PASS
+
+// InfluxDB server, database, and access credentials
+// #define INFLUXDB_URL 
+// #define INFLUXDB_DB_NAME
+// #define INFLUXDB_USER
+// #define INFLUXDB_PASSWORD
