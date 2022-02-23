@@ -207,8 +207,8 @@ void setup()
     internetAvailable = false;
     WiFi.begin(WIFI_SSID, WIFI_PASS);
   
-    for (tries=1;tries<=MAX_TRIES;tries++) {
-      debugMessage(String("Connection attempt ") + tries + " of " + MAX_TRIES + " to " + WIFI_SSID + " in " + (tries * 10) + " seconds");
+    for(tries=1;tries<=MAX_TRIES;tries++) {
+      debugMessage(String("Connection attempt ") + tries + " of " + MAX_TRIES + " to " + WIFI_SSID + " in " + (tries*10) + " seconds");
       if(WiFi.status() == WL_CONNECTED) {
         // Successful connection!
         internetAvailable = true;
@@ -487,14 +487,14 @@ void loop()
   int mqttSensorUpdate()
   // Publishes sensor data to MQTT broker
   {
-    if ((sensorData.internalCO2 == 10000) && (sensorData.internalTemp = 10000))
+    if ((sensorData.internalCO2==10000) && (sensorData.internalTemp=10000))
     // no sensor data to publish
     {
       debugMessage("No sensor data to publish to MQTT broker");
       return 1;
     }
     mqttConnect();
-    if (sensorData.internalCO2 == 10000)
+    if (sensorData.internalCO2==10000)
     // temperature and humidity only to publish
     {
       if ((tempPub.publish(sensorData.internalTemp)) && (humidityPub.publish(sensorData.internalHumidity)))
@@ -702,7 +702,7 @@ void alertScreen(String messageText)
   display.clearBuffer();
   display.setTextColor(EPD_BLACK);
   display.setFont();  // resets to system default monospace font
-  display.setCursor(5, (display.height() / 2));
+  display.setCursor(5,(display.height()/2));
   display.print(messageText);
 
   //update display
@@ -723,7 +723,7 @@ void infoScreen(String messageText)
   // humidity area
   display.drawLine(0,(display.height()*5/8),display.width(),(display.height()*5/8),EPD_GRAY);
   // C02 area
-  display.drawLine(0,(display.height()*7/8),display.width(),(display.height()*7/8), EPD_GRAY);
+  display.drawLine(0,(display.height()*7/8),display.width(),(display.height()*7/8),EPD_GRAY);
   // splitting sensor vs. outside values
   display.drawLine((display.width()/2),0,(display.width()/2),(display.height()*7/8),EPD_GRAY);
 
@@ -742,35 +742,35 @@ void infoScreen(String messageText)
   display.setFont(&FreeSans9pt7b);
 
   // indoor info
-  if (sensorData.internalTemp != 10000)
+  if (sensorData.internalTemp!=10000)
   {
     display.setCursor(5,((display.height()*3/8)-10));
     display.print(String("Temp ") + sensorData.internalTemp + "F");
   }
-  if (sensorData.internalHumidity != 10000)
+  if (sensorData.internalHumidity!=10000)
   {
     display.setCursor(5,((display.height()*5/8)-10));
     display.print(String("Humidity ") + sensorData.internalHumidity + "%");
   }
-  if (sensorData.internalCO2 != 10000)
+  if (sensorData.internalCO2!=10000)
   {
     display.setCursor(5,((display.height()*7/8)-10));
     display.print(String("C02 ") + sensorData.internalCO2 + " ppm");
   }
 
   // outdoor info
-  if (sensorData.extTemperature != 10000)
+  if (sensorData.extTemperature!=10000)
   {
     display.setCursor(((display.width()/2)+5),((display.height()*3/8)-10));
     display.print(String("Temp ") + sensorData.extTemperature + "F");
   }
-  if (sensorData.extHumidity != 10000)
+  if (sensorData.extHumidity!=10000)
   {
     display.setCursor(((display.width()/2)+5),((display.height()*5/8)-10));
     display.print(String("Humidity ") + sensorData.extHumidity + "%");
   }
   // air quality index (AQI)
-  if (sensorData.extAQI != 10000)
+  if (sensorData.extAQI!=10000)
   {
     display.setCursor(((display.width()/2)+5),((display.height()*7/8)-10));
     display.print("AQI ");
