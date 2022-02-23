@@ -12,7 +12,8 @@
 extern void debugMessage(String messageText);
 
 #include <InfluxDbClient.h>
-// InfluxDB setup.  See config.h for settings
+// InfluxDB setup.  See config.h and secrets.h for site-specific settings
+
 // InfluxDB client instance for InfluxDB 1
 InfluxDBClient dbclient(INFLUXDB_URL, INFLUXDB_DB_NAME);
 
@@ -24,10 +25,11 @@ Point dbenvdata("weather");
 void post_influx(uint16_t co2, float tempF, float humidity)
 {
   Serial.println("Saving data to Influx");
-  // Set InfluxDB 1 authentication params
+  // Set InfluxDB 1 authentication params using values defined in secrets.h
   dbclient.setConnectionParamsV1(INFLUXDB_URL, INFLUXDB_DB_NAME, INFLUXDB_USER, INFLUXDB_PASSWORD);
   
   // Add constant Influx data point tags - only do once, will be added to all individual data points
+  // Modify if required to reflect your InfluxDB data model (and set values in config.h)
   dbenvdata.addTag("device", DEVICE_NAME);
   dbenvdata.addTag("location", DEVICE_LOCATION);
   dbenvdata.addTag("site", DEVICE_SITE);

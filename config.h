@@ -4,7 +4,7 @@
 #define WIFI    // use WiFi
 #define MQTTLOG // log sensor data to MQTT broker
 #define DWEET     // Post sensor readings to dweet.io
-#define INFLUX  // Log data to remote InfluxDB server
+//#define INFLUX  // Log data to remote InfluxDB server
 
 // set logging interval in minutes
 #ifdef DEBUG
@@ -91,23 +91,15 @@ const int timeZone = -8;  // USA PST
 #endif
 
 #ifdef INFLUX
-  // InfluxDB server url using name or IP address (not localhost)
-  #define INFLUXDB_URL "http://jakku.local:8086"
-  // InfluxDB v1 database name 
-  #define INFLUXDB_DB_NAME "home"
-  // InfluxDB v1 user name
-  #define INFLUXDB_USER "grafana"
-  // InfluxDB v1 user password
-  #define INFLUXDB_PASSWORD "anafarg1729"
-  
-  // Tags values for InfluxDB data points
+  // Tags values for InfluxDB data points.  Should be customized to match your 
+  // InfluxDB data model, and can add more here and in post_influx.cpp if desired
   #define DEVICE_NAME "airquality"
   #define DEVICE_LOCATION "dining room"
   #define DEVICE_SITE "indoor"
 #endif
 
 
-// the following parameters are defined in secrets.h
+// The following parameters are defined in secrets.h
 // #ifdef WIFI
 // 	// WiFi credentials
 // 	#define WIFI_SSID
@@ -121,3 +113,9 @@ const int timeZone = -8;  // USA PST
 // 	#define MQTT_USER
 // 	#define MQTT_BROKER
 // 	#define MQTT_PASS
+
+// InfluxDB server, database, and access credentials
+// #define INFLUXDB_URL 
+// #define INFLUXDB_DB_NAME
+// #define INFLUXDB_USER
+// #define INFLUXDB_PASSWORD
