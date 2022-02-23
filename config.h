@@ -79,8 +79,8 @@ const int timeZone = -8;  // USA PST
 // will require a differernt #define scheme.
 // #define BATTERY_APA 0x1D // 1200 mAH per LC709203F datasheet
 
-// Set the threshold for generating a low-battery alert via MQTT
-#define BATTERY_ALERT_PCT 20  // Low battery alert at or below 20% charge
+// Set threshold for low battery alert, dispatched via MQTT
+#define BATTERY_ALERT_PCT 20  // Publishes MQTT alert if battery <= 20% charge
 
 // Post data to the internet via dweet.io.  Set DWEET_DEVICE to be a
 // unique name you want associated with this reporting device, allowing
