@@ -105,13 +105,13 @@ ThinkInk_290_Grayscale4_T5 display(EPD_DC, EPD_RESET, EPD_CS, SRAM_CS, EPD_BUSY)
   //IPAddress timeServer(132, 163, 4, 101); // time-a.timefreq.bldrdoc.gov
   // IPAddress timeServer(132, 163, 4, 102); // time-b.timefreq.bldrdoc.gov
   // IPAddress timeServer(132, 163, 4, 103); // time-c.timefreq.bldrdoc.gov
-  IPAddress timeServer(132, 163, 97, 6); // time.nist.gov
+  IPAddress timeServer(132,163,97,6); // time.nist.gov
 
   const int NTP_PACKET_SIZE = 48; // NTP time is in the first 48 bytes of message
   byte packetBuffer[NTP_PACKET_SIZE]; //buffer to hold incoming & outgoing packets
 
   // used to retreive weather information
-  #include <HTTPClient.h>
+  #include <HTTPClient.h> 
   #include "ArduinoJson.h"
 
   #ifdef MQTTLOG
@@ -120,7 +120,7 @@ ThinkInk_290_Grayscale4_T5 display(EPD_DC, EPD_RESET, EPD_CS, SRAM_CS, EPD_BUSY)
     #include "Adafruit_MQTT_Client.h"
     Adafruit_MQTT_Client mqtt(&client, MQTT_BROKER, MQTT_PORT, CLIENT_ID, MQTT_USER, MQTT_PASS);
 
-    Adafruit_MQTT_Publish tempPub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC1, MQTT_QOS_1);
+    Adafruit_MQTT_Publish tempPub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC1,MQTT_QOS_1);
     Adafruit_MQTT_Publish humidityPub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC2, MQTT_QOS_1);
     Adafruit_MQTT_Publish co2Pub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC3, MQTT_QOS_1);
     Adafruit_MQTT_Publish errMsgPub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC4, MQTT_QOS_1);
@@ -207,17 +207,17 @@ void setup()
     internetAvailable = false;
     WiFi.begin(WIFI_SSID, WIFI_PASS);
   
-    for (tries = 1; tries <= MAX_TRIES; tries++) {
+    for (tries=1;tries<=MAX_TRIES;tries++) {
       debugMessage(String("Connection attempt ") + tries + " of " + MAX_TRIES + " to " + WIFI_SSID + " in " + (tries * 10) + " seconds");
-      if (WiFi.status() == WL_CONNECTED) {
+      if(WiFi.status() == WL_CONNECTED) {
         // Successful connection!
         internetAvailable = true;
         break;
       }
       // use of delay OK as this is initialization code
-      delay(tries * 10000); // Waiting longer each time we check for status
+      delay(tries*10000); // Waiting longer each time we check for status
     }
-    if (internetAvailable) {
+    if(internetAvailable) {
       debugMessage("WiFi IP address is: " + ip2CharArray(WiFi.localIP()));
       debugMessage("RSSI is: " + String(WiFi.RSSI()) + " dBm");
     }
@@ -270,9 +270,9 @@ void setup()
   //  MQTT to publish data to an MQTT broker on specified topics
 
   #if defined(WIFI) || defined(RJ45)
-    // if there is a network interface (so networking code will compile)
+  // if there is a network interface (so networking code will compile)
     if (internetAvailable)
-      // and internet is verified
+    // and internet is verified
     {
       // Get time from NTP
       Udp.begin(localPort);
@@ -301,8 +301,8 @@ void setup()
         // if battery low, update mqtt broker
         mqttBatteryAlert();
       #else
-          // No MQTT, so just do the standard screen update.
-          infoScreen("Updated: " + zuluDateTimeString());
+        // No MQTT, so just do the standard screen update.
+        infoScreen("Updated: " + zuluDateTimeString());
       #endif
     
       #ifdef INFLUX
@@ -310,7 +310,7 @@ void setup()
       #endif
       
       #ifdef DWEET
-          post_dweet(sensorData.internalCO2, sensorData.internalTemp, sensorData.internalHumidity);
+        post_dweet(sensorData.internalCO2, sensorData.internalTemp, sensorData.internalHumidity);
       #endif
 
     } // End of internetAvailble
@@ -321,10 +321,10 @@ void setup()
     }
     deepSleep();
   
-    #else
-      // no internet hardware present so update screen only
-      infoScreen("Last update at " + zuluDateTimeString());
-      deepSleep();
+  #else
+    // no internet hardware present so update screen only
+    infoScreen("Last update at " + zuluDateTimeString());
+    deepSleep();
   #endif
 }
 
@@ -425,7 +425,7 @@ void loop()
       return;
     }
   
-    while ((mqttErr = mqtt.connect() != 0) && (tries <= MQTT_ATTEMPT_LIMIT))
+    while ((mqttErr = mqtt.connect() != 0) && (tries<=MQTT_ATTEMPT_LIMIT))
     {
       // generic MQTT error
       // debugMessage(mqtt.connectErrorString(mqttErr));
@@ -441,9 +441,9 @@ void loop()
         case 6: debugMessage("Failed to subscribe"); break;
         default: debugMessage("GENERIC - Connection failed"); break;
       }
-      debugMessage(String(MQTT_BROKER) + " connect attempt " + tries + " of " + MQTT_ATTEMPT_LIMIT + " happens in " + (tries * 10) + " seconds");
+      debugMessage(String(MQTT_BROKER) + " connect attempt " + tries + " of " + MQTT_ATTEMPT_LIMIT + " happens in " + (tries*10) + " seconds");
       mqtt.disconnect();
-      delay(tries * 10000);
+      delay(tries*10000);
       tries++;
   
       if (tries == MQTT_ATTEMPT_LIMIT)
@@ -468,7 +468,7 @@ void loop()
       String errMessage = String(CLIENT_ID) + " battery at " + percent + " percent at " + zuluDateTimeString();
       mqttConnect();
   
-      int charArrayLength = errMessage.length() + 1;
+      int charArrayLength = errMessage.length()+1;
       char textInChars[charArrayLength];
       errMessage.toCharArray(textInChars, charArrayLength);
   
@@ -488,14 +488,14 @@ void loop()
   // Publishes sensor data to MQTT broker
   {
     if ((sensorData.internalCO2 == 10000) && (sensorData.internalTemp = 10000))
-      // no sensor data to publish
+    // no sensor data to publish
     {
       debugMessage("No sensor data to publish to MQTT broker");
       return 1;
     }
     mqttConnect();
     if (sensorData.internalCO2 == 10000)
-      // temperature and humidity only to publish
+    // temperature and humidity only to publish
     {
       if ((tempPub.publish(sensorData.internalTemp)) && (humidityPub.publish(sensorData.internalHumidity)))
       {
@@ -537,26 +537,26 @@ String zuluDateTimeString()
   {
     logString = year();
     logString += "-";
-    if (month() < 10) logString += "0";
+    if (month()<10) logString += "0";
     logString += month();
     logString += "-";
-    if (day() < 10) logString += "0";
+    if (day()<10) logString += "0";
     logString += day();
     logString += "T";
-    if (hour() < 10) logString += "0";
+    if (hour()<10) logString += "0";
     logString += hour();
     logString += ":";
-    if (minute() < 10) logString += "0";
+    if (minute()<10) logString += "0";
     logString += minute();
     logString += ":";
-    if (second() < 10) logString += "0";
+    if (second()<10) logString += "0";
     logString += second();
     //logString += "Z";
     logString += "PST";
   }
   else
   {
-    logString = "Time not set";
+    logString ="Time not set";
   }
   return logString;
 }
@@ -584,107 +584,107 @@ void deepSleep()
   #endif
   // SCD40 only
   envSensor.stopPeriodicMeasurement();
-  esp_sleep_enable_timer_wakeup(LOG_INTERVAL * LOG_INTERVAL_US_MODIFIER);
+  esp_sleep_enable_timer_wakeup(LOG_INTERVAL*LOG_INTERVAL_US_MODIFIER);
   esp_deep_sleep_start();
 }
 
 void getWeather()
 // retrieves weather from Open Weather Map APIs and stores data to environment global
 {
-#if defined(WIFI) || defined(RJ45)
-  // if there is a network interface (so it will compile)
-  if (internetAvailable)
+  #if defined(WIFI) || defined(RJ45)
+    // if there is a network interface (so it will compile)
+    if (internetAvailable)
     // and internet is verified
-  {
-    String jsonBuffer;
-
-    // Get local temp and humidity
-    String serverPath = String(OWM_SERVER) + OWM_WEATHER_PATH + OWM_LAT_LONG + "&units=imperial" + "&APPID=" + OWM_KEY;
-
-    jsonBuffer = httpGETRequest(serverPath.c_str());
-    debugMessage(jsonBuffer);
-
-    StaticJsonDocument<1024> doc;
-
-    DeserializationError httpError = deserializeJson(doc, jsonBuffer);
-
-    if (httpError)
     {
-      debugMessage("Unable to parse weather JSON object");
-      debugMessage(String(httpError.c_str()));
+      String jsonBuffer;
+  
+      // Get local temp and humidity
+      String serverPath = String(OWM_SERVER) + OWM_WEATHER_PATH + OWM_LAT_LONG + "&units=imperial" + "&APPID=" + OWM_KEY;
+  
+      jsonBuffer = httpGETRequest(serverPath.c_str());
+      debugMessage(jsonBuffer);
+  
+      StaticJsonDocument<1024> doc;
+  
+      DeserializationError httpError = deserializeJson(doc, jsonBuffer);
+  
+      if (httpError)
+      {
+        debugMessage("Unable to parse weather JSON object");
+        debugMessage(String(httpError.c_str()));
+        sensorData.extTemperature = 10000;
+        sensorData.extHumidity = 10000;
+      }
+  
+      //JsonObject weather_0 = doc["weather"][0];
+      // int weather_0_id = weather_0["id"]; // 804
+      // const char* weather_0_main = weather_0["main"]; // "Clouds"
+      // const char* weather_0_description = weather_0["description"]; // "overcast clouds"
+      // const char* weather_0_icon = weather_0["icon"]; // "04n"
+  
+      JsonObject main = doc["main"];
+      sensorData.extTemperature = main["temp"];
+      // float main_feels_like = main["feels_like"]; // 21.31
+      // float main_temp_min = main["temp_min"]; // 18.64
+      // float main_temp_max = main["temp_max"]; // 23.79
+      // int main_pressure = main["pressure"]; // 1010
+      sensorData.extHumidity = main["humidity"]; // 81
+  
+      // int visibility = doc["visibility"]; // 10000
+  
+      // JsonObject wind = doc["wind"];
+      // float wind_speed = wind["speed"]; // 1.99
+      // int wind_deg = wind["deg"]; // 150
+      // float wind_gust = wind["gust"]; // 5.99
+  
+      // int clouds_all = doc["clouds"]["all"]; // 90
+  
+      // long sys_sunrise = sys["sunrise"]; // 1640620588
+      // long sys_sunset = sys["sunset"]; // 1640651017
+  
+      // int timezone = doc["timezone"]; // -28800
+      // long id = doc["id"]; // 5803139
+      // const char* name = doc["name"]; // "Mercer Island"
+      // int cod = doc["cod"]; // 200
+  
+      // Get local AQI
+      serverPath = String(OWM_SERVER) + OWM_AQM_PATH + OWM_LAT_LONG + "&APPID=" + OWM_KEY;
+  
+      jsonBuffer = httpGETRequest(serverPath.c_str());
+      debugMessage(jsonBuffer);
+  
+      StaticJsonDocument<384> doc1;
+  
+      httpError = deserializeJson(doc1, jsonBuffer);
+  
+      if (httpError)
+      {
+        debugMessage("Unable to parse air quality JSON object");
+        debugMessage(String(httpError.c_str()));
+        sensorData.extAQI = 10000;
+      }
+  
+      // double coord_lon = doc1["coord"]["lon"]; // -122.2221
+      // float coord_lat = doc1["coord"]["lat"]; // 47.5707
+  
+      JsonObject list_0 = doc1["list"][0];
+  
+      sensorData.extAQI = list_0["main"]["aqi"]; // 2
+  
+      // JsonObject list_0_components = list_0["components"];
+      // float list_0_components_co = list_0_components["co"]; // 453.95
+      // float list_0_components_no = list_0_components["no"]; // 0.47
+      // float list_0_components_no2 = list_0_components["no2"]; // 52.09
+      // float list_0_components_o3 = list_0_components["o3"]; // 17.17
+      // float list_0_components_so2 = list_0_components["so2"]; // 7.51
+      // float list_0_components_pm2_5 = list_0_components["pm2_5"]; // 8.04
+      // float list_0_components_pm10 = list_0_components["pm10"]; // 9.96
+      // float list_0_components_nh3 = list_0_components["nh3"]; // 0.86
+    }
+    #else
       sensorData.extTemperature = 10000;
       sensorData.extHumidity = 10000;
-    }
-
-    //JsonObject weather_0 = doc["weather"][0];
-    // int weather_0_id = weather_0["id"]; // 804
-    // const char* weather_0_main = weather_0["main"]; // "Clouds"
-    // const char* weather_0_description = weather_0["description"]; // "overcast clouds"
-    // const char* weather_0_icon = weather_0["icon"]; // "04n"
-
-    JsonObject main = doc["main"];
-    sensorData.extTemperature = main["temp"];
-    // float main_feels_like = main["feels_like"]; // 21.31
-    // float main_temp_min = main["temp_min"]; // 18.64
-    // float main_temp_max = main["temp_max"]; // 23.79
-    // int main_pressure = main["pressure"]; // 1010
-    sensorData.extHumidity = main["humidity"]; // 81
-
-    // int visibility = doc["visibility"]; // 10000
-
-    // JsonObject wind = doc["wind"];
-    // float wind_speed = wind["speed"]; // 1.99
-    // int wind_deg = wind["deg"]; // 150
-    // float wind_gust = wind["gust"]; // 5.99
-
-    // int clouds_all = doc["clouds"]["all"]; // 90
-
-    // long sys_sunrise = sys["sunrise"]; // 1640620588
-    // long sys_sunset = sys["sunset"]; // 1640651017
-
-    // int timezone = doc["timezone"]; // -28800
-    // long id = doc["id"]; // 5803139
-    // const char* name = doc["name"]; // "Mercer Island"
-    // int cod = doc["cod"]; // 200
-
-    // Get local AQI
-    serverPath = String(OWM_SERVER) + OWM_AQM_PATH + OWM_LAT_LONG + "&APPID=" + OWM_KEY;
-
-    jsonBuffer = httpGETRequest(serverPath.c_str());
-    debugMessage(jsonBuffer);
-
-    StaticJsonDocument<384> doc1;
-
-    httpError = deserializeJson(doc1, jsonBuffer);
-
-    if (httpError)
-    {
-      debugMessage("Unable to parse air quality JSON object");
-      debugMessage(String(httpError.c_str()));
       sensorData.extAQI = 10000;
-    }
-
-    // double coord_lon = doc1["coord"]["lon"]; // -122.2221
-    // float coord_lat = doc1["coord"]["lat"]; // 47.5707
-
-    JsonObject list_0 = doc1["list"][0];
-
-    sensorData.extAQI = list_0["main"]["aqi"]; // 2
-
-    // JsonObject list_0_components = list_0["components"];
-    // float list_0_components_co = list_0_components["co"]; // 453.95
-    // float list_0_components_no = list_0_components["no"]; // 0.47
-    // float list_0_components_no2 = list_0_components["no2"]; // 52.09
-    // float list_0_components_o3 = list_0_components["o3"]; // 17.17
-    // float list_0_components_so2 = list_0_components["so2"]; // 7.51
-    // float list_0_components_pm2_5 = list_0_components["pm2_5"]; // 8.04
-    // float list_0_components_pm10 = list_0_components["pm10"]; // 9.96
-    // float list_0_components_nh3 = list_0_components["nh3"]; // 0.86
-  }
-  #else
-    sensorData.extTemperature = 10000;
-    sensorData.extHumidity = 10000;
-    sensorData.extAQI = 10000;
   #endif
   debugMessage(String("OWM->") + sensorData.extTemperature + "F," + sensorData.extHumidity + "%, " + sensorData.extAQI + " AQI");
 }
@@ -717,15 +717,15 @@ void infoScreen(String messageText)
   // borders
   // ThinkInk 2.9" epd is 296x128 pixels
   // label border
-  display.drawLine(0, (display.height() / 8), display.width(), (display.height() / 8), EPD_GRAY);
+  display.drawLine(0,(display.height()/8),display.width(),(display.height()/8),EPD_GRAY);
   // temperature area
-  display.drawLine(0, (display.height() * 3 / 8), display.width(), (display.height() * 3 / 8), EPD_GRAY);
+  display.drawLine(0,(display.height()*3/8),display.width(),(display.height()*3/8),EPD_GRAY);
   // humidity area
-  display.drawLine(0, (display.height() * 5 / 8), display.width(), (display.height() * 5 / 8), EPD_GRAY);
+  display.drawLine(0,(display.height()*5/8),display.width(),(display.height()*5/8),EPD_GRAY);
   // C02 area
-  display.drawLine(0, (display.height() * 7 / 8), display.width(), (display.height() * 7 / 8), EPD_GRAY);
+  display.drawLine(0,(display.height()*7/8),display.width(),(display.height()*7/8), EPD_GRAY);
   // splitting sensor vs. outside values
-  display.drawLine((display.width() / 2), 0, (display.width() / 2), (display.height() * 7 / 8), EPD_GRAY);
+  display.drawLine((display.width()/2),0,(display.width()/2),(display.height()*7/8),EPD_GRAY);
 
   // battery status
   screenBatteryStatus();
@@ -733,9 +733,9 @@ void infoScreen(String messageText)
   display.setTextColor(EPD_BLACK);
 
   // indoor and outdoor labels
-  display.setCursor(((display.width() / 4) - 10), ((display.height() * 1 / 8) - 11));
+  display.setCursor(((display.width()/4)-10),((display.height()*1/8)-11));
   display.print("Here");
-  display.setCursor(((display.width() * 3 / 4 - 12)), ((display.height() * 1 / 8) - 11));
+  display.setCursor(((display.width()*3/4-12)),((display.height()*1/8)-11));
   display.print("Outside");
 
   display.setTextSize(1);
@@ -744,35 +744,35 @@ void infoScreen(String messageText)
   // indoor info
   if (sensorData.internalTemp != 10000)
   {
-    display.setCursor(5, ((display.height() * 3 / 8) - 10));
+    display.setCursor(5,((display.height()*3/8)-10));
     display.print(String("Temp ") + sensorData.internalTemp + "F");
   }
   if (sensorData.internalHumidity != 10000)
   {
-    display.setCursor(5, ((display.height() * 5 / 8) - 10));
+    display.setCursor(5,((display.height()*5/8)-10));
     display.print(String("Humidity ") + sensorData.internalHumidity + "%");
   }
   if (sensorData.internalCO2 != 10000)
   {
-    display.setCursor(5, ((display.height() * 7 / 8) - 10));
+    display.setCursor(5,((display.height()*7/8)-10));
     display.print(String("C02 ") + sensorData.internalCO2 + " ppm");
   }
 
   // outdoor info
   if (sensorData.extTemperature != 10000)
   {
-    display.setCursor(((display.width() / 2) + 5), ((display.height() * 3 / 8) - 10));
+    display.setCursor(((display.width()/2)+5),((display.height()*3/8)-10));
     display.print(String("Temp ") + sensorData.extTemperature + "F");
   }
   if (sensorData.extHumidity != 10000)
   {
-    display.setCursor(((display.width() / 2) + 5), ((display.height() * 5 / 8) - 10));
+    display.setCursor(((display.width()/2)+5),((display.height()*5/8)-10));
     display.print(String("Humidity ") + sensorData.extHumidity + "%");
   }
   // air quality index (AQI)
   if (sensorData.extAQI != 10000)
   {
-    display.setCursor(((display.width() / 2) + 5), ((display.height() * 7 / 8) - 10));
+    display.setCursor(((display.width()/2)+5),((display.height()*7/8)-10));
     display.print("AQI ");
     switch (sensorData.extAQI)
     {
@@ -799,7 +799,7 @@ void infoScreen(String messageText)
 
   // message
   display.setFont();  // resets to system default monospace font
-  display.setCursor(5, (display.height() - 10));
+  display.setCursor(5,(display.height()-10));
   display.print(messageText);
 
   //update display
@@ -821,9 +821,9 @@ void screenBatteryStatus()
     debugMessage("Battery voltage: " + String(lc.cellVoltage()) + " v");
 
     //calculate fill
-    display.fillRect((display.width() - 33), ((display.height() * 7 / 8) + 4), (int((percent / 100)*barWidth)), barHeight, EPD_GRAY);
+    display.fillRect((display.width()-33),((display.height()*7/8)+4),(int((percent/100)*barWidth)),barHeight,EPD_GRAY);
     // border
-    display.drawRect((display.width() - 33), ((display.height() * 7 / 8) + 4), barWidth, barHeight, EPD_BLACK);
+    display.drawRect((display.width()-33),((display.height()*7/8)+4),barWidth,barHeight,EPD_BLACK);
   }
 }
 
@@ -875,7 +875,7 @@ void readSensor()
   else
   {
     // convert C to F for temp, round to int, and store
-    sensorData.internalTemp = (int) ((sensorTemp * 1.8) + 32 + 0.5);
+    sensorData.internalTemp = (int) ((sensorTemp*1.8)+32+0.5);
     sensorData.internalHumidity = (int) (sensorHumidity + 0.5);
   }
 
@@ -907,7 +907,7 @@ void readSensor()
 void post_dweet(uint16_t co2, float tempF, float humidity)
 {
 
-  if (WiFi.status() != WL_CONNECTED) {
+  if(WiFi.status() != WL_CONNECTED) {
     debugMessage("Lost network connection to '" + String(WIFI_SSID) + "'!");
     // show_disconnected();  / Future feature to display state of network connectivity (LED?)
     return;
@@ -927,7 +927,7 @@ void post_dweet(uint16_t co2, float tempF, float humidity)
   String device_info = "{\"rssi\":\""   + String(WiFi.RSSI())        + "\"," +
                        "\"ipaddr\":\"" + WiFi.localIP().toString()  + "\",";
   String battery_info;
-  if (batteryAvailable) {
+  if(batteryAvailable) {
     battery_info = "\"battery_percent\":\"" + String(lc.cellPercent()) + "\"," +
                    "\"battery_voltage\":\"" + String(lc.cellVoltage()) + "\",";
   }
@@ -951,7 +951,7 @@ void post_dweet(uint16_t co2, float tempF, float humidity)
   delay(1500);
 
   // Fetch any reply from server and print as debug messages
-  while (dweet_client.available()) {
+  while(dweet_client.available()) {
     String line = dweet_client.readStringUntil('\r');
     debugMessage(line);
   }
