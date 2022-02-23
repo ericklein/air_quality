@@ -67,68 +67,68 @@ ThinkInk_290_Grayscale4_T5 display(EPD_DC, EPD_RESET, EPD_CS, SRAM_CS, EPD_BUSY)
 #include <TimeLib.h> // for zuluTimeString()
 
 #ifdef WIFI
-#if defined(ARDUINO_SAMD_MKRWIFI1010) || defined(ARDUINO_SAMD_NANO_33_IOT) || defined(ARDUINO_AVR_UNO_WIFI_REV2)
-#include <WiFiNINA.h>
-#elif defined(ARDUINO_SAMD_MKR1000)
-#include <WiFi101.h>
-#elif defined(ARDUINO_ESP8266_ESP12)
-#include <ESP8266WiFi.h>
-#else
-#include <WiFi.h>
-#endif
+  #if defined(ARDUINO_SAMD_MKRWIFI1010) || defined(ARDUINO_SAMD_NANO_33_IOT) || defined(ARDUINO_AVR_UNO_WIFI_REV2)
+    #include <WiFiNINA.h>
+  #elif defined(ARDUINO_SAMD_MKR1000)
+    #include <WiFi101.h>
+  #elif defined(ARDUINO_ESP8266_ESP12)
+    #include <ESP8266WiFi.h>
+  #else
+    #include <WiFi.h>
+  #endif
 
-WiFiClient client;
-//WiFiClientSecure client; // for SSL
+  WiFiClient client;
+  //WiFiClientSecure client; // for SSL
 
-// NTP support
-#include <WiFiUdp.h>
-WiFiUDP Udp;
+  // NTP support
+  #include <WiFiUdp.h>
+  WiFiUDP Udp;
 #endif
 
 #ifdef RJ45
-// Set MAC address. If unknown, be careful for duplicate addresses across projects.
-byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
-#include <SPI.h>
-#include <Ethernet.h>
-EthernetClient client;
+  // Set MAC address. If unknown, be careful for duplicate addresses across projects.
+  byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
+  #include <SPI.h>
+  #include <Ethernet.h>
+  EthernetClient client;
 
-// NTP support
-#include <EthernetUdp.h>
-EthernetUDP Udp;
+  // NTP support
+  #include <EthernetUdp.h>
+  EthernetUDP Udp;
 #endif
 
 #if defined(WIFI) || defined(RJ45)
-// NTP setup
-unsigned int localPort = 8888;       // local port to listen for UDP packets
+  // NTP setup
+  unsigned int localPort = 8888;       // local port to listen for UDP packets
 
-// NTP Servers
-//IPAddress timeServer(132, 163, 4, 101); // time-a.timefreq.bldrdoc.gov
-// IPAddress timeServer(132, 163, 4, 102); // time-b.timefreq.bldrdoc.gov
-// IPAddress timeServer(132, 163, 4, 103); // time-c.timefreq.bldrdoc.gov
-IPAddress timeServer(132, 163, 97, 6); // time.nist.gov
+  // NTP Servers
+  //IPAddress timeServer(132, 163, 4, 101); // time-a.timefreq.bldrdoc.gov
+  // IPAddress timeServer(132, 163, 4, 102); // time-b.timefreq.bldrdoc.gov
+  // IPAddress timeServer(132, 163, 4, 103); // time-c.timefreq.bldrdoc.gov
+  IPAddress timeServer(132, 163, 97, 6); // time.nist.gov
 
-const int NTP_PACKET_SIZE = 48; // NTP time is in the first 48 bytes of message
-byte packetBuffer[NTP_PACKET_SIZE]; //buffer to hold incoming & outgoing packets
+  const int NTP_PACKET_SIZE = 48; // NTP time is in the first 48 bytes of message
+  byte packetBuffer[NTP_PACKET_SIZE]; //buffer to hold incoming & outgoing packets
 
-// used to retreive weather information
-#include <HTTPClient.h>
-#include "ArduinoJson.h"
+  // used to retreive weather information
+  #include <HTTPClient.h>
+  #include "ArduinoJson.h"
 
-#ifdef MQTTLOG
-// MQTT setup
-#include "Adafruit_MQTT.h"
-#include "Adafruit_MQTT_Client.h"
-Adafruit_MQTT_Client mqtt(&client, MQTT_BROKER, MQTT_PORT, CLIENT_ID, MQTT_USER, MQTT_PASS);
+  #ifdef MQTTLOG
+    // MQTT setup
+    #include "Adafruit_MQTT.h"
+    #include "Adafruit_MQTT_Client.h"
+    Adafruit_MQTT_Client mqtt(&client, MQTT_BROKER, MQTT_PORT, CLIENT_ID, MQTT_USER, MQTT_PASS);
 
-Adafruit_MQTT_Publish tempPub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC1, MQTT_QOS_1);
-Adafruit_MQTT_Publish humidityPub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC2, MQTT_QOS_1);
-Adafruit_MQTT_Publish co2Pub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC3, MQTT_QOS_1);
-Adafruit_MQTT_Publish errMsgPub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC4, MQTT_QOS_1);
-#endif
+    Adafruit_MQTT_Publish tempPub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC1, MQTT_QOS_1);
+    Adafruit_MQTT_Publish humidityPub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC2, MQTT_QOS_1);
+    Adafruit_MQTT_Publish co2Pub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC3, MQTT_QOS_1);
+    Adafruit_MQTT_Publish errMsgPub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC4, MQTT_QOS_1);
+  #endif
 
-#ifdef INFLUX
-extern void post_influx(uint16_t co2, float tempF, float humidity);
-#endif
+  #ifdef INFLUX
+    extern void post_influx(uint16_t co2, float tempF, float humidity);
+  #endif
 
 #endif
 
@@ -136,21 +136,21 @@ void setup()
 // One time run of code, then deep sleep
 {
 
-#ifdef DEBUG
-  Serial.begin(115200);
-  while (!Serial)
-  {
-    // wait for serial port
-  }
-  // Confirm key site configuration parameters
-  debugMessage("Log interval: " + String(LOG_INTERVAL));
-  debugMessage("Site lat/long: " + String(OWM_LAT_LONG));
-  debugMessage("Client ID: " + String(CLIENT_ID));
-  debugMessage("Dweet device: " + String(DWEET_DEVICE));
-  debugMessage("---------------------------------");
-  debugMessage("Air Quality started");
+  #ifdef DEBUG
+    Serial.begin(115200);
+    while (!Serial)
+    {
+      // wait for serial port
+    }
+    // Confirm key site configuration parameters
+    debugMessage("Log interval: " + String(LOG_INTERVAL));
+    debugMessage("Site lat/long: " + String(OWM_LAT_LONG));
+    debugMessage("Client ID: " + String(CLIENT_ID));
+    debugMessage("Dweet device: " + String(DWEET_DEVICE));
+    debugMessage("---------------------------------");
+    debugMessage("Air Quality started");
 
-#endif
+  #endif
 
   if (initScreen())
   {
@@ -193,74 +193,74 @@ void setup()
     batteryAvailable = false;
   }
 
-#ifdef WIFI
-  uint8_t tries;
-#define MAX_TRIES 5
-
-  // set hostname has to come before WiFi.begin
-  WiFi.hostname(CLIENT_ID);
-  // WiFi.setHostname(CLIENT_ID); //for WiFiNINA
-
-  // Connect to WiFi.  Prepared to wait a reasonable interval for the connection to
-  // succeed, but not forever.  Will check status and, if not connected, delay an
-  // increasing amount of time up to a maximum of MAX_TRIES delay intervals.
-  internetAvailable = false;
-  WiFi.begin(WIFI_SSID, WIFI_PASS);
-
-  for (tries = 1; tries <= MAX_TRIES; tries++) {
-    debugMessage(String("Connection attempt ") + tries + " of " + MAX_TRIES + " to " + WIFI_SSID + " in " + (tries * 10) + " seconds");
-    if (WiFi.status() == WL_CONNECTED) {
-      // Successful connection!
-      internetAvailable = true;
-      break;
+  #ifdef WIFI
+    uint8_t tries;
+    #define MAX_TRIES 5
+  
+    // set hostname has to come before WiFi.begin
+    WiFi.hostname(CLIENT_ID);
+    // WiFi.setHostname(CLIENT_ID); //for WiFiNINA
+  
+    // Connect to WiFi.  Prepared to wait a reasonable interval for the connection to
+    // succeed, but not forever.  Will check status and, if not connected, delay an
+    // increasing amount of time up to a maximum of MAX_TRIES delay intervals.
+    internetAvailable = false;
+    WiFi.begin(WIFI_SSID, WIFI_PASS);
+  
+    for (tries = 1; tries <= MAX_TRIES; tries++) {
+      debugMessage(String("Connection attempt ") + tries + " of " + MAX_TRIES + " to " + WIFI_SSID + " in " + (tries * 10) + " seconds");
+      if (WiFi.status() == WL_CONNECTED) {
+        // Successful connection!
+        internetAvailable = true;
+        break;
+      }
+      // use of delay OK as this is initialization code
+      delay(tries * 10000); // Waiting longer each time we check for status
     }
-    // use of delay OK as this is initialization code
-    delay(tries * 10000); // Waiting longer each time we check for status
-  }
-  if (internetAvailable) {
-    debugMessage("WiFi IP address is: " + ip2CharArray(WiFi.localIP()));
-    debugMessage("RSSI is: " + String(WiFi.RSSI()) + " dBm");
-  }
-  else {
-    // Couldn't connect, alas
-    debugMessage(String("Can not connect to WiFi after ") + MAX_TRIES + " attempts");
-  }
-#endif
-
-#ifdef RJ45
-  // Configure Ethernet CS pin, not needed if using default D10
-  //Ethernet.init(10);  // Most Arduino shields
-  //Ethernet.init(5);   // MKR ETH shield
-  //Ethernet.init(0);   // Teensy 2.0
-  //Ethernet.init(20);  // Teensy++ 2.0
-  //Ethernet.init(15);  // ESP8266 with Adafruit Featherwing Ethernet
-  //Ethernet.init(33);  // ESP32 with Adafruit Featherwing Ethernet
-
-  // Initialize Ethernet and UDP
-  if (Ethernet.begin(mac) == 0)
-  {
-    // identified errors
-    if (Ethernet.hardwareStatus() == EthernetNoHardware)
-    {
-      debugMessage("Ethernet hardware not found");
+    if (internetAvailable) {
+      debugMessage("WiFi IP address is: " + ip2CharArray(WiFi.localIP()));
+      debugMessage("RSSI is: " + String(WiFi.RSSI()) + " dBm");
     }
-    else if (Ethernet.linkStatus() == LinkOFF)
+    else {
+      // Couldn't connect, alas
+      debugMessage(String("Can not connect to WiFi after ") + MAX_TRIES + " attempts");
+    }
+  #endif
+
+  #ifdef RJ45
+    // Configure Ethernet CS pin, not needed if using default D10
+    //Ethernet.init(10);  // Most Arduino shields
+    //Ethernet.init(5);   // MKR ETH shield
+    //Ethernet.init(0);   // Teensy 2.0
+    //Ethernet.init(20);  // Teensy++ 2.0
+    //Ethernet.init(15);  // ESP8266 with Adafruit Featherwing Ethernet
+    //Ethernet.init(33);  // ESP32 with Adafruit Featherwing Ethernet
+  
+    // Initialize Ethernet and UDP
+    if (Ethernet.begin(mac) == 0)
     {
-      debugMessage("Ethernet cable not connected");
+      // identified errors
+      if (Ethernet.hardwareStatus() == EthernetNoHardware)
+      {
+        debugMessage("Ethernet hardware not found");
+      }
+      else if (Ethernet.linkStatus() == LinkOFF)
+      {
+        debugMessage("Ethernet cable not connected");
+      }
+      else
+      {
+        // generic error
+        debugMessage("Failed to configure Ethernet");
+      }
+      internetAvailable = false;
     }
     else
     {
-      // generic error
-      debugMessage("Failed to configure Ethernet");
+      debugMessage(String("Ethernet IP address is: ") + ip2CharArray(Ethernet.localIP()));
+      internetAvailable = true;
     }
-    internetAvailable = false;
-  }
-  else
-  {
-    debugMessage(String("Ethernet IP address is: ") + ip2CharArray(Ethernet.localIP()));
-    internetAvailable = true;
-  }
-#endif
+  #endif
 
   // Implement a variety of internet services, if networking hardware is present and the
   // network is connected.  Services supported include:
@@ -269,264 +269,264 @@ void setup()
   //  Open Weather Map (OWM) to get local weather and AQI info
   //  MQTT to publish data to an MQTT broker on specified topics
 
-#if defined(WIFI) || defined(RJ45)
-  // if there is a network interface (so networking code will compile)
-  if (internetAvailable)
-    // and internet is verified
-  {
-    // Get time from NTP
-    Udp.begin(localPort);
-    setSyncProvider(getNtpTime);
-
-    // wait until the time is set by the sync provider
-    while (timeStatus() == timeNotSet);
-    debugMessage("NTP time is " + zuluDateTimeString());
-
-
-    // Get local weather and AQI info
-    getWeather();
-
-
-    // MQTT Service interface, if defined.  Uses different status line to
-    // reflect whether MQTT publish succeeded or not
-#ifdef MQTTLOG
-    if (mqttSensorUpdate())
+  #if defined(WIFI) || defined(RJ45)
+    // if there is a network interface (so networking code will compile)
+    if (internetAvailable)
+      // and internet is verified
     {
-      infoScreen(String(CLIENT_ID) + " pub:" + zuluDateTimeString());
-    }
+      // Get time from NTP
+      Udp.begin(localPort);
+      setSyncProvider(getNtpTime);
+  
+      // wait until the time is set by the sync provider
+      while (timeStatus() == timeNotSet);
+      debugMessage("NTP time is " + zuluDateTimeString());
+  
+  
+      // Get local weather and AQI info
+      getWeather();
+  
+  
+      // MQTT Service interface, if defined.  Uses different status line to
+      // reflect whether MQTT publish succeeded or not
+      #ifdef MQTTLOG
+        if (mqttSensorUpdate())
+        {
+          infoScreen(String(CLIENT_ID) + " pub:" + zuluDateTimeString());
+        }
+        else
+        {
+          infoScreen(String(CLIENT_ID) + " pub fail:" + zuluDateTimeString());
+        }
+        // if battery low, update mqtt broker
+        mqttBatteryAlert();
+      #else
+          // No MQTT, so just do the standard screen update.
+          infoScreen("Updated: " + zuluDateTimeString());
+      #endif
+    
+      #ifdef INFLUX
+          post_influx(sensorData.internalCO2, sensorData.internalTemp, sensorData.internalHumidity);
+      #endif
+      
+      #ifdef DWEET
+          post_dweet(sensorData.internalCO2, sensorData.internalTemp, sensorData.internalHumidity);
+      #endif
+
+    } // End of internetAvailble
     else
     {
-      infoScreen(String(CLIENT_ID) + " pub fail:" + zuluDateTimeString());
+      // no internet connection, update screen only
+      infoScreen("Updated: " + zuluDateTimeString());
     }
-    // if battery low, update mqtt broker
-    mqttBatteryAlert();
-#else
-    // No MQTT, so just do the standard screen update.
-    infoScreen("Updated: " + zuluDateTimeString());
-#endif
-
-#ifdef INFLUX
-    post_influx(sensorData.internalCO2, sensorData.internalTemp, sensorData.internalHumidity);
-#endif
-
-#ifdef DWEET
-    post_dweet(sensorData.internalCO2, sensorData.internalTemp, sensorData.internalHumidity);
-#endif
-
-  } // End of internetAvailble
-  else
-  {
-    // no internet connection, update screen only
-    infoScreen("Updated: " + zuluDateTimeString());
-  }
-  deepSleep();
-
-#else
-  // no internet hardware present so update screen only
-  infoScreen("Last update at " + zuluDateTimeString());
-  deepSleep();
-#endif
+    deepSleep();
+  
+    #else
+      // no internet hardware present so update screen only
+      infoScreen("Last update at " + zuluDateTimeString());
+      deepSleep();
+  #endif
 }
 
 void loop()
 {}
 
 #if defined(WIFI) || defined(RJ45)
-time_t getNtpTime()
-{
-  while (Udp.parsePacket() > 0) ; // discard any previously received packets
-  sendNTPpacket(timeServer);
-  uint32_t beginWait = millis();
-  while (millis() - beginWait < 1500)
+  time_t getNtpTime()
   {
-    int size = Udp.parsePacket();
-    if (size >= NTP_PACKET_SIZE)
+    while (Udp.parsePacket() > 0) ; // discard any previously received packets
+    sendNTPpacket(timeServer);
+    uint32_t beginWait = millis();
+    while (millis() - beginWait < 1500)
     {
-      Udp.read(packetBuffer, NTP_PACKET_SIZE);  // read packet into the buffer
-      unsigned long secsSince1900;
-      // convert four bytes starting at location 40 to a long integer
-      secsSince1900 =  (unsigned long)packetBuffer[40] << 24;
-      secsSince1900 |= (unsigned long)packetBuffer[41] << 16;
-      secsSince1900 |= (unsigned long)packetBuffer[42] << 8;
-      secsSince1900 |= (unsigned long)packetBuffer[43];
-      return secsSince1900 - 2208988800UL + timeZone * SECS_PER_HOUR;
+      int size = Udp.parsePacket();
+      if (size >= NTP_PACKET_SIZE)
+      {
+        Udp.read(packetBuffer, NTP_PACKET_SIZE);  // read packet into the buffer
+        unsigned long secsSince1900;
+        // convert four bytes starting at location 40 to a long integer
+        secsSince1900 =  (unsigned long)packetBuffer[40] << 24;
+        secsSince1900 |= (unsigned long)packetBuffer[41] << 16;
+        secsSince1900 |= (unsigned long)packetBuffer[42] << 8;
+        secsSince1900 |= (unsigned long)packetBuffer[43];
+        return secsSince1900 - 2208988800UL + timeZone * SECS_PER_HOUR;
+      }
     }
+    debugMessage("No NTP response");
+    return 0;
   }
-  debugMessage("No NTP response");
-  return 0;
-}
-
-// send an NTP request to the time server at the given address
-void sendNTPpacket(IPAddress &address)
-{
-  // set all bytes in the buffer to 0
-  memset(packetBuffer, 0, NTP_PACKET_SIZE);
-  // Initialize values needed to form NTP request
-  packetBuffer[0] = 0b11100011; // LI, Version, Mode
-  packetBuffer[1] = 0;          // Stratum, or type of clock
-  packetBuffer[2] = 6;          // Polling Interval
-  packetBuffer[3] = 0xEC;       // Peer Clock Precision
-  // 8 bytes of zero for Root Delay & Root Dispersion
-  packetBuffer[12]  = 49;
-  packetBuffer[13]  = 0x4E;
-  packetBuffer[14]  = 49;
-  packetBuffer[15]  = 52;
-  // send a packet requesting a timestamp:
-  Udp.beginPacket(address, 123); //NTP requests are to port 123
-  Udp.write(packetBuffer, NTP_PACKET_SIZE);
-  Udp.endPacket();
-}
-
-String ip2CharArray(IPAddress ip)
-{
-  static char a[16];
-  sprintf(a, "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
-  return a;
-}
-
-String httpGETRequest(const char* serverName)
-{
-  HTTPClient http;
-
-  // servername is domain name w/URL path or IP address w/URL path
-  http.begin(client, serverName);
-
-  // Send HTTP POST request
-  int httpResponseCode = http.GET();
-
-  String payload = "{}";
-
-  if (httpResponseCode > 0)
+  
+  // send an NTP request to the time server at the given address
+  void sendNTPpacket(IPAddress &address)
   {
-    debugMessage("HTTP Response code: " + httpResponseCode);
-    payload = http.getString();
+    // set all bytes in the buffer to 0
+    memset(packetBuffer, 0, NTP_PACKET_SIZE);
+    // Initialize values needed to form NTP request
+    packetBuffer[0] = 0b11100011; // LI, Version, Mode
+    packetBuffer[1] = 0;          // Stratum, or type of clock
+    packetBuffer[2] = 6;          // Polling Interval
+    packetBuffer[3] = 0xEC;       // Peer Clock Precision
+    // 8 bytes of zero for Root Delay & Root Dispersion
+    packetBuffer[12]  = 49;
+    packetBuffer[13]  = 0x4E;
+    packetBuffer[14]  = 49;
+    packetBuffer[15]  = 52;
+    // send a packet requesting a timestamp:
+    Udp.beginPacket(address, 123); //NTP requests are to port 123
+    Udp.write(packetBuffer, NTP_PACKET_SIZE);
+    Udp.endPacket();
   }
-  else
+  
+  String ip2CharArray(IPAddress ip)
   {
-    debugMessage("Error code: " + httpResponseCode);
+    static char a[16];
+    sprintf(a, "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
+    return a;
   }
-  // free resources
-  http.end();
-
-  return payload;
-}
+  
+  String httpGETRequest(const char* serverName)
+  {
+    HTTPClient http;
+  
+    // servername is domain name w/URL path or IP address w/URL path
+    http.begin(client, serverName);
+  
+    // Send HTTP POST request
+    int httpResponseCode = http.GET();
+  
+    String payload = "{}";
+  
+    if (httpResponseCode > 0)
+    {
+      debugMessage("HTTP Response code: " + httpResponseCode);
+      payload = http.getString();
+    }
+    else
+    {
+      debugMessage("Error code: " + httpResponseCode);
+    }
+    // free resources
+    http.end();
+  
+    return payload;
+  }
 #endif
 
 #if ((defined(WIFI) || defined(RJ45)) && defined(MQTTLOG))
-void mqttConnect()
-// Connects and reconnects to MQTT broker, call as needed to maintain connection
-{
-  int8_t mqttErr;
-  int8_t tries = 1;
-
-  // exit if already connected
-  if (mqtt.connected())
+  void mqttConnect()
+  // Connects and reconnects to MQTT broker, call as needed to maintain connection
   {
-    return;
-  }
-
-  while ((mqttErr = mqtt.connect() != 0) && (tries <= MQTT_ATTEMPT_LIMIT))
-  {
-    // generic MQTT error
-    // debugMessage(mqtt.connectErrorString(mqttErr));
-
-    // Adafruit IO connect errors
-    switch (mqttErr)
+    int8_t mqttErr;
+    int8_t tries = 1;
+  
+    // exit if already connected
+    if (mqtt.connected())
     {
-      case 1: debugMessage("Wrong protocol"); break;
-      case 2: debugMessage("ID rejected"); break;
-      case 3: debugMessage("Server unavailable"); break;
-      case 4: debugMessage("Incorrect user or password"); break;
-      case 5: debugMessage("Not authorized"); break;
-      case 6: debugMessage("Failed to subscribe"); break;
-      default: debugMessage("GENERIC - Connection failed"); break;
+      return;
     }
-    debugMessage(String(MQTT_BROKER) + " connect attempt " + tries + " of " + MQTT_ATTEMPT_LIMIT + " happens in " + (tries * 10) + " seconds");
-    mqtt.disconnect();
-    delay(tries * 10000);
-    tries++;
-
-    if (tries == MQTT_ATTEMPT_LIMIT)
+  
+    while ((mqttErr = mqtt.connect() != 0) && (tries <= MQTT_ATTEMPT_LIMIT))
     {
-      debugMessage(String("Connection failed to MQTT broker ") + MQTT_BROKER);
+      // generic MQTT error
+      // debugMessage(mqtt.connectErrorString(mqttErr));
+  
+      // Adafruit IO connect errors
+      switch (mqttErr)
+      {
+        case 1: debugMessage("Wrong protocol"); break;
+        case 2: debugMessage("ID rejected"); break;
+        case 3: debugMessage("Server unavailable"); break;
+        case 4: debugMessage("Incorrect user or password"); break;
+        case 5: debugMessage("Not authorized"); break;
+        case 6: debugMessage("Failed to subscribe"); break;
+        default: debugMessage("GENERIC - Connection failed"); break;
+      }
+      debugMessage(String(MQTT_BROKER) + " connect attempt " + tries + " of " + MQTT_ATTEMPT_LIMIT + " happens in " + (tries * 10) + " seconds");
+      mqtt.disconnect();
+      delay(tries * 10000);
+      tries++;
+  
+      if (tries == MQTT_ATTEMPT_LIMIT)
+      {
+        debugMessage(String("Connection failed to MQTT broker ") + MQTT_BROKER);
+      }
+    }
+    if (tries < MQTT_ATTEMPT_LIMIT)
+    {
+      debugMessage(String("Connected to MQTT broker ") + MQTT_BROKER);
     }
   }
-  if (tries < MQTT_ATTEMPT_LIMIT)
+  
+  void mqttBatteryAlert()
+  // Publishes battery percent to MQTT broker when <= pre-defined level is met
   {
-    debugMessage(String("Connected to MQTT broker ") + MQTT_BROKER);
+    // stored so we don't call the function twice in the routine
+    float percent = lc.cellPercent();
+  
+    if ((batteryAvailable) && (percent < BATTERY_ALERT_PCT))
+    {
+      String errMessage = String(CLIENT_ID) + " battery at " + percent + " percent at " + zuluDateTimeString();
+      mqttConnect();
+  
+      int charArrayLength = errMessage.length() + 1;
+      char textInChars[charArrayLength];
+      errMessage.toCharArray(textInChars, charArrayLength);
+  
+      if (!errMsgPub.publish(textInChars))
+      {
+        debugMessage("MQTT low battery publish failed at " + zuluDateTimeString());
+      }
+      else
+      {
+        debugMessage("MQTT publish: " + errMessage);
+      }
+      mqtt.disconnect();
+    }
   }
-}
-
-void mqttBatteryAlert()
-// Publishes battery percent to MQTT broker when <= pre-defined level is met
-{
-  // stored so we don't call the function twice in the routine
-  float percent = lc.cellPercent();
-
-  if ((batteryAvailable) && (percent < BATTERY_ALERT_PCT))
+  
+  int mqttSensorUpdate()
+  // Publishes sensor data to MQTT broker
   {
-    String errMessage = String(CLIENT_ID) + " battery at " + percent + " percent at " + zuluDateTimeString();
+    if ((sensorData.internalCO2 == 10000) && (sensorData.internalTemp = 10000))
+      // no sensor data to publish
+    {
+      debugMessage("No sensor data to publish to MQTT broker");
+      return 1;
+    }
     mqttConnect();
-
-    int charArrayLength = errMessage.length() + 1;
-    char textInChars[charArrayLength];
-    errMessage.toCharArray(textInChars, charArrayLength);
-
-    if (!errMsgPub.publish(textInChars))
+    if (sensorData.internalCO2 == 10000)
+      // temperature and humidity only to publish
     {
-      debugMessage("MQTT low battery publish failed at " + zuluDateTimeString());
+      if ((tempPub.publish(sensorData.internalTemp)) && (humidityPub.publish(sensorData.internalHumidity)))
+      {
+        debugMessage("MQTT publish at  " + zuluDateTimeString() + " , " + CLIENT_ID + " , " + sensorData.internalTemp + " , " + sensorData.internalHumidity);
+        mqtt.disconnect();
+        return 1;
+      }
+      else
+      {
+        debugMessage("MQTT publish failed at " + zuluDateTimeString());
+        mqtt.disconnect();
+        return 0;
+      }
     }
     else
+      // temperature, humidity, and CO2 to publish
     {
-      debugMessage("MQTT publish: " + errMessage);
-    }
-    mqtt.disconnect();
-  }
-}
-
-int mqttSensorUpdate()
-// Publishes sensor data to MQTT broker
-{
-  if ((sensorData.internalCO2 == 10000) && (sensorData.internalTemp = 10000))
-    // no sensor data to publish
-  {
-    debugMessage("No sensor data to publish to MQTT broker");
-    return 1;
-  }
-  mqttConnect();
-  if (sensorData.internalCO2 == 10000)
-    // temperature and humidity only to publish
-  {
-    if ((tempPub.publish(sensorData.internalTemp)) && (humidityPub.publish(sensorData.internalHumidity)))
-    {
-      debugMessage("MQTT publish at  " + zuluDateTimeString() + " , " + CLIENT_ID + " , " + sensorData.internalTemp + " , " + sensorData.internalHumidity);
-      mqtt.disconnect();
-      return 1;
-    }
-    else
-    {
-      debugMessage("MQTT publish failed at " + zuluDateTimeString());
-      mqtt.disconnect();
-      return 0;
+      if ((tempPub.publish(sensorData.internalTemp)) && (humidityPub.publish(sensorData.internalHumidity)) && (co2Pub.publish(sensorData.internalCO2)))
+      {
+        debugMessage("MQTT publish at " + zuluDateTimeString() + "->" + CLIENT_ID + "," + sensorData.internalTemp + "," + sensorData.internalHumidity + "," + sensorData.internalCO2);
+        mqtt.disconnect();
+        return 1;
+      }
+      else
+      {
+        debugMessage("MQTT publish failed at " + zuluDateTimeString());
+        mqtt.disconnect();
+        return 0;
+      }
     }
   }
-  else
-    // temperature, humidity, and CO2 to publish
-  {
-    if ((tempPub.publish(sensorData.internalTemp)) && (humidityPub.publish(sensorData.internalHumidity)) && (co2Pub.publish(sensorData.internalCO2)))
-    {
-      debugMessage("MQTT publish at " + zuluDateTimeString() + "->" + CLIENT_ID + "," + sensorData.internalTemp + "," + sensorData.internalHumidity + "," + sensorData.internalCO2);
-      mqtt.disconnect();
-      return 1;
-    }
-    else
-    {
-      debugMessage("MQTT publish failed at " + zuluDateTimeString());
-      mqtt.disconnect();
-      return 0;
-    }
-  }
-}
 #endif
 
 String zuluDateTimeString()
@@ -579,9 +579,9 @@ void deepSleep()
     display.powerDown();
     digitalWrite(EPD_RESET, LOW); // hardware power down mode
   }
-#ifdef WIFI
-  client.stop();
-#endif
+  #ifdef WIFI
+    client.stop();
+  #endif
   // SCD40 only
   envSensor.stopPeriodicMeasurement();
   esp_sleep_enable_timer_wakeup(LOG_INTERVAL * LOG_INTERVAL_US_MODIFIER);
@@ -681,11 +681,11 @@ void getWeather()
     // float list_0_components_pm10 = list_0_components["pm10"]; // 9.96
     // float list_0_components_nh3 = list_0_components["nh3"]; // 0.86
   }
-#else
-  sensorData.extTemperature = 10000;
-  sensorData.extHumidity = 10000;
-  sensorData.extAQI = 10000;
-#endif
+  #else
+    sensorData.extTemperature = 10000;
+    sensorData.extHumidity = 10000;
+    sensorData.extAQI = 10000;
+  #endif
   debugMessage(String("OWM->") + sensorData.extTemperature + "F," + sensorData.extHumidity + "%, " + sensorData.extAQI + " AQI");
 }
 
