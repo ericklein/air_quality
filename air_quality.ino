@@ -396,7 +396,7 @@ void loop()
   
     String payload = "{}";
   
-    if (httpResponseCode > 0)
+    if (httpResponseCode>0)
     {
       debugMessage("HTTP Response code: " + httpResponseCode);
       payload = http.getString();
@@ -487,7 +487,7 @@ void loop()
   int mqttSensorUpdate()
   // Publishes sensor data to MQTT broker
   {
-    if ((sensorData.internalCO2==10000) && (sensorData.internalTemp=10000))
+    if ((sensorData.internalCO2==10000)&&(sensorData.internalTemp=10000))
     // no sensor data to publish
     {
       debugMessage("No sensor data to publish to MQTT broker");
