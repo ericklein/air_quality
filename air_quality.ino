@@ -10,10 +10,6 @@
 // private credentials for network, MQTT, weather provider
 #include "secrets.h"
 
-// read/write to ESP32 persistent storage
-#include <Preferences.h>
-Preferences nvStorage;
-
 // environment characteristics
 typedef struct
 {
@@ -171,29 +167,6 @@ void setup()
       alertScreen("Environment sensor not detected");
     deepSleep();
   }
-
-// Open EEPROM replacement
-//   If != nuke and pave preference structure
-//   Else
-    
-// Read cycle count  =x 
-//   X < 3
-//     Write current[ x ]
-//       Temperature'
-//       Humidity
-//       Co2
-//     X++
-//   else
-//     average current [1-2, t,h,c]
-//     If ( t || h || c) !=  old(t,h,c)
-//       Swap != t || h || c
-//       Store delta t || h || c for display
-//       Write old(t,h,c)
-//       X=1
-//     else
-//       X=1
-//       Deepsleep()
-// // time to call home
 
   if (lc.begin())
   // Check battery monitoring status
