@@ -64,7 +64,7 @@ Adafruit_LC709203F lc;
 ThinkInk_290_Grayscale4_T5 display(EPD_DC, EPD_RESET, EPD_CS, SRAM_CS, EPD_BUSY);
 // colors are EPD_WHITE, EPD_BLACK, EPD_RED, EPD_GRAY, EPD_LIGHT, EPD_DARK
 
-#include <TimeLib.h> // for zuluTimeString()
+//#include <TimeLib.h> // time related functions
 
 #ifdef WIFI
   #if defined(ARDUINO_SAMD_MKRWIFI1010) || defined(ARDUINO_SAMD_NANO_33_IOT) || defined(ARDUINO_AVR_UNO_WIFI_REV2)
@@ -82,7 +82,7 @@ ThinkInk_290_Grayscale4_T5 display(EPD_DC, EPD_RESET, EPD_CS, SRAM_CS, EPD_BUSY)
 
   // NTP support
   #include <WiFiUdp.h>
-  WiFiUDP Udp;
+  WiFiUDP ntpUDP;
 #endif
 
 #ifdef RJ45
@@ -94,23 +94,15 @@ ThinkInk_290_Grayscale4_T5 display(EPD_DC, EPD_RESET, EPD_CS, SRAM_CS, EPD_BUSY)
 
   // NTP support
   #include <EthernetUdp.h>
-  EthernetUDP Udp;
+  EthernetUDP ntpUDP;
 #endif
 
 #if defined(WIFI) || defined(RJ45)
   // NTP setup
-  unsigned int localPort = 8888;       // local port to listen for UDP packets
+  #include <NTPClient.h>
+  NTPClient timeClient(ntpUDP);
 
-  // NTP Servers
-  //IPAddress timeServer(132, 163, 4, 101); // time-a.timefreq.bldrdoc.gov
-  // IPAddress timeServer(132, 163, 4, 102); // time-b.timefreq.bldrdoc.gov
-  // IPAddress timeServer(132, 163, 4, 103); // time-c.timefreq.bldrdoc.gov
-  IPAddress timeServer(132,163,97,6); // time.nist.gov
-
-  const int NTP_PACKET_SIZE = 48; // NTP time is in the first 48 bytes of message
-  byte packetBuffer[NTP_PACKET_SIZE]; //buffer to hold incoming & outgoing packets
-
-  // used to retreive weather information
+  // used to retreive OWM information
   #include <HTTPClient.h> 
   #include "ArduinoJson.h"
 
@@ -140,7 +132,9 @@ void setup()
     debugMessage("Log interval: " + String(LOG_INTERVAL));
     debugMessage("Site lat/long: " + String(OWM_LAT_LONG));
     debugMessage("Client ID: " + String(CLIENT_ID));
-    debugMessage("Dweet device: " + String(DWEET_DEVICE));
+    #ifdef DWEET
+      debugMessage("Dweet device: " + String(DWEET_DEVICE));
+    #endif
     debugMessage("---------------------------------");
     debugMessage("Air Quality started");
   #endif
@@ -194,9 +188,11 @@ void setup()
     // increasing amount of time up to a maximum of MAX_TRIES delay intervals. 
     WiFi.begin(WIFI_SSID, WIFI_PASS);
     
-    for(tries=1;tries<=MAX_TRIES;tries++) {
+    for(tries=1;tries<=MAX_TRIES;tries++) 
+    {
       debugMessage(String("Connection attempt ") + tries + " of " + MAX_TRIES + " to " + WIFI_SSID + " in " + (tries*10) + " seconds");
-      if(WiFi.status() == WL_CONNECTED) {
+      if(WiFi.status() == WL_CONNECTED) 
+      {
         // Successful connection!
         internetAvailable = true;
         break;
@@ -204,11 +200,13 @@ void setup()
       // use of delay OK as this is initialization code
       delay(tries*10000);   // Waiting longer each time we check for status
     }
-    if(internetAvailable) {
+    if(internetAvailable)
+    {
       debugMessage("WiFi IP address is: " + ip2CharArray(WiFi.localIP()));
       debugMessage("RSSI is: " + String(WiFi.RSSI()) + " dBm");  
     }
-    else {
+    else
+    {
       // Couldn't connect, alas
       debugMessage(String("Can not connect to WFii after ") + MAX_TRIES + " attempts");   
     }
@@ -262,12 +260,10 @@ void setup()
     // and internet is verified
     {
       // Get time from NTP
-      Udp.begin(localPort);
-      setSyncProvider(getNtpTime);
-
-      // wait until the time is set by the sync provider
-      while(timeStatus()== timeNotSet);
-      debugMessage("NTP time: " + zuluDateTimeString());
+      timeClient.begin();
+      // Set offset time in seconds to adjust for your timezone
+      timeClient.setTimeOffset(timeZone*60*60);
+      debugMessage("NTP time: " + dateTimeString());
 
       // Get local weather and AQI info
       getWeather();
@@ -275,7 +271,7 @@ void setup()
       #ifdef MQTTLOG
         if ((mqttSensorUpdate()) && (mqttBatteryUpdate()))
         {
-          infoScreen("Updated [+M]:" + zuluDateTimeString());     
+          infoScreen("Updated [+M]:" + dateTimeString());     
         }
       #endif
 
@@ -286,7 +282,7 @@ void setup()
     else
     {
       // update screen only
-      infoScreen("Updated: " + zuluDateTimeString());
+      infoScreen("Updated: " + dateTimeString());
     }
     deepSleep();
   #endif
@@ -296,57 +292,12 @@ void loop()
 {}
 
 #if defined(WIFI) || defined(RJ45)
-  time_t getNtpTime()
-  {
-    while (Udp.parsePacket() > 0) ; // discard any previously received packets
-    sendNTPpacket(timeServer);
-    uint32_t beginWait = millis();
-    while (millis() - beginWait < 1500)
-    {
-      int size = Udp.parsePacket();
-      if (size >= NTP_PACKET_SIZE)
-      {
-        Udp.read(packetBuffer, NTP_PACKET_SIZE);  // read packet into the buffer
-        unsigned long secsSince1900;
-        // convert four bytes starting at location 40 to a long integer
-        secsSince1900 =  (unsigned long)packetBuffer[40] << 24;
-        secsSince1900 |= (unsigned long)packetBuffer[41] << 16;
-        secsSince1900 |= (unsigned long)packetBuffer[42] << 8;
-        secsSince1900 |= (unsigned long)packetBuffer[43];
-        return secsSince1900 - 2208988800UL + timeZone * SECS_PER_HOUR;
-      }
-    }
-    debugMessage("No NTP response");
-    return 0;
-  }
-
-  // send an NTP request to the time server at the given address
-  void sendNTPpacket(IPAddress &address)
-  {
-    // set all bytes in the buffer to 0
-    memset(packetBuffer, 0, NTP_PACKET_SIZE);
-    // Initialize values needed to form NTP request
-    packetBuffer[0] = 0b11100011; // LI, Version, Mode
-    packetBuffer[1] = 0;          // Stratum, or type of clock
-    packetBuffer[2] = 6;          // Polling Interval
-    packetBuffer[3] = 0xEC;       // Peer Clock Precision
-    // 8 bytes of zero for Root Delay & Root Dispersion
-    packetBuffer[12]  = 49;
-    packetBuffer[13]  = 0x4E;
-    packetBuffer[14]  = 49;
-    packetBuffer[15]  = 52;
-    // send a packet requesting a timestamp:                 
-    Udp.beginPacket(address, 123); //NTP requests are to port 123
-    Udp.write(packetBuffer, NTP_PACKET_SIZE);
-    Udp.endPacket();
-  }
-
   String ip2CharArray(IPAddress ip) 
-    {
-      static char a[16];
-      sprintf(a, "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
-      return a;
-    }
+  {
+    static char a[16];
+    sprintf(a, "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
+    return a;
+  }
 
   String httpGETRequest(const char* serverName) 
   {
@@ -429,12 +380,12 @@ void loop()
       float percent = lc.cellPercent();
       if (batteryLevelPub.publish(percent))
       {
-        debugMessage("MQTT battery percent publish with value:" + percent);
+        debugMessage(String("MQTT battery percent publish with value:") + percent);
         return 1;
       }
       else 
       {
-        debugMessage("MQTT battery percent publish failed at:" + zuluDateTimeString());
+        debugMessage(String("MQTT battery percent publish failed at:") + dateTimeString());
         return 0;
       }
       mqtt.disconnect();
@@ -454,60 +405,95 @@ void loop()
       mqttConnect();
       if ((tempPub.publish(sensorData.internalTemp)) && (humidityPub.publish(sensorData.internalHumidity)))
       {
-        if (sensorData.internalCO2==10000)
+        if (sensorData.internalCO2!=10000)
         {
           if(co2Pub.publish(sensorData.internalCO2))
           {
-            debugMessage("MQTT publish at " + zuluDateTimeString() + "->" + CLIENT_ID + "," + sensorData.internalTemp + "," + sensorData.internalHumidity + "," + sensorData.internalCO2);
+            debugMessage("MQTT publish at " + dateTimeString() + "->" + CLIENT_ID + "," + sensorData.internalTemp + "," + sensorData.internalHumidity + "," + sensorData.internalCO2);
             return 1;
           }
           else
           {
-            debugMessage("MQTT publish at  " + zuluDateTimeString() + " , " + CLIENT_ID + " , " + sensorData.internalTemp + " , " + sensorData.internalHumidity);
-            debugMessage("MQTT CO2 publish failed at " + zuluDateTimeString());
+            debugMessage("MQTT publish at  " + dateTimeString() + " , " + CLIENT_ID + " , " + sensorData.internalTemp + " , " + sensorData.internalHumidity);
+            debugMessage("MQTT CO2 publish failed at " + dateTimeString());
             return 0;
           }
         }
+      }
       else
       {
-        debugMessage("MQTT temp and humidity publish failed at " + zuluDateTimeString());
+        debugMessage("MQTT temp and humidity publish failed at " + dateTimeString());
         return 0;   
-      }
-    }
+      } 
     mqtt.disconnect();
+    } 
   }
 #endif
 
-String zuluDateTimeString()
-// Converts system time into human readable string
+String dateTimeString()
+// Converts system time into human readable strings
 {
-  String logString;
-  if (timeStatus() != timeNotSet)
+  String dateTime;
+  String weekDays[7]={"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
+
+  if (timeClient.update())
   {
-    logString = year();
-    logString += "-";
-    if (month()<10) logString += "0";
-    logString += month();
-    logString += "-";
-    if (day()<10) logString += "0";
-    logString += day();
-    logString += "T";
-    if (hour()<10) logString += "0";
-    logString += hour();
-    logString += ":";
-    if (minute()<10) logString += "0";
-    logString += minute();
-    logString += ":";
-    if (second()<10) logString += "0";
-    logString += second();
-    //logString += "Z";
-    logString += "PST";
+    // NTPClient doesn't include date information, get it from time structure
+    time_t epochTime = timeClient.getEpochTime();
+    struct tm *ptm = gmtime ((time_t *)&epochTime);
+    int day = ptm->tm_mday;
+    int month = ptm->tm_mon+1;
+    int year = ptm->tm_year+1900;
+
+    dateTime = weekDays[timeClient.getDay()];
+    dateTime += ",";
+
+    if (month<10) dateTime += "0";
+    dateTime += month;
+    dateTime += "-";
+    if (day<10) dateTime += "0";
+    dateTime += day;
+    dateTime += " at ";
+    if (timeClient.getHours()<10) dateTime += "0";
+    dateTime += timeClient.getHours();
+    dateTime += ":";
+    if (timeClient.getMinutes()<10) dateTime += "0";
+    dateTime += timeClient.getMinutes();
+
+    // zulu format
+    // dateTime = year + "-";
+    // if (month()<10) dateTime += "0";
+    // dateTime += month;
+    // dateTime += "-";
+    // if (day()<10) dateTime += "0";
+    // dateTime += day;
+    // dateTime += "T";
+    // if (timeClient.getHours()<10) dateTime += "0";
+    // dateTime += timeClient.getHours();
+    // dateTime += ":";
+    // if (timeClient.getMinutes()<10) dateTime += "0";
+    // dateTime += timeClient.getMinutes();
+    // dateTime += ":";
+    // if (timeClient.getSeconds()<10) dateTime += "0";
+    // dateTime += timeClient.getSeconds();
+    // switch (timeZone)
+    // {
+    //   case 0:
+    //     dateTime += "Z";
+    //     break;
+    //   case -7:
+    //     dateTime += "PDT";
+    //     break;
+    //   case -8:
+    //     dateTime += "PST";
+    //     break;     
+    // }
   }
   else
   {
-    logString ="Time not set";
+    dateTime ="Time not set";
   }
-  return logString;
+  return dateTime;
 }
 
 void debugMessage(String messageText)
@@ -633,7 +619,7 @@ void getWeather()
     sensorData.extTemperature = 10000;
     sensorData.extHumidity = 10000;
     sensorData.extAQI = 10000;
-#endif
+  #endif
   debugMessage(String("OWM->") + sensorData.extTemperature + "F," + sensorData.extHumidity + "%, " + sensorData.extAQI + " AQI");
 }
 
@@ -850,60 +836,60 @@ void readSensor()
 }
 
 #ifdef DWEET
-// Post a dweet to report the various sensor reading.  This routine blocks while
-// talking to the network, so may take a while to execute.
-void post_dweet(uint16_t co2, float tempF, float humidity)
-{
-  
-  if(WiFi.status() != WL_CONNECTED) {
-    debugMessage("Lost network connection to '" + String(WIFI_SSID) + "'!");
-    // show_disconnected();  / Future feature to display state of network connectivity (LED?)
-    return;
-  }
-  
-  debugMessage("connecting to " + String(DWEET_HOST));
-      
-  // Use WiFiClient class to create TCP connections
-  WiFiClient dweet_client;
-  const int httpPort = 80;
-  if (!dweet_client.connect(DWEET_HOST, httpPort)) {
-    debugMessage("connection failed: " + String(DWEET_HOST));
-    return;
-  }
-
-  // Use HTTP post and send a data payload as JSON
-  String device_info = "{\"rssi\":\""   + String(WiFi.RSSI())        + "\"," +
-                       "\"ipaddr\":\"" + WiFi.localIP().toString()  + "\",";                      
-  String battery_info;
-  if(batteryAvailable) {
-    battery_info = "\"battery_percent\":\"" + String(lc.cellPercent()) + "\"," +
-                   "\"battery_voltage\":\"" + String(lc.cellVoltage()) + "\",";
-  }
-  else {
-    battery_info = "";
-  }
-  String sensor_info = "\"co2\":\""         + String(co2)             + "\"," +
-                       "\"temperature\":\"" + String(tempF,2)         + "\"," +
-                       "\"humidity\":\""    + String(humidity,2)      + "\"}";
- 
-  String postdata = device_info + battery_info + sensor_info;
-  dweet_client.println("POST /dweet/for/" + String(DWEET_DEVICE) + " HTTP/1.1");
-  dweet_client.println("Host: dweet.io");
-  dweet_client.println("Cache-Control: no-cache");
-  dweet_client.println("Content-Type: application/json");
-  dweet_client.print("Content-Length: ");
-  dweet_client.println(postdata.length());
-  dweet_client.println();
-  dweet_client.println(postdata);
-  debugMessage(postdata);
-  delay(1500);
+  // Post a dweet to report the various sensor reading.  This routine blocks while
+  // talking to the network, so may take a while to execute.
+  void post_dweet(uint16_t co2, float tempF, float humidity)
+  {
     
-  // Fetch any reply from server and print as debug messages
-  while(dweet_client.available()) {
-    String line = dweet_client.readStringUntil('\r');
-    debugMessage(line);
+    if(WiFi.status() != WL_CONNECTED) {
+      debugMessage("Lost network connection to '" + String(WIFI_SSID) + "'!");
+      // show_disconnected();  / Future feature to display state of network connectivity (LED?)
+      return;
+    }
+    
+    debugMessage("connecting to " + String(DWEET_HOST));
+        
+    // Use WiFiClient class to create TCP connections
+    WiFiClient dweet_client;
+    const int httpPort = 80;
+    if (!dweet_client.connect(DWEET_HOST, httpPort)) {
+      debugMessage("connection failed: " + String(DWEET_HOST));
+      return;
+    }
+
+    // Use HTTP post and send a data payload as JSON
+    String device_info = "{\"rssi\":\""   + String(WiFi.RSSI())        + "\"," +
+                         "\"ipaddr\":\"" + WiFi.localIP().toString()  + "\",";                      
+    String battery_info;
+    if(batteryAvailable) {
+      battery_info = "\"battery_percent\":\"" + String(lc.cellPercent()) + "\"," +
+                     "\"battery_voltage\":\"" + String(lc.cellVoltage()) + "\",";
+    }
+    else {
+      battery_info = "";
+    }
+    String sensor_info = "\"co2\":\""         + String(co2)             + "\"," +
+                         "\"temperature\":\"" + String(tempF,2)         + "\"," +
+                         "\"humidity\":\""    + String(humidity,2)      + "\"}";
+   
+    String postdata = device_info + battery_info + sensor_info;
+    dweet_client.println("POST /dweet/for/" + String(DWEET_DEVICE) + " HTTP/1.1");
+    dweet_client.println("Host: dweet.io");
+    dweet_client.println("Cache-Control: no-cache");
+    dweet_client.println("Content-Type: application/json");
+    dweet_client.print("Content-Length: ");
+    dweet_client.println(postdata.length());
+    dweet_client.println();
+    dweet_client.println(postdata);
+    debugMessage(postdata);
+    delay(1500);
+      
+    // Fetch any reply from server and print as debug messages
+    while(dweet_client.available()) {
+      String line = dweet_client.readStringUntil('\r');
+      debugMessage(line);
+    }
+    dweet_client.stop();
+    debugMessage("closing connection for dweeting");
   }
-  dweet_client.stop();
-  debugMessage("closing connection for dweeting");
-}
 #endif

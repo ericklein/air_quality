@@ -1,8 +1,10 @@
 // conditional compile flags
-#define DEBUG     // Output to serial port
+//#define DEBUG     // Output to serial port
 //#define RJ45    // use Ethernet
 #define WIFI    // use WiFi
 #define MQTTLOG // log sensor data to MQTT broker
+//#define DWEET     // Post sensor readings to dweet.io
+//#define INFLUX  // Log data to remote InfluxDB server
 
 // set logging interval in minutes
 #ifdef DEBUG
@@ -25,49 +27,67 @@
 #define OWM_AQM_PATH		  "air_pollution?"
 #define OWM_LAT_LONG		  "lat=47.5707&lon=-122.2221"
 
-// select time zone
+// select time zone, used by NTPClient
 //const int timeZone = 0;  	// UTC
 //const int timeZone = -5;  // USA EST
 //const int timeZone = -4;  // USA EDT
-const int timeZone = -8;  // USA PST
-//const int timeZone = -7;  // USA PDT
+//const int timeZone = -8;  // USA PST
+const int timeZone = -7;  // USA PDT
 
-// set MQTT parameters
-// #define MQTT_KEEP_ALIVE 	300 // needed?
-#define MQTT_ATTEMPT_LIMIT 	3 	// number of connection attempts for MQTT broker
+#ifdef MQTTLOG
+	// set MQTT parameters
+	// #define MQTT_KEEP_ALIVE 	300 // needed?
+	#define MQTT_ATTEMPT_LIMIT 	3 	// number of connection attempts for MQTT broker
 
-// #define MQTT_PUB_TOPIC1		"sircoolio/feeds/pocket-office.temperature"
-// #define MQTT_PUB_TOPIC2		"sircoolio/feeds/pocket-office.humidity"
-// #define MQTT_PUB_TOPIC3		"sircoolio/feeds/pocket-office.co2"
-// #define MQTT_PUB_TOPIC4		"sircoolio/feeds/pocket-office.battery-level"
+	// #define MQTT_PUB_TOPIC1		"sircoolio/feeds/pocket-office.temperature"
+	// #define MQTT_PUB_TOPIC2		"sircoolio/feeds/pocket-office.humidity"
+	// #define MQTT_PUB_TOPIC3		"sircoolio/feeds/pocket-office.co2"
+	// #define MQTT_PUB_TOPIC4		"sircoolio/feeds/pocket-office.battery-level"
 
-// #define MQTT_PUB_TOPIC1		"sircoolio/feeds/master-bedroom.temperature"
-// #define MQTT_PUB_TOPIC2		"sircoolio/feeds/master-bedroom.humidity"
-// #define MQTT_PUB_TOPIC3		"sircoolio/feeds/master-bedroom.co2"
-// #define MQTT_PUB_TOPIC4		"sircoolio/feeds/master-bedroom.battery-level"
+	// #define MQTT_PUB_TOPIC1		"sircoolio/feeds/master-bedroom.temperature"
+	// #define MQTT_PUB_TOPIC2		"sircoolio/feeds/master-bedroom.humidity"
+	// #define MQTT_PUB_TOPIC3		"sircoolio/feeds/master-bedroom.co2"
+	// #define MQTT_PUB_TOPIC4		"sircoolio/feeds/master-bedroom.battery-level"
 
-// #define MQTT_PUB_TOPIC1		"sircoolio/feeds/lab-office.temperature"
-// #define MQTT_PUB_TOPIC2		"sircoolio/feeds/lab-office.humidity"
-// #define MQTT_PUB_TOPIC3		"sircoolio/feeds/lab-office.co2"
-// #define MQTT_PUB_TOPIC4		"sircoolio/feeds/lab-office.battery-level"
+	// #define MQTT_PUB_TOPIC1		"sircoolio/feeds/lab-office.temperature"
+	// #define MQTT_PUB_TOPIC2		"sircoolio/feeds/lab-office.humidity"
+	// #define MQTT_PUB_TOPIC3		"sircoolio/feeds/lab-office.co2"
+	// #define MQTT_PUB_TOPIC4		"sircoolio/feeds/lab-office.battery-level"
 
-// #define MQTT_PUB_TOPIC1		"sircoolio/feeds/kitchen.temperature"
-// #define MQTT_PUB_TOPIC2		"sircoolio/feeds/kitchen.humidity"
-// #define MQTT_PUB_TOPIC3		"sircoolio/feeds/kitchen.co2"
-// #define MQTT_PUB_TOPIC4		"sircoolio/feeds/kitchen.battery-level"
+	// #define MQTT_PUB_TOPIC1		"sircoolio/feeds/kitchen.temperature"
+	// #define MQTT_PUB_TOPIC2		"sircoolio/feeds/kitchen.humidity"
+	// #define MQTT_PUB_TOPIC3		"sircoolio/feeds/kitchen.co2"
+	// #define MQTT_PUB_TOPIC4		"sircoolio/feeds/kitchen.battery-level"
 
-#define MQTT_PUB_TOPIC1		"sircoolio/feeds/test-room.temperature"
-#define MQTT_PUB_TOPIC2		"sircoolio/feeds/test-room.humidity"
-#define MQTT_PUB_TOPIC3		"sircoolio/feeds/test-room.co2"
-#define MQTT_PUB_TOPIC4		"sircoolio/feeds/test-room.battery-level"
+	#define MQTT_PUB_TOPIC1		"sircoolio/feeds/test-room.temperature"
+	#define MQTT_PUB_TOPIC2		"sircoolio/feeds/test-room.humidity"
+	#define MQTT_PUB_TOPIC3		"sircoolio/feeds/test-room.co2"
+	#define MQTT_PUB_TOPIC4		"sircoolio/feeds/test-room.battery-level"
+#endif
 
 // select battery size closest to used
 // #define BATTERYSIZE LC709203F_APA_100MAH // 0x08
 // #define BATTERYSIZE LC709203F_APA_200MAH // 0x0B
-// #define BATTERYSIZE LC709203F_APA_500MAH	// 0x10
-#define BATTERYSIZE LC709203F_APA_1000MAH // 0x19
+ #define BATTERYSIZE LC709203F_APA_500MAH	// 0x10
+//#define BATTERYSIZE LC709203F_APA_1000MAH // 0x19
 // #define BATTERYSIZE LC709203F_APA_2000MAH // 0x2D
 // #define BATTERYSIZE LC709203F_APA_3000MAH // 0x36
+
+// Post data to the internet via dweet.io.  Set DWEET_DEVICE to be a
+// unique name you want associated with this reporting device, allowing
+// data to be easily retrieved through the web or Dweet's REST API.
+#ifdef DWEET
+	#define DWEET_HOST "dweet.io"   // Typically dweet.io
+	#define DWEET_DEVICE "makerhour-airquality"  // Must be unique across all of dweet.io
+#endif
+
+#ifdef INFLUX
+	// Tags values for InfluxDB data points.  Should be customized to match your 
+	// InfluxDB data model, and can add more here and in post_influx.cpp if desired
+	#define DEVICE_NAME "airquality"
+	#define DEVICE_LOCATION "dining room"
+	#define DEVICE_SITE "indoor"
+#endif
 
 // the following parameters are defined in secrets.h
 // #ifdef WIFI
@@ -83,3 +103,9 @@ const int timeZone = -8;  // USA PST
 // 	#define MQTT_USER
 // 	#define MQTT_BROKER
 // 	#define MQTT_PASS
+
+// InfluxDB server, database, and access credentials
+// #define INFLUXDB_URL 
+// #define INFLUXDB_DB_NAME
+// #define INFLUXDB_USER
+// #define INFLUXDB_PASSWORD
