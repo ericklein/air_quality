@@ -51,10 +51,7 @@ Air Quality samples and logs temperature, humidity, and if sensor available, co2
 	- https://www.arduino.cc/en/reference/ethernet
 	- https://store.arduino.cc/usa/arduino-ethernet-rev3-without-poe
 - Display
-	- https://learn.adafruit.com/adafruit-oled-featherwing/overview
 	- https://cdn-learn.adafruit.com/downloads/pdf/adafruit-gfx-graphics-library.pdf
-	- https://engineeringnotes.blogspot.com/2013/07/using-ssd1306-textgraphics-display.html
-	- https://github.com/adafruit/Adafruit_SSD1306/issues/106 (turning OLED on and off)
 - MQTT services
 	- https://hackaday.com/2017/10/31/review-iot-data-logging-services-with-mqtt/
 
@@ -65,9 +62,4 @@ Air Quality samples and logs temperature, humidity, and if sensor available, co2
 - See GitHub Issues for project
 
 ### Questions
-- [Q]090721: I've failed at compressing zuluDateTimeString() twice, what is the issue relative to string buildout?
-- [Q]100621: how did LadyAda calculate battery capacity, as hex values are not on a linear formula though battery capacity is?
 - [Q]012622: does SparkFun or Adafruit have a sensor measurement API that is consistent across temp/humidity sensors? [readEnvironment]
-
-### Revisions
-- 020922 - First refactored version

@@ -10,6 +10,10 @@
 // private credentials for network, MQTT, weather provider
 #include "secrets.h"
 
+// read/write to ESP32 persistent storage
+#include <Preferences.h>
+Preferences nvStorage;
+
 // environment characteristics
 typedef struct
 {
@@ -123,7 +127,7 @@ ThinkInk_290_Grayscale4_T5 display(EPD_DC, EPD_RESET, EPD_CS, SRAM_CS, EPD_BUSY)
     Adafruit_MQTT_Publish tempPub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC1,MQTT_QOS_1);
     Adafruit_MQTT_Publish humidityPub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC2, MQTT_QOS_1);
     Adafruit_MQTT_Publish co2Pub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC3, MQTT_QOS_1);
-    Adafruit_MQTT_Publish errMsgPub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC4, MQTT_QOS_1);
+    Adafruit_MQTT_Publish batteryLevelPub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC4, MQTT_QOS_1);
   #endif
 #endif
 
@@ -141,42 +145,83 @@ void setup()
 
   if (initScreen())
   {
+<<<<<<< Updated upstream
     debugMessage("screen initialized");
+=======
+    debugMessage("Screen ready");
+>>>>>>> Stashed changes
     screenAvailable = true;
   }
   else
   {
+<<<<<<< Updated upstream
     debugMessage("screen not detected");
     screenAvailable = false;
+=======
+    debugMessage("Screen not detected");
+>>>>>>> Stashed changes
   }
 
   if (initSensor())
   {
+<<<<<<< Updated upstream
     debugMessage("environment sensor initialized");
+=======
+    debugMessage("Environment sensor ready");
+    readSensor();
+>>>>>>> Stashed changes
   }
   else
   {
     debugMessage("environment sensor failed to initialize, going to sleep");
     if (screenAvailable)
+<<<<<<< Updated upstream
       alertScreen("environment sensor failure");
+=======
+      alertScreen("Environment sensor not detected");
+>>>>>>> Stashed changes
     deepSleep();
   }
 
-  // add the logic here to determine if sample vs. log
-  // sample
-  // this is a logging session
-  readSensor();
+// Open EEPROM replacement
+//   If != nuke and pave preference structure
+//   Else
+    
+// Read cycle count  =x 
+//   X < 3
+//     Write current[ x ]
+//       Temperature'
+//       Humidity
+//       Co2
+//     X++
+//   else
+//     average current [1-2, t,h,c]
+//     If ( t || h || c) !=  old(t,h,c)
+//       Swap != t || h || c
+//       Store delta t || h || c for display
+//       Write old(t,h,c)
+//       X=1
+//     else
+//       X=1
+//       Deepsleep()
+// // time to call home
 
   if (lc.begin())
+  // Check battery monitoring status
   {
+<<<<<<< Updated upstream
     debugMessage("Battery voltage monitor ready");
     lc.setPackSize(BATTERYSIZE);
+=======
+    debugMessage("Battery monitor ready");
+    lc.setPackSize(BATTERYSIZE);   // If library version 1.1.0 or earlier
+    // lc.setPackAPA(BATTERY_APA); // Uses new library API. See comments in config.h
+>>>>>>> Stashed changes
     batteryAvailable = true;
   }
   else
   {
-    debugMessage("Battery voltage monitor not detected");
-    batteryAvailable = false;
+    debugMessage("Battery monitor not detected");
   }
 
   #ifdef WIFI
@@ -186,6 +231,13 @@ void setup()
     // set hostname has to come before WiFi.begin
     WiFi.hostname(CLIENT_ID);
     // WiFi.setHostname(CLIENT_ID); //for WiFiNINA
+<<<<<<< Updated upstream
+=======
+    
+    // Connect to WiFi.  Prepared to wait a reasonable interval for the connection to
+    // succeed, but not forever.  Will check status and, if not connected, delay an
+    // increasing amount of time up to a maximum of MAX_TRIES delay intervals. 
+>>>>>>> Stashed changes
     WiFi.begin(WIFI_SSID, WIFI_PASS);
 
     while (WiFi.status() != WL_CONNECTED) 
@@ -235,7 +287,6 @@ void setup()
         // generic error
         debugMessage("Failed to configure Ethernet");
       }
-      internetAvailable = false;
     }
     else
     {
@@ -243,7 +294,19 @@ void setup()
       internetAvailable = true;
     }
   #endif
+<<<<<<< Updated upstream
     
+=======
+
+  // Implement a variety of internet services, if networking hardware is present and the
+  // network is connected.  Services supported include:
+  //
+  //  NTP to get date and time information
+  //  Open Weather Map (OWM) to get local weather and AQI info
+  //  MQTT to publish data to an MQTT broker on specified topics
+  //  DWEET to publish data to the DWEET service
+ 
+>>>>>>> Stashed changes
   #if defined(WIFI) || defined(RJ45)
   // if there is a network interface (so it will compile)
     if (internetAvailable)
@@ -255,6 +318,7 @@ void setup()
 
       // wait until the time is set by the sync provider
       while(timeStatus()== timeNotSet);
+<<<<<<< Updated upstream
       debugMessage("NTP time is " + zuluDateTimeString());
     }
   #endif
@@ -289,6 +353,31 @@ void setup()
   infoScreen("Last update at " + zuluDateTimeString());
   deepSleep();
 #endif
+=======
+      debugMessage("NTP time: " + zuluDateTimeString());
+
+      // Get local weather and AQI info
+      getWeather();
+
+      #ifdef MQTTLOG
+        if ((mqttSensorUpdate()) && (mqttBatteryUpdate()))
+        {
+          infoScreen("Updated [+M]:" + zuluDateTimeString());     
+        }
+      #endif
+
+      #ifdef DWEET
+        post_dweet(sensorData.internalCO2, sensorData.internalTemp, sensorData.internalHumidity);
+      #endif
+    }
+    else
+    {
+      // update screen only
+      infoScreen("Updated: " + zuluDateTimeString());
+    }
+    deepSleep();
+  #endif
+>>>>>>> Stashed changes
 }
 
 void loop()
@@ -396,13 +485,13 @@ void loop()
       // Adafruit IO connect errors
       switch (mqttErr) 
       {
-        case 1: debugMessage("Wrong protocol"); break;
-        case 2: debugMessage("ID rejected"); break;
-        case 3: debugMessage("Server unavailable"); break;
-        case 4: debugMessage("Incorrect user or password"); break;
-        case 5: debugMessage("Not authorized"); break;
-        case 6: debugMessage("Failed to subscribe"); break;
-        default: debugMessage("GENERIC - Connection failed"); break;
+        case 1: debugMessage("Adafruit MQTT: Wrong protocol"); break;
+        case 2: debugMessage("Adafruit MQTT: ID rejected"); break;
+        case 3: debugMessage("Adafruit MQTT: Server unavailable"); break;
+        case 4: debugMessage("Adafruit MQTT: Incorrect user or password"); break;
+        case 5: debugMessage("Adafruit MQTT: Not authorized"); break;
+        case 6: debugMessage("Adafruit MQTT: Failed to subscribe"); break;
+        default: debugMessage("Adafruit MQTT: GENERIC - Connection failed"); break;
       }
       debugMessage(String(MQTT_BROKER) + " connect attempt " + tries + " of " + MQTT_ATTEMPT_LIMIT + " happens in " + (tries*10) + " seconds");
       mqtt.disconnect();
@@ -411,7 +500,7 @@ void loop()
 
       if (tries == MQTT_ATTEMPT_LIMIT) 
       {
-        debugMessage(String("Connection failed to MQTT broker ") + MQTT_BROKER);
+        debugMessage(String("Connection failed to MQTT broker: ") + MQTT_BROKER);
       }
     }
     if (tries<MQTT_ATTEMPT_LIMIT)
@@ -420,28 +509,28 @@ void loop()
     }
   }
 
-  void mqttBatteryAlert()
-  // Publishes battery percent to MQTT broker when <= pre-defined level is met
+  int mqttBatteryUpdate()
   {
+<<<<<<< Updated upstream
     // stored so we don't call the function twice in the routine
     float percent = lc.cellPercent();
 
     if ((batteryAvailable) && (percent<20))
+=======
+    if (batteryAvailable)
+>>>>>>> Stashed changes
     {
-      String errMessage = String(CLIENT_ID) + " battery at " + percent + " percent at " + zuluDateTimeString();  
-      mqttConnect();
-
-      int charArrayLength = errMessage.length()+1;
-      char textInChars[charArrayLength];
-      errMessage.toCharArray(textInChars, charArrayLength);
-
-      if (!errMsgPub.publish(textInChars))
+      // stored so we don't call the function twice in the routine
+      float percent = lc.cellPercent();
+      if (batteryLevelPub.publish(percent))
       {
-        debugMessage("MQTT low battery publish failed at " + zuluDateTimeString());
+        debugMessage("MQTT battery percent publish with value:" + percent);
+        return 1;
       }
       else 
       {
-        debugMessage("MQTT publish: " + errMessage);
+        debugMessage("MQTT battery percent publish failed at:" + zuluDateTimeString());
+        return 0;
       }
       mqtt.disconnect();
     }
@@ -454,41 +543,33 @@ void loop()
     // no sensor data to publish
     {
       debugMessage("No sensor data to publish to MQTT broker");
-      return 1;
-    }
-    mqttConnect();
-    if (sensorData.internalCO2==10000)
-    // temperature and humidity only to publish
-    {
-      if ((tempPub.publish(sensorData.internalTemp)) && (humidityPub.publish(sensorData.internalHumidity)))
-      {
-        debugMessage("MQTT publish at  " + zuluDateTimeString() + " , " + CLIENT_ID + " , " + sensorData.internalTemp + " , " + sensorData.internalHumidity);
-        mqtt.disconnect();
-        return 1;
-      }
-      else
-      {
-        debugMessage("MQTT publish failed at " + zuluDateTimeString());
-        mqtt.disconnect();
-        return 0;
-      }
     }
     else
-    // temperature, humidity, and CO2 to publish
     {
-      if ((tempPub.publish(sensorData.internalTemp)) && (humidityPub.publish(sensorData.internalHumidity)) && (co2Pub.publish(sensorData.internalCO2)))
+      mqttConnect();
+      if ((tempPub.publish(sensorData.internalTemp)) && (humidityPub.publish(sensorData.internalHumidity)))
       {
-        debugMessage("MQTT publish at " + zuluDateTimeString() + "->" + CLIENT_ID + "," + sensorData.internalTemp + "," + sensorData.internalHumidity + "," + sensorData.internalCO2);
-        mqtt.disconnect();
-        return 1;
-      }
+        if (sensorData.internalCO2==10000)
+        {
+          if(co2Pub.publish(sensorData.internalCO2))
+          {
+            debugMessage("MQTT publish at " + zuluDateTimeString() + "->" + CLIENT_ID + "," + sensorData.internalTemp + "," + sensorData.internalHumidity + "," + sensorData.internalCO2);
+            return 1;
+          }
+          else
+          {
+            debugMessage("MQTT publish at  " + zuluDateTimeString() + " , " + CLIENT_ID + " , " + sensorData.internalTemp + " , " + sensorData.internalHumidity);
+            debugMessage("MQTT CO2 publish failed at " + zuluDateTimeString());
+            return 0;
+          }
+        }
       else
       {
-        debugMessage("MQTT publish failed at " + zuluDateTimeString());
-        mqtt.disconnect();
-        return 0;
+        debugMessage("MQTT temp and humidity publish failed at " + zuluDateTimeString());
+        return 0;   
       }
     }
+    mqtt.disconnect();
   }
 #endif
 
