@@ -39,27 +39,27 @@ const int timeZone = -8;  // USA PST
 // #define MQTT_PUB_TOPIC1		"sircoolio/feeds/pocket-office.temperature"
 // #define MQTT_PUB_TOPIC2		"sircoolio/feeds/pocket-office.humidity"
 // #define MQTT_PUB_TOPIC3		"sircoolio/feeds/pocket-office.co2"
-// #define MQTT_PUB_TOPIC4		"sircoolio/feeds/pocket-office.errmessage"
+// #define MQTT_PUB_TOPIC4		"sircoolio/feeds/pocket-office.battery-level"
 
 // #define MQTT_PUB_TOPIC1		"sircoolio/feeds/master-bedroom.temperature"
 // #define MQTT_PUB_TOPIC2		"sircoolio/feeds/master-bedroom.humidity"
 // #define MQTT_PUB_TOPIC3		"sircoolio/feeds/master-bedroom.co2"
-// #define MQTT_PUB_TOPIC4		"sircoolio/feeds/master-bedroom.errmessage"
+// #define MQTT_PUB_TOPIC4		"sircoolio/feeds/master-bedroom.battery-level"
 
 // #define MQTT_PUB_TOPIC1		"sircoolio/feeds/lab-office.temperature"
 // #define MQTT_PUB_TOPIC2		"sircoolio/feeds/lab-office.humidity"
 // #define MQTT_PUB_TOPIC3		"sircoolio/feeds/lab-office.co2"
-// #define MQTT_PUB_TOPIC4		"sircoolio/feeds/lab-office.errmessage"
+// #define MQTT_PUB_TOPIC4		"sircoolio/feeds/lab-office.battery-level"
 
 // #define MQTT_PUB_TOPIC1		"sircoolio/feeds/kitchen.temperature"
 // #define MQTT_PUB_TOPIC2		"sircoolio/feeds/kitchen.humidity"
 // #define MQTT_PUB_TOPIC3		"sircoolio/feeds/kitchen.co2"
-// #define MQTT_PUB_TOPIC4		"sircoolio/feeds/kitchen.errmessage"
+// #define MQTT_PUB_TOPIC4		"sircoolio/feeds/kitchen.battery-level"
 
 #define MQTT_PUB_TOPIC1		"sircoolio/feeds/test-room.temperature"
 #define MQTT_PUB_TOPIC2		"sircoolio/feeds/test-room.humidity"
 #define MQTT_PUB_TOPIC3		"sircoolio/feeds/test-room.co2"
-#define MQTT_PUB_TOPIC4		"sircoolio/feeds/test-room.errmessage"
+#define MQTT_PUB_TOPIC4		"sircoolio/feeds/test-room.battery-level"
 
 // select battery size closest to used
 // #define BATTERYSIZE LC709203F_APA_100MAH // 0x08
