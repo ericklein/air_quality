@@ -90,7 +90,7 @@ const int timeZone = -7;  // USA PDT
 	#define DEVICE_SITE "indoor"
 #endif
 
-// the following parameters are defined in secrets.h
+// The following parameters are defined in secrets.h
 // #ifdef WIFI
 // 	// WiFi credentials
 // 	#define WIFI_SSID

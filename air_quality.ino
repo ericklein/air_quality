@@ -117,11 +117,17 @@ ThinkInk_290_Grayscale4_T5 display(EPD_DC, EPD_RESET, EPD_CS, SRAM_CS, EPD_BUSY)
     Adafruit_MQTT_Publish co2Pub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC3, MQTT_QOS_1);
     Adafruit_MQTT_Publish batteryLevelPub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC4, MQTT_QOS_1);
   #endif
+
+  #ifdef INFLUX
+    extern void post_influx(uint16_t co2, float tempF, float humidity);
+  #endif
+
 #endif
 
 void setup()
 // One time run of code, then deep sleep
 {
+
   #ifdef DEBUG
     Serial.begin(115200);
     while (!Serial)
@@ -137,6 +143,7 @@ void setup()
     #endif
     debugMessage("---------------------------------");
     debugMessage("Air Quality started");
+
   #endif
 
   if (initScreen())
@@ -177,7 +184,7 @@ void setup()
   #ifdef WIFI
     uint8_t tries;
     #define MAX_TRIES 5
-
+  
     // set hostname has to come before WiFi.begin
     WiFi.hostname(CLIENT_ID);
     // WiFi.setHostname(CLIENT_ID); //for WiFiNINA
@@ -219,16 +226,16 @@ void setup()
     //Ethernet.init(20);  // Teensy++ 2.0
     //Ethernet.init(15);  // ESP8266 with Adafruit Featherwing Ethernet
     //Ethernet.init(33);  // ESP32 with Adafruit Featherwing Ethernet
-
+  
     // Initialize Ethernet and UDP
     if (Ethernet.begin(mac) == 0)
-    {      
+    {
       // identified errors
       if (Ethernet.hardwareStatus() == EthernetNoHardware)
       {
         debugMessage("Ethernet hardware not found");
       }
-      else if (Ethernet.linkStatus() == LinkOFF) 
+      else if (Ethernet.linkStatus() == LinkOFF)
       {
         debugMessage("Ethernet cable not connected");
       }
@@ -252,7 +259,7 @@ void setup()
   //  Open Weather Map (OWM) to get local weather and AQI info
   //  MQTT to publish data to an MQTT broker on specified topics
   //  DWEET to publish data to the DWEET service
- 
+
   #if defined(WIFI) || defined(RJ45)
   // if there is a network interface (so networking code will compile)
     if (internetAvailable)
@@ -301,15 +308,15 @@ void loop()
   String httpGETRequest(const char* serverName) 
   {
     HTTPClient http;
-      
+  
     // servername is domain name w/URL path or IP address w/URL path
     http.begin(client, serverName);
-    
+  
     // Send HTTP POST request
     int httpResponseCode = http.GET();
-    
-    String payload = "{}"; 
-    
+  
+    String payload = "{}";
+  
     if (httpResponseCode>0)
     {
       debugMessage("HTTP Response code: " + httpResponseCode);
@@ -321,7 +328,7 @@ void loop()
     }
     // free resources
     http.end();
-
+  
     return payload;
   }
 #endif
@@ -332,20 +339,20 @@ void loop()
   {
     int8_t mqttErr;
     int8_t tries = 1;
-
+  
     // exit if already connected
-    if (mqtt.connected()) 
+    if (mqtt.connected())
     {
       return;
     }
-
+  
     while ((mqttErr = mqtt.connect() != 0) && (tries<=MQTT_ATTEMPT_LIMIT))
     {
       // generic MQTT error
       // debugMessage(mqtt.connectErrorString(mqttErr));
-
+  
       // Adafruit IO connect errors
-      switch (mqttErr) 
+      switch (mqttErr)
       {
         case 1: debugMessage("Adafruit MQTT: Wrong protocol"); break;
         case 2: debugMessage("Adafruit MQTT: ID rejected"); break;
@@ -359,13 +366,13 @@ void loop()
       mqtt.disconnect();
       delay(tries*10000);
       tries++;
-
-      if (tries == MQTT_ATTEMPT_LIMIT) 
+  
+      if (tries == MQTT_ATTEMPT_LIMIT)
       {
         debugMessage(String("Connection failed to MQTT broker: ") + MQTT_BROKER);
       }
     }
-    if (tries<MQTT_ATTEMPT_LIMIT)
+    if (tries < MQTT_ATTEMPT_LIMIT)
     {
       debugMessage(String("Connected to MQTT broker ") + MQTT_BROKER);
     }
@@ -382,7 +389,7 @@ void loop()
         debugMessage(String("MQTT battery percent publish with value:") + percent);
         return 1;
       }
-      else 
+      else
       {
         debugMessage(String("MQTT battery percent publish failed at:") + dateTimeString());
         return 0;
@@ -390,7 +397,7 @@ void loop()
       mqtt.disconnect();
     }
   }
-
+  
   int mqttSensorUpdate()
   // Publishes sensor data to MQTT broker
   {
@@ -498,9 +505,10 @@ String dateTimeString()
 void debugMessage(String messageText)
 // wraps Serial.println as #define conditional
 {
-  #ifdef DEBUG
-    Serial.println(messageText);
-  #endif
+#ifdef DEBUG
+  Serial.println(messageText);
+  Serial.flush();  // Make sure the message gets output (before any sleeping...)
+#endif
 }
 
 void deepSleep()
@@ -527,20 +535,20 @@ void getWeather()
   #if defined(WIFI) || defined(RJ45)
     // if there is a network interface (so it will compile)
     if (internetAvailable)
-    // and internet is verified 
+    // and internet is verified
     {
       String jsonBuffer;
-
+  
       // Get local temp and humidity
       String serverPath = String(OWM_SERVER) + OWM_WEATHER_PATH + OWM_LAT_LONG + "&units=imperial" + "&APPID=" + OWM_KEY;
-        
+  
       jsonBuffer = httpGETRequest(serverPath.c_str());
       debugMessage(jsonBuffer);
-      
+  
       StaticJsonDocument<1024> doc;
-
+  
       DeserializationError httpError = deserializeJson(doc, jsonBuffer);
-
+  
       if (httpError)
       {
         debugMessage("Unable to parse weather JSON object");
@@ -548,13 +556,13 @@ void getWeather()
         sensorData.extTemperature = 10000;
         sensorData.extHumidity = 10000;
       }
-
+  
       //JsonObject weather_0 = doc["weather"][0];
       // int weather_0_id = weather_0["id"]; // 804
       // const char* weather_0_main = weather_0["main"]; // "Clouds"
       // const char* weather_0_description = weather_0["description"]; // "overcast clouds"
       // const char* weather_0_icon = weather_0["icon"]; // "04n"
-
+  
       JsonObject main = doc["main"];
       sensorData.extTemperature = main["temp"];
       // float main_feels_like = main["feels_like"]; // 21.31
@@ -562,48 +570,48 @@ void getWeather()
       // float main_temp_max = main["temp_max"]; // 23.79
       // int main_pressure = main["pressure"]; // 1010
       sensorData.extHumidity = main["humidity"]; // 81
-
+  
       // int visibility = doc["visibility"]; // 10000
-
+  
       // JsonObject wind = doc["wind"];
       // float wind_speed = wind["speed"]; // 1.99
       // int wind_deg = wind["deg"]; // 150
       // float wind_gust = wind["gust"]; // 5.99
-
+  
       // int clouds_all = doc["clouds"]["all"]; // 90
-
+  
       // long sys_sunrise = sys["sunrise"]; // 1640620588
       // long sys_sunset = sys["sunset"]; // 1640651017
-
+  
       // int timezone = doc["timezone"]; // -28800
       // long id = doc["id"]; // 5803139
       // const char* name = doc["name"]; // "Mercer Island"
       // int cod = doc["cod"]; // 200
-
+  
       // Get local AQI
       serverPath = String(OWM_SERVER) + OWM_AQM_PATH + OWM_LAT_LONG + "&APPID=" + OWM_KEY;
-        
+  
       jsonBuffer = httpGETRequest(serverPath.c_str());
       debugMessage(jsonBuffer);
-      
+  
       StaticJsonDocument<384> doc1;
-
+  
       httpError = deserializeJson(doc1, jsonBuffer);
-
+  
       if (httpError)
       {
         debugMessage("Unable to parse air quality JSON object");
         debugMessage(String(httpError.c_str()));
         sensorData.extAQI = 10000;
       }
-
+  
       // double coord_lon = doc1["coord"]["lon"]; // -122.2221
       // float coord_lat = doc1["coord"]["lat"]; // 47.5707
-
+  
       JsonObject list_0 = doc1["list"][0];
-
+  
       sensorData.extAQI = list_0["main"]["aqi"]; // 2
-
+  
       // JsonObject list_0_components = list_0["components"];
       // float list_0_components_co = list_0_components["co"]; // 453.95
       // float list_0_components_no = list_0_components["no"]; // 0.47
@@ -624,9 +632,9 @@ void getWeather()
 
 int initScreen()
 {
-    // initalize epd screen
-    display.begin(THINKINK_GRAYSCALE4);
-    return 1;
+  // initalize epd screen
+  display.begin(THINKINK_GRAYSCALE4);
+  return 1;
 }
 
 void alertScreen(String messageText)
@@ -656,9 +664,9 @@ void infoScreen(String messageText)
   // temperature area
   display.drawLine(0,(display.height()*3/8),display.width(),(display.height()*3/8),EPD_GRAY);
   // humidity area
-  display.drawLine(0,(display.height()*5/8),display.width(),(display.height()*5/8), EPD_GRAY);
+  display.drawLine(0,(display.height()*5/8),display.width(),(display.height()*5/8),EPD_GRAY);
   // C02 area
-  display.drawLine(0,(display.height()*7/8),display.width(),(display.height()*7/8), EPD_GRAY);
+  display.drawLine(0,(display.height()*7/8),display.width(),(display.height()*7/8),EPD_GRAY);
   // splitting sensor vs. outside values
   display.drawLine((display.width()/2),0,(display.width()/2),(display.height()*7/8),EPD_GRAY);
 
@@ -690,7 +698,7 @@ void infoScreen(String messageText)
   if (sensorData.internalCO2!=10000)
   {
     display.setCursor(5,((display.height()*7/8)-10));
-    display.print(String("C02 ") + sensorData.internalCO2 + " ppm");    
+    display.print(String("C02 ") + sensorData.internalCO2 + " ppm");
   }
 
   // outdoor info
@@ -702,7 +710,7 @@ void infoScreen(String messageText)
   if (sensorData.extHumidity!=10000)
   {
     display.setCursor(((display.width()/2)+5),((display.height()*5/8)-10));
-    display.print(String("Humidity ") + sensorData.extHumidity +"%");
+    display.print(String("Humidity ") + sensorData.extHumidity + "%");
   }
   // air quality index (AQI)
   if (sensorData.extAQI!=10000)
@@ -773,7 +781,7 @@ int initSensor()
 
 void readSensor()
 // reads environment sensor and stores data to environment global
-{ 
+{
   // SCD40
   uint8_t error;
   float sensorTemp;
@@ -790,8 +798,8 @@ void readSensor()
   else
   {
     // convert C to F for temp, round to int, and store
-    sensorData.internalTemp = (int) sensorTemp*1.8+32+0.5;
-    sensorData.internalHumidity = (int) sensorHumidity + 0.5;
+    sensorData.internalTemp = (int) ((sensorTemp*1.8)+32+0.5);
+    sensorData.internalHumidity = (int) (sensorHumidity + 0.5);
   }
 
   // AHTX0
@@ -817,60 +825,60 @@ void readSensor()
 }
 
 #ifdef DWEET
-  // Post a dweet to report the various sensor reading.  This routine blocks while
-  // talking to the network, so may take a while to execute.
-  void post_dweet(uint16_t co2, float tempF, float humidity)
-  {
-    
-    if(WiFi.status() != WL_CONNECTED) {
-      debugMessage("Lost network connection to '" + String(WIFI_SSID) + "'!");
-      // show_disconnected();  / Future feature to display state of network connectivity (LED?)
-      return;
-    }
-    
-    debugMessage("connecting to " + String(DWEET_HOST));
-        
-    // Use WiFiClient class to create TCP connections
-    WiFiClient dweet_client;
-    const int httpPort = 80;
-    if (!dweet_client.connect(DWEET_HOST, httpPort)) {
-      debugMessage("connection failed: " + String(DWEET_HOST));
-      return;
-    }
+// Post a dweet to report the various sensor reading.  This routine blocks while
+// talking to the network, so may take a while to execute.
+void post_dweet(uint16_t co2, float tempF, float humidity)
+{
 
-    // Use HTTP post and send a data payload as JSON
-    String device_info = "{\"rssi\":\""   + String(WiFi.RSSI())        + "\"," +
-                         "\"ipaddr\":\"" + WiFi.localIP().toString()  + "\",";                      
-    String battery_info;
-    if(batteryAvailable) {
-      battery_info = "\"battery_percent\":\"" + String(lc.cellPercent()) + "\"," +
-                     "\"battery_voltage\":\"" + String(lc.cellVoltage()) + "\",";
-    }
-    else {
-      battery_info = "";
-    }
-    String sensor_info = "\"co2\":\""         + String(co2)             + "\"," +
-                         "\"temperature\":\"" + String(tempF,2)         + "\"," +
-                         "\"humidity\":\""    + String(humidity,2)      + "\"}";
-   
-    String postdata = device_info + battery_info + sensor_info;
-    dweet_client.println("POST /dweet/for/" + String(DWEET_DEVICE) + " HTTP/1.1");
-    dweet_client.println("Host: dweet.io");
-    dweet_client.println("Cache-Control: no-cache");
-    dweet_client.println("Content-Type: application/json");
-    dweet_client.print("Content-Length: ");
-    dweet_client.println(postdata.length());
-    dweet_client.println();
-    dweet_client.println(postdata);
-    debugMessage(postdata);
-    delay(1500);
-      
-    // Fetch any reply from server and print as debug messages
-    while(dweet_client.available()) {
-      String line = dweet_client.readStringUntil('\r');
-      debugMessage(line);
-    }
-    dweet_client.stop();
-    debugMessage("closing connection for dweeting");
+  if(WiFi.status() != WL_CONNECTED) {
+    debugMessage("Lost network connection to '" + String(WIFI_SSID) + "'!");
+    // show_disconnected();  / Future feature to display state of network connectivity (LED?)
+    return;
   }
+
+  debugMessage("connecting to " + String(DWEET_HOST));
+
+  // Use WiFiClient class to create TCP connections
+  WiFiClient dweet_client;
+  const int httpPort = 80;
+  if (!dweet_client.connect(DWEET_HOST, httpPort)) {
+    debugMessage("connection failed: " + String(DWEET_HOST));
+    return;
+  }
+
+  // Use HTTP post and send a data payload as JSON
+  String device_info = "{\"rssi\":\""   + String(WiFi.RSSI())        + "\"," +
+                       "\"ipaddr\":\"" + WiFi.localIP().toString()  + "\",";
+  String battery_info;
+  if(batteryAvailable) {
+    battery_info = "\"battery_percent\":\"" + String(lc.cellPercent()) + "\"," +
+                   "\"battery_voltage\":\"" + String(lc.cellVoltage()) + "\",";
+  }
+  else {
+    battery_info = "";
+  }
+  String sensor_info = "\"co2\":\""         + String(co2)             + "\"," +
+                       "\"temperature\":\"" + String(tempF, 2)         + "\"," +
+                       "\"humidity\":\""    + String(humidity, 2)      + "\"}";
+
+  String postdata = device_info + battery_info + sensor_info;
+  dweet_client.println("POST /dweet/for/" + String(DWEET_DEVICE) + " HTTP/1.1");
+  dweet_client.println("Host: dweet.io");
+  dweet_client.println("Cache-Control: no-cache");
+  dweet_client.println("Content-Type: application/json");
+  dweet_client.print("Content-Length: ");
+  dweet_client.println(postdata.length());
+  dweet_client.println();
+  dweet_client.println(postdata);
+  debugMessage(postdata);
+  delay(1500);
+
+  // Fetch any reply from server and print as debug messages
+  while(dweet_client.available()) {
+    String line = dweet_client.readStringUntil('\r');
+    debugMessage(line);
+  }
+  dweet_client.stop();
+  debugMessage("closing connection for dweeting");
+}
 #endif
