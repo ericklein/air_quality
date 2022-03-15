@@ -64,7 +64,7 @@ Adafruit_LC709203F lc;
 ThinkInk_290_Grayscale4_T5 display(EPD_DC, EPD_RESET, EPD_CS, SRAM_CS, EPD_BUSY);
 // colors are EPD_WHITE, EPD_BLACK, EPD_RED, EPD_GRAY, EPD_LIGHT, EPD_DARK
 
-#include <TimeLib.h> // for zuluTimeString()
+//#include <TimeLib.h> // time related functions
 
 #ifdef WIFI
   #if defined(ARDUINO_SAMD_MKRWIFI1010) || defined(ARDUINO_SAMD_NANO_33_IOT) || defined(ARDUINO_AVR_UNO_WIFI_REV2)
@@ -82,7 +82,7 @@ ThinkInk_290_Grayscale4_T5 display(EPD_DC, EPD_RESET, EPD_CS, SRAM_CS, EPD_BUSY)
 
   // NTP support
   #include <WiFiUdp.h>
-  WiFiUDP Udp;
+  WiFiUDP ntpUDP;
 #endif
 
 #ifdef RJ45
@@ -94,23 +94,15 @@ ThinkInk_290_Grayscale4_T5 display(EPD_DC, EPD_RESET, EPD_CS, SRAM_CS, EPD_BUSY)
 
   // NTP support
   #include <EthernetUdp.h>
-  EthernetUDP Udp;
+  EthernetUDP ntpUDP;
 #endif
 
 #if defined(WIFI) || defined(RJ45)
   // NTP setup
-  unsigned int localPort = 8888;       // local port to listen for UDP packets
+  #include <NTPClient.h>
+  NTPClient timeClient(ntpUDP);
 
-  // NTP Servers
-  //IPAddress timeServer(132, 163, 4, 101); // time-a.timefreq.bldrdoc.gov
-  // IPAddress timeServer(132, 163, 4, 102); // time-b.timefreq.bldrdoc.gov
-  // IPAddress timeServer(132, 163, 4, 103); // time-c.timefreq.bldrdoc.gov
-  IPAddress timeServer(132,163,97,6); // time.nist.gov
-
-  const int NTP_PACKET_SIZE = 48; // NTP time is in the first 48 bytes of message
-  byte packetBuffer[NTP_PACKET_SIZE]; //buffer to hold incoming & outgoing packets
-
-  // used to retreive weather information
+  // used to retreive OWM information
   #include <HTTPClient.h> 
   #include "ArduinoJson.h"
 
@@ -123,7 +115,7 @@ ThinkInk_290_Grayscale4_T5 display(EPD_DC, EPD_RESET, EPD_CS, SRAM_CS, EPD_BUSY)
     Adafruit_MQTT_Publish tempPub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC1,MQTT_QOS_1);
     Adafruit_MQTT_Publish humidityPub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC2, MQTT_QOS_1);
     Adafruit_MQTT_Publish co2Pub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC3, MQTT_QOS_1);
-    Adafruit_MQTT_Publish errMsgPub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC4, MQTT_QOS_1);
+    Adafruit_MQTT_Publish batteryLevelPub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC4, MQTT_QOS_1);
   #endif
 
   #ifdef INFLUX
@@ -146,7 +138,9 @@ void setup()
     debugMessage("Log interval: " + String(LOG_INTERVAL));
     debugMessage("Site lat/long: " + String(OWM_LAT_LONG));
     debugMessage("Client ID: " + String(CLIENT_ID));
-    debugMessage("Dweet device: " + String(DWEET_DEVICE));
+    #ifdef DWEET
+      debugMessage("Dweet device: " + String(DWEET_DEVICE));
+    #endif
     debugMessage("---------------------------------");
     debugMessage("Air Quality started");
 
@@ -154,43 +148,37 @@ void setup()
 
   if (initScreen())
   {
-    debugMessage("Screen initialized");
+    debugMessage("Screen ready");
     screenAvailable = true;
   }
   else
   {
     debugMessage("Screen not detected");
-    screenAvailable = false;
   }
 
   if (initSensor())
   {
-    debugMessage("Environment sensor initialized");
+    debugMessage("Environment sensor ready");
+    readSensor();
   }
   else
   {
     debugMessage("Environment sensor failed to initialize, going to sleep");
     if (screenAvailable)
-      alertScreen("Environment sensor failure");
+      alertScreen("Environment sensor not detected");
     deepSleep();
   }
 
-  // add the logic here to determine if sample vs. log
-  // sample
-  // this is a logging session
-  readSensor();
-
   if (lc.begin())
+  // Check battery monitoring status
   {
-    debugMessage("Battery voltage monitor ready");
-    lc.setPackSize(BATTERYSIZE);   // If library version 1.1.0 or earlier
-    // lc.setPackAPA(BATTERY_APA); // Uses new library API. See comments in config.h
+    debugMessage("Battery monitor ready");
+    lc.setPackAPA(BATTERY_APA);
     batteryAvailable = true;
   }
   else
   {
-    debugMessage("Battery voltage monitor not detected");
-    batteryAvailable = false;
+    debugMessage("Battery monitor not detected");
   }
 
   #ifdef WIFI
@@ -200,30 +188,33 @@ void setup()
     // set hostname has to come before WiFi.begin
     WiFi.hostname(CLIENT_ID);
     // WiFi.setHostname(CLIENT_ID); //for WiFiNINA
-  
+    
     // Connect to WiFi.  Prepared to wait a reasonable interval for the connection to
     // succeed, but not forever.  Will check status and, if not connected, delay an
-    // increasing amount of time up to a maximum of MAX_TRIES delay intervals.
-    internetAvailable = false;
+    // increasing amount of time up to a maximum of MAX_TRIES delay intervals. 
     WiFi.begin(WIFI_SSID, WIFI_PASS);
-  
-    for(tries=1;tries<=MAX_TRIES;tries++) {
+    
+    for(tries=1;tries<=MAX_TRIES;tries++) 
+    {
       debugMessage(String("Connection attempt ") + tries + " of " + MAX_TRIES + " to " + WIFI_SSID + " in " + (tries*10) + " seconds");
-      if(WiFi.status() == WL_CONNECTED) {
+      if(WiFi.status() == WL_CONNECTED) 
+      {
         // Successful connection!
         internetAvailable = true;
         break;
       }
       // use of delay OK as this is initialization code
-      delay(tries*10000); // Waiting longer each time we check for status
+      delay(tries*10000);   // Waiting longer each time we check for status
     }
-    if(internetAvailable) {
+    if(internetAvailable)
+    {
       debugMessage("WiFi IP address is: " + ip2CharArray(WiFi.localIP()));
-      debugMessage("RSSI is: " + String(WiFi.RSSI()) + " dBm");
+      debugMessage("RSSI is: " + String(WiFi.RSSI()) + " dBm");  
     }
-    else {
+    else
+    {
       // Couldn't connect, alas
-      debugMessage(String("Can not connect to WiFi after ") + MAX_TRIES + " attempts");
+      debugMessage(String("Can not connect to WFii after ") + MAX_TRIES + " attempts");   
     }
   #endif
 
@@ -253,7 +244,6 @@ void setup()
         // generic error
         debugMessage("Failed to configure Ethernet");
       }
-      internetAvailable = false;
     }
     else
     {
@@ -268,6 +258,7 @@ void setup()
   //  NTP to get date and time information
   //  Open Weather Map (OWM) to get local weather and AQI info
   //  MQTT to publish data to an MQTT broker on specified topics
+  //  DWEET to publish data to the DWEET service
 
   #if defined(WIFI) || defined(RJ45)
   // if there is a network interface (so networking code will compile)
@@ -275,55 +266,30 @@ void setup()
     // and internet is verified
     {
       // Get time from NTP
-      Udp.begin(localPort);
-      setSyncProvider(getNtpTime);
-  
-      // wait until the time is set by the sync provider
-      while (timeStatus() == timeNotSet);
-      debugMessage("NTP time is " + zuluDateTimeString());
-  
-  
+      timeClient.begin();
+      // Set offset time in seconds to adjust for your timezone
+      timeClient.setTimeOffset(timeZone*60*60);
+      debugMessage("NTP time: " + dateTimeString());
+
       // Get local weather and AQI info
       getWeather();
-  
-  
-      // MQTT Service interface, if defined.  Uses different status line to
-      // reflect whether MQTT publish succeeded or not
+
       #ifdef MQTTLOG
-        if (mqttSensorUpdate())
+        if ((mqttSensorUpdate()) && (mqttBatteryUpdate()))
         {
-          infoScreen(String(CLIENT_ID) + " pub:" + zuluDateTimeString());
+          infoScreen("Updated [+M]:" + dateTimeString());     
         }
-        else
-        {
-          infoScreen(String(CLIENT_ID) + " pub fail:" + zuluDateTimeString());
-        }
-        // if battery low, update mqtt broker
-        mqttBatteryAlert();
-      #else
-        // No MQTT, so just do the standard screen update.
-        infoScreen("Updated: " + zuluDateTimeString());
       #endif
-    
-      #ifdef INFLUX
-          post_influx(sensorData.internalCO2, sensorData.internalTemp, sensorData.internalHumidity);
-      #endif
-      
+
       #ifdef DWEET
         post_dweet(sensorData.internalCO2, sensorData.internalTemp, sensorData.internalHumidity);
       #endif
-
-    } // End of internetAvailble
+    }
     else
     {
-      // no internet connection, update screen only
-      infoScreen("Updated: " + zuluDateTimeString());
+      // update screen only
+      infoScreen("Updated: " + dateTimeString());
     }
-    deepSleep();
-  
-  #else
-    // no internet hardware present so update screen only
-    infoScreen("Last update at " + zuluDateTimeString());
     deepSleep();
   #endif
 }
@@ -332,59 +298,14 @@ void loop()
 {}
 
 #if defined(WIFI) || defined(RJ45)
-  time_t getNtpTime()
-  {
-    while (Udp.parsePacket() > 0) ; // discard any previously received packets
-    sendNTPpacket(timeServer);
-    uint32_t beginWait = millis();
-    while (millis() - beginWait < 1500)
-    {
-      int size = Udp.parsePacket();
-      if (size >= NTP_PACKET_SIZE)
-      {
-        Udp.read(packetBuffer, NTP_PACKET_SIZE);  // read packet into the buffer
-        unsigned long secsSince1900;
-        // convert four bytes starting at location 40 to a long integer
-        secsSince1900 =  (unsigned long)packetBuffer[40] << 24;
-        secsSince1900 |= (unsigned long)packetBuffer[41] << 16;
-        secsSince1900 |= (unsigned long)packetBuffer[42] << 8;
-        secsSince1900 |= (unsigned long)packetBuffer[43];
-        return secsSince1900 - 2208988800UL + timeZone * SECS_PER_HOUR;
-      }
-    }
-    debugMessage("No NTP response");
-    return 0;
-  }
-  
-  // send an NTP request to the time server at the given address
-  void sendNTPpacket(IPAddress &address)
-  {
-    // set all bytes in the buffer to 0
-    memset(packetBuffer, 0, NTP_PACKET_SIZE);
-    // Initialize values needed to form NTP request
-    packetBuffer[0] = 0b11100011; // LI, Version, Mode
-    packetBuffer[1] = 0;          // Stratum, or type of clock
-    packetBuffer[2] = 6;          // Polling Interval
-    packetBuffer[3] = 0xEC;       // Peer Clock Precision
-    // 8 bytes of zero for Root Delay & Root Dispersion
-    packetBuffer[12]  = 49;
-    packetBuffer[13]  = 0x4E;
-    packetBuffer[14]  = 49;
-    packetBuffer[15]  = 52;
-    // send a packet requesting a timestamp:
-    Udp.beginPacket(address, 123); //NTP requests are to port 123
-    Udp.write(packetBuffer, NTP_PACKET_SIZE);
-    Udp.endPacket();
-  }
-  
-  String ip2CharArray(IPAddress ip)
+  String ip2CharArray(IPAddress ip) 
   {
     static char a[16];
     sprintf(a, "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
     return a;
   }
-  
-  String httpGETRequest(const char* serverName)
+
+  String httpGETRequest(const char* serverName) 
   {
     HTTPClient http;
   
@@ -433,13 +354,13 @@ void loop()
       // Adafruit IO connect errors
       switch (mqttErr)
       {
-        case 1: debugMessage("Wrong protocol"); break;
-        case 2: debugMessage("ID rejected"); break;
-        case 3: debugMessage("Server unavailable"); break;
-        case 4: debugMessage("Incorrect user or password"); break;
-        case 5: debugMessage("Not authorized"); break;
-        case 6: debugMessage("Failed to subscribe"); break;
-        default: debugMessage("GENERIC - Connection failed"); break;
+        case 1: debugMessage("Adafruit MQTT: Wrong protocol"); break;
+        case 2: debugMessage("Adafruit MQTT: ID rejected"); break;
+        case 3: debugMessage("Adafruit MQTT: Server unavailable"); break;
+        case 4: debugMessage("Adafruit MQTT: Incorrect user or password"); break;
+        case 5: debugMessage("Adafruit MQTT: Not authorized"); break;
+        case 6: debugMessage("Adafruit MQTT: Failed to subscribe"); break;
+        default: debugMessage("Adafruit MQTT: GENERIC - Connection failed"); break;
       }
       debugMessage(String(MQTT_BROKER) + " connect attempt " + tries + " of " + MQTT_ATTEMPT_LIMIT + " happens in " + (tries*10) + " seconds");
       mqtt.disconnect();
@@ -448,7 +369,7 @@ void loop()
   
       if (tries == MQTT_ATTEMPT_LIMIT)
       {
-        debugMessage(String("Connection failed to MQTT broker ") + MQTT_BROKER);
+        debugMessage(String("Connection failed to MQTT broker: ") + MQTT_BROKER);
       }
     }
     if (tries < MQTT_ATTEMPT_LIMIT)
@@ -456,29 +377,22 @@ void loop()
       debugMessage(String("Connected to MQTT broker ") + MQTT_BROKER);
     }
   }
-  
-  void mqttBatteryAlert()
-  // Publishes battery percent to MQTT broker when <= pre-defined level is met
+
+  int mqttBatteryUpdate()
   {
-    // stored so we don't call the function twice in the routine
-    float percent = lc.cellPercent();
-  
-    if ((batteryAvailable) && (percent < BATTERY_ALERT_PCT))
+    if (batteryAvailable)
     {
-      String errMessage = String(CLIENT_ID) + " battery at " + percent + " percent at " + zuluDateTimeString();
-      mqttConnect();
-  
-      int charArrayLength = errMessage.length()+1;
-      char textInChars[charArrayLength];
-      errMessage.toCharArray(textInChars, charArrayLength);
-  
-      if (!errMsgPub.publish(textInChars))
+      // stored so we don't call the function twice in the routine
+      float percent = lc.cellPercent();
+      if (batteryLevelPub.publish(percent))
       {
-        debugMessage("MQTT low battery publish failed at " + zuluDateTimeString());
+        debugMessage(String("MQTT battery percent publish with value:") + percent);
+        return 1;
       }
       else
       {
-        debugMessage("MQTT publish: " + errMessage);
+        debugMessage(String("MQTT battery percent publish failed at:") + dateTimeString());
+        return 0;
       }
       mqtt.disconnect();
     }
@@ -491,74 +405,101 @@ void loop()
     // no sensor data to publish
     {
       debugMessage("No sensor data to publish to MQTT broker");
-      return 1;
-    }
-    mqttConnect();
-    if (sensorData.internalCO2==10000)
-    // temperature and humidity only to publish
-    {
-      if ((tempPub.publish(sensorData.internalTemp)) && (humidityPub.publish(sensorData.internalHumidity)))
-      {
-        debugMessage("MQTT publish at  " + zuluDateTimeString() + " , " + CLIENT_ID + " , " + sensorData.internalTemp + " , " + sensorData.internalHumidity);
-        mqtt.disconnect();
-        return 1;
-      }
-      else
-      {
-        debugMessage("MQTT publish failed at " + zuluDateTimeString());
-        mqtt.disconnect();
-        return 0;
-      }
     }
     else
-      // temperature, humidity, and CO2 to publish
     {
-      if ((tempPub.publish(sensorData.internalTemp)) && (humidityPub.publish(sensorData.internalHumidity)) && (co2Pub.publish(sensorData.internalCO2)))
+      mqttConnect();
+      if ((tempPub.publish(sensorData.internalTemp)) && (humidityPub.publish(sensorData.internalHumidity)))
       {
-        debugMessage("MQTT publish at " + zuluDateTimeString() + "->" + CLIENT_ID + "," + sensorData.internalTemp + "," + sensorData.internalHumidity + "," + sensorData.internalCO2);
-        mqtt.disconnect();
-        return 1;
+        if (sensorData.internalCO2!=10000)
+        {
+          if(co2Pub.publish(sensorData.internalCO2))
+          {
+            debugMessage("MQTT publish at " + dateTimeString() + "->" + CLIENT_ID + "," + sensorData.internalTemp + "," + sensorData.internalHumidity + "," + sensorData.internalCO2);
+            return 1;
+          }
+          else
+          {
+            debugMessage("MQTT publish at  " + dateTimeString() + " , " + CLIENT_ID + " , " + sensorData.internalTemp + " , " + sensorData.internalHumidity);
+            debugMessage("MQTT CO2 publish failed at " + dateTimeString());
+            return 0;
+          }
+        }
       }
       else
       {
-        debugMessage("MQTT publish failed at " + zuluDateTimeString());
-        mqtt.disconnect();
-        return 0;
-      }
-    }
+        debugMessage("MQTT temp and humidity publish failed at " + dateTimeString());
+        return 0;   
+      } 
+    mqtt.disconnect();
+    } 
   }
 #endif
 
-String zuluDateTimeString()
-// Converts system time into human readable string
+String dateTimeString()
+// Converts system time into human readable strings
 {
-  String logString;
-  if (timeStatus() != timeNotSet)
+  String dateTime;
+  String weekDays[7]={"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
+
+  if (timeClient.update())
   {
-    logString = year();
-    logString += "-";
-    if (month()<10) logString += "0";
-    logString += month();
-    logString += "-";
-    if (day()<10) logString += "0";
-    logString += day();
-    logString += "T";
-    if (hour()<10) logString += "0";
-    logString += hour();
-    logString += ":";
-    if (minute()<10) logString += "0";
-    logString += minute();
-    logString += ":";
-    if (second()<10) logString += "0";
-    logString += second();
-    //logString += "Z";
-    logString += "PST";
+    // NTPClient doesn't include date information, get it from time structure
+    time_t epochTime = timeClient.getEpochTime();
+    struct tm *ptm = gmtime ((time_t *)&epochTime);
+    int day = ptm->tm_mday;
+    int month = ptm->tm_mon+1;
+    int year = ptm->tm_year+1900;
+
+    dateTime = weekDays[timeClient.getDay()];
+    dateTime += ",";
+
+    if (month<10) dateTime += "0";
+    dateTime += month;
+    dateTime += "-";
+    if (day<10) dateTime += "0";
+    dateTime += day;
+    dateTime += " at ";
+    if (timeClient.getHours()<10) dateTime += "0";
+    dateTime += timeClient.getHours();
+    dateTime += ":";
+    if (timeClient.getMinutes()<10) dateTime += "0";
+    dateTime += timeClient.getMinutes();
+
+    // zulu format
+    // dateTime = year + "-";
+    // if (month()<10) dateTime += "0";
+    // dateTime += month;
+    // dateTime += "-";
+    // if (day()<10) dateTime += "0";
+    // dateTime += day;
+    // dateTime += "T";
+    // if (timeClient.getHours()<10) dateTime += "0";
+    // dateTime += timeClient.getHours();
+    // dateTime += ":";
+    // if (timeClient.getMinutes()<10) dateTime += "0";
+    // dateTime += timeClient.getMinutes();
+    // dateTime += ":";
+    // if (timeClient.getSeconds()<10) dateTime += "0";
+    // dateTime += timeClient.getSeconds();
+    // switch (timeZone)
+    // {
+    //   case 0:
+    //     dateTime += "Z";
+    //     break;
+    //   case -7:
+    //     dateTime += "PDT";
+    //     break;
+    //   case -8:
+    //     dateTime += "PST";
+    //     break;     
+    // }
   }
   else
   {
-    logString ="Time not set";
+    dateTime ="Time not set";
   }
-  return logString;
+  return dateTime;
 }
 
 void debugMessage(String messageText)
@@ -681,10 +622,10 @@ void getWeather()
       // float list_0_components_pm10 = list_0_components["pm10"]; // 9.96
       // float list_0_components_nh3 = list_0_components["nh3"]; // 0.86
     }
-    #else
-      sensorData.extTemperature = 10000;
-      sensorData.extHumidity = 10000;
-      sensorData.extAQI = 10000;
+  #else
+    sensorData.extTemperature = 10000;
+    sensorData.extHumidity = 10000;
+    sensorData.extAQI = 10000;
   #endif
   debugMessage(String("OWM->") + sensorData.extTemperature + "F," + sensorData.extHumidity + "%, " + sensorData.extAQI + " AQI");
 }
@@ -712,6 +653,8 @@ void alertScreen(String messageText)
 void infoScreen(String messageText)
 // Display environmental information on screen
 {
+  String aqiLabels[5]={"Good", "Fair", "Moderate", "Poor", "Very Poor"};
+  
   display.clearBuffer();
 
   // borders
@@ -774,27 +717,7 @@ void infoScreen(String messageText)
   {
     display.setCursor(((display.width()/2)+5),((display.height()*7/8)-10));
     display.print("AQI ");
-    switch (sensorData.extAQI)
-    {
-      case 1:
-        display.print("Good");
-        break;
-      case 2:
-        display.print("Fair");
-        break;
-      case 3:
-        display.print("Moderate");
-        break;
-      case 4:
-        display.print("Poor");
-        break;
-      case 5:
-        display.print("Very Poor");
-        break;
-      default:
-        display.print("???");
-        break;
-    }
+    display.print(aqiLabels[(sensorData.extAQI-1)]);
   }
 
   // message
