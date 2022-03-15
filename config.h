@@ -25,7 +25,6 @@
 #define OWM_SERVER 			  "http://api.openweathermap.org/data/2.5/"
 #define OWM_WEATHER_PATH	"weather?"
 #define OWM_AQM_PATH		  "air_pollution?"
-#define OWM_LAT_LONG		  "lat=47.5707&lon=-122.2221"
 
 // select time zone, used by NTPClient
 //const int timeZone = 0;  	// UTC
@@ -49,28 +48,28 @@ const int timeZone = -7;  // USA PDT
 	// #define MQTT_PUB_TOPIC3		"sircoolio/feeds/master-bedroom.co2"
 	// #define MQTT_PUB_TOPIC4		"sircoolio/feeds/master-bedroom.battery-level"
 
-	// #define MQTT_PUB_TOPIC1		"sircoolio/feeds/lab-office.temperature"
-	// #define MQTT_PUB_TOPIC2		"sircoolio/feeds/lab-office.humidity"
-	// #define MQTT_PUB_TOPIC3		"sircoolio/feeds/lab-office.co2"
-	// #define MQTT_PUB_TOPIC4		"sircoolio/feeds/lab-office.battery-level"
+	#define MQTT_PUB_TOPIC1		"sircoolio/feeds/lab-office.temperature"
+	#define MQTT_PUB_TOPIC2		"sircoolio/feeds/lab-office.humidity"
+	#define MQTT_PUB_TOPIC3		"sircoolio/feeds/lab-office.co2"
+	#define MQTT_PUB_TOPIC4		"sircoolio/feeds/lab-office.battery-level"
 
 	// #define MQTT_PUB_TOPIC1		"sircoolio/feeds/kitchen.temperature"
 	// #define MQTT_PUB_TOPIC2		"sircoolio/feeds/kitchen.humidity"
 	// #define MQTT_PUB_TOPIC3		"sircoolio/feeds/kitchen.co2"
 	// #define MQTT_PUB_TOPIC4		"sircoolio/feeds/kitchen.battery-level"
 
-	#define MQTT_PUB_TOPIC1		"sircoolio/feeds/test-room.temperature"
-	#define MQTT_PUB_TOPIC2		"sircoolio/feeds/test-room.humidity"
-	#define MQTT_PUB_TOPIC3		"sircoolio/feeds/test-room.co2"
-	#define MQTT_PUB_TOPIC4		"sircoolio/feeds/test-room.battery-level"
+	// #define MQTT_PUB_TOPIC1		"sircoolio/feeds/test-room.temperature"
+	// #define MQTT_PUB_TOPIC2		"sircoolio/feeds/test-room.humidity"
+	// #define MQTT_PUB_TOPIC3		"sircoolio/feeds/test-room.co2"
+	// #define MQTT_PUB_TOPIC4		"sircoolio/feeds/test-room.battery-level"
 #endif
 
 // select battery size closest to used
 // #define BATTERYSIZE LC709203F_APA_100MAH // 0x08
 // #define BATTERYSIZE LC709203F_APA_200MAH // 0x0B
- #define BATTERYSIZE LC709203F_APA_500MAH	// 0x10
-//#define BATTERYSIZE LC709203F_APA_1000MAH // 0x19
-// #define BATTERYSIZE LC709203F_APA_2000MAH // 0x2D
+// #define BATTERYSIZE LC709203F_APA_500MAH	// 0x10
+// #define BATTERYSIZE LC709203F_APA_1000MAH // 0x19
+#define BATTERYSIZE LC709203F_APA_2000MAH // 0x2D
 // #define BATTERYSIZE LC709203F_APA_3000MAH // 0x36
 
 // Post data to the internet via dweet.io.  Set DWEET_DEVICE to be a
@@ -96,8 +95,9 @@ const int timeZone = -7;  // USA PDT
 // 	#define WIFI_PASS       
 // #endif
 
-// 	// open weather map key
+// 	open weather map
 // 	#define OWM_KEY
+//	#define OWM_LAT_LONG
 
 // 	#define MQTT_PORT
 // 	#define MQTT_USER

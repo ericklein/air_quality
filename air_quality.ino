@@ -646,6 +646,8 @@ void alertScreen(String messageText)
 void infoScreen(String messageText)
 // Display environmental information on screen
 {
+  String aqiLabels[5]={"Good", "Fair", "Moderate", "Poor", "Very Poor"};
+  
   display.clearBuffer();
 
   // borders
@@ -708,27 +710,7 @@ void infoScreen(String messageText)
   {
     display.setCursor(((display.width()/2)+5),((display.height()*7/8)-10));
     display.print("AQI ");
-    switch (sensorData.extAQI)
-    {
-    case 1:
-      display.print("Good");
-      break;
-    case 2:
-      display.print("Fair");
-      break;
-    case 3:
-      display.print("Moderate");
-      break;
-    case 4:
-      display.print("Poor");
-      break;
-    case 5:
-      display.print("Very Poor");
-      break;
-    default:
-      display.print("???");
-      break;        
-    }
+    display.print(aqiLabels[(sensorData.extAQI-1)]);
   }
 
   // message
