@@ -166,8 +166,7 @@ void setup()
   // Check battery monitoring status
   {
     debugMessage("Battery monitor ready");
-    lc.setPackSize(BATTERYSIZE);   // If library version 1.1.0 or earlier
-    // lc.setPackAPA(BATTERY_APA); // Uses new library API. See comments in config.h
+    lc.setPackAPA(BATTERY_APA);
     batteryAvailable = true;
   }
   else

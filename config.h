@@ -64,13 +64,15 @@ const int timeZone = -7;  // USA PDT
 	// #define MQTT_PUB_TOPIC4		"sircoolio/feeds/test-room.battery-level"
 #endif
 
-// select battery size closest to used
-// #define BATTERYSIZE LC709203F_APA_100MAH // 0x08
-// #define BATTERYSIZE LC709203F_APA_200MAH // 0x0B
-// #define BATTERYSIZE LC709203F_APA_500MAH	// 0x10
-// #define BATTERYSIZE LC709203F_APA_1000MAH // 0x19
-#define BATTERYSIZE LC709203F_APA_2000MAH // 0x2D
-// #define BATTERYSIZE LC709203F_APA_3000MAH // 0x36
+// Battery parameters
+// based on a settings curve in the LC709203F datasheet
+// #define BATTERY_APA 0x08 // 100mAH
+// #define BATTERY_APA 0x0B // 200mAH
+// #define BATTERY_APA 0x10 // 500mAH
+#define BATTERY_APA 0x19 // 1000mAH
+// #define BATTERY_APA 0x1D // 1200mAH
+// #define BATTERY_APA 0x2D // 2000mAH
+// #define BATTERY_APA 0x36 // 3000mAH
 
 // Post data to the internet via dweet.io.  Set DWEET_DEVICE to be a
 // unique name you want associated with this reporting device, allowing
