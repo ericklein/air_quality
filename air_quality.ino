@@ -17,14 +17,14 @@ Preferences nvStorage;
 int sampleCounter;
 float intermediateTemp;
 float intermediateHumidity;
-float intermediateCO2;
+uint16_t intermediateCO2;
 
 // environment characteristics
 typedef struct
 {
   float internalTemp;
   float internalHumidity;
-  float internalCO2;
+  uint16_t internalCO2;
   int extTemperature;
   int extHumidity;
   int extAQI;
@@ -145,7 +145,11 @@ void setup()
     // Confirm key site configuration parameters
     debugMessage("Air Quality started");
     debugMessage("---------------------------------");
-    debugMessage("Log interval: " + String(LOG_INTERVAL));
+    debugMessage(String(SAMPLE_INTERVAL) + " minute sample interval");
+    debugMessage(String(SAMPLE_SIZE) + " samples before logging");
+    #ifdef SAMPLE_INTERVAL_ESP_MODIFIER
+      debugMessage("ESP microsecond modified is active");
+    #endif
     debugMessage("Site lat/long: " + String(OWM_LAT_LONG));
     debugMessage("Client ID: " + String(CLIENT_ID));
     #ifdef DWEET
@@ -163,11 +167,7 @@ void setup()
     debugMessage("Screen not detected");
   }
 
-  if (initSensor())
-  {
-    debugMessage("Environment sensor ready");
-  }
-  else
+  if (!initSensor())
   {
     debugMessage("Environment sensor failed to initialize, going to sleep");
     if (screenAvailable)
@@ -177,47 +177,50 @@ void setup()
 
   readSensor();
   sampleCounter = readNVStorage();
-  nvStorage.putInt("counter",sampleCounter++);
-  debugMessage(String("New sample count is ") + sampleCounter);
+  nvStorage.putInt("counter",++sampleCounter);
+  debugMessage(String("Sample count TO nv storage is ") + sampleCounter);
 
-  if (sampleCounter < LOG_SAMPLES)
+  if (sampleCounter < SAMPLE_SIZE)
   // update intermediate sensor values and go back to sleep
   {
-    nvStorage.putUInt("temp",(sensorData.internalTemp+intermediateTemp));
-    nvStorage.putUInt("humidity",(sensorData.internalHumidity+intermediateHumidity));
-    if (sensorData.internalCO2 = 10000)
+    nvStorage.putFloat("temp",(sensorData.internalTemp+intermediateTemp));
+    nvStorage.putFloat("humidity",(sensorData.internalHumidity+intermediateHumidity));
+    if (sensorData.internalCO2 == 10000)
     {
-    debugMessage(String("Intermediate values to nv storage are Temp:"+(sensorData.internalTemp+intermediateTemp)+" Humd:"+intermediateHumidity);
+    debugMessage(String("Intermediate values TO nv storage: Temp:")+(sensorData.internalTemp+intermediateTemp)+" Humidity:"+(sensorData.internalHumidity+intermediateHumidity));
     }
     else
     {
       nvStorage.putUInt("co2",(sensorData.internalCO2+intermediateCO2));
+      debugMessage(String("Intermediate values TO nv storage: Temp:") + (sensorData.internalTemp+intermediateTemp) + " Humidity:" + (sensorData.internalHumidity+intermediateHumidity) + ", CO2:" + (sensorData.internalCO2+intermediateCO2));
     }
     deepSleep();
   }
   else
   {
     // average intermediate values
-    intermediateTemp = ((sensorData.internalTemp+intermediateTemp)/LOG_SAMPLES);
-    intermediateHumidity = ((sensorData.internalHumidity+intermediateHumidity)/LOG_SAMPLES);
+    intermediateTemp = ((sensorData.internalTemp+intermediateTemp)/SAMPLE_SIZE);
+    intermediateHumidity = ((sensorData.internalHumidity+intermediateHumidity)/SAMPLE_SIZE);
     if (sensorData.internalCO2 != 10000)
     {
-      intermediateCO2 = ((sensorData.internalCO2+intermediateCO2)/LOG_SAMPLES);
+      intermediateCO2 = ((sensorData.internalCO2+intermediateCO2)/SAMPLE_SIZE);
     }
     // publish new averages to persistent storage
-    nvStorage.putUInt("temp",intermediateTemp);
-    nvStorage.putUInt("humidity",intermediateHumidity);
-    if (sensorData.internalCO2 = 10000)
+    nvStorage.putFloat("temp",intermediateTemp);
+    nvStorage.putFloat("humidity",intermediateHumidity);
+    if (sensorData.internalCO2 == 10000)
     {
-    debugMessage(String("Intermediate values to nv storage are Temp:"+(sensorData.internalTemp+intermediateTemp)+" Humd:"+intermediateHumidity);
+    debugMessage(String("Averaged values TO nv storage: Temp:")+(sensorData.internalTemp+intermediateTemp)+", Humidity:"+intermediateHumidity);
     }
     else
     {
       nvStorage.putUInt("co2",intermediateCO2);
+      debugMessage(String("Averaged values TO nv storage: Temp:")+intermediateTemp+", Humidity:"+intermediateHumidity+", CO2:"+intermediateCO2);
     }
     //reset and store sample count
     sampleCounter = 1;
     nvStorage.putInt("counter",sampleCounter);
+    debugMessage(String("Sample counter reset to ")+sampleCounter);
   }
 
   if (lc.begin())
@@ -311,6 +314,9 @@ void setup()
   //  MQTT to publish data to an MQTT broker on specified topics
   //  DWEET to publish data to the DWEET service
 
+  // Get local weather and air quality info from Open Weather Map
+  getWeather();
+
   #if defined(WIFI) || defined(RJ45)
   // if there is a network interface (so networking code will compile)
     if (internetAvailable)
@@ -322,15 +328,19 @@ void setup()
       timeClient.setTimeOffset(timeZone*60*60);
       debugMessage("NTP time: " + dateTimeString());
 
-      // Get local weather and AQI info
-      getWeather();
-
       #ifdef MQTTLOG
         if ((mqttSensorUpdate()) && (mqttBatteryUpdate()))
         {
-          infoScreen("Updated [+M]:" + dateTimeString());     
+          infoScreen("Updated [+M] " + dateTimeString());     
+        }
+        else
+        {
+          infoScreen("Updated " + dateTimeString());
         }
       #endif
+
+      // update screen only
+      infoScreen("Updated " + dateTimeString());
 
       #ifdef DWEET
         post_dweet(intermediateCO2, intermediateTemp, intermediateHumidity);
@@ -339,8 +349,12 @@ void setup()
     else
     {
       // update screen only
-      infoScreen("Updated: " + dateTimeString());
+      infoScreen("Updated " + dateTimeString());
     }
+    deepSleep();
+  #else
+    // update screen only
+    infoScreen("Updated " + dateTimeString());
     deepSleep();
   #endif
 }
@@ -452,7 +466,7 @@ void loop()
   int mqttSensorUpdate()
   // Publishes sensor data to MQTT broker
   {
-    if ((sensorData.internalCO2==10000)&&(sensorData.internalTemp=10000))
+    if ((sensorData.internalCO2==10000)&&(sensorData.internalTemp==10000))
     // no sensor data to publish
     {
       debugMessage("No sensor data to publish to MQTT broker");
@@ -493,63 +507,67 @@ String dateTimeString()
   String dateTime;
   String weekDays[7]={"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
 
-  if (timeClient.update())
-  {
-    // NTPClient doesn't include date information, get it from time structure
-    time_t epochTime = timeClient.getEpochTime();
-    struct tm *ptm = gmtime ((time_t *)&epochTime);
-    int day = ptm->tm_mday;
-    int month = ptm->tm_mon+1;
-    int year = ptm->tm_year+1900;
+  #if defined(WIFI) || defined(RJ45)
+    if (timeClient.update())
+    {
+      // NTPClient doesn't include date information, get it from time structure
+      time_t epochTime = timeClient.getEpochTime();
+      struct tm *ptm = gmtime ((time_t *)&epochTime);
+      int day = ptm->tm_mday;
+      int month = ptm->tm_mon+1;
+      int year = ptm->tm_year+1900;
 
-    dateTime = weekDays[timeClient.getDay()];
-    dateTime += ",";
+      dateTime = weekDays[timeClient.getDay()];
+      dateTime += ", ";
 
-    if (month<10) dateTime += "0";
-    dateTime += month;
-    dateTime += "-";
-    if (day<10) dateTime += "0";
-    dateTime += day;
-    dateTime += " at ";
-    if (timeClient.getHours()<10) dateTime += "0";
-    dateTime += timeClient.getHours();
-    dateTime += ":";
-    if (timeClient.getMinutes()<10) dateTime += "0";
-    dateTime += timeClient.getMinutes();
+      if (month<10) dateTime += "0";
+      dateTime += month;
+      dateTime += "/";
+      if (day<10) dateTime += "0";
+      dateTime += day;
+      dateTime += " at ";
+      if (timeClient.getHours()<10) dateTime += "0";
+      dateTime += timeClient.getHours();
+      dateTime += ":";
+      if (timeClient.getMinutes()<10) dateTime += "0";
+      dateTime += timeClient.getMinutes();
 
-    // zulu format
-    // dateTime = year + "-";
-    // if (month()<10) dateTime += "0";
-    // dateTime += month;
-    // dateTime += "-";
-    // if (day()<10) dateTime += "0";
-    // dateTime += day;
-    // dateTime += "T";
-    // if (timeClient.getHours()<10) dateTime += "0";
-    // dateTime += timeClient.getHours();
-    // dateTime += ":";
-    // if (timeClient.getMinutes()<10) dateTime += "0";
-    // dateTime += timeClient.getMinutes();
-    // dateTime += ":";
-    // if (timeClient.getSeconds()<10) dateTime += "0";
-    // dateTime += timeClient.getSeconds();
-    // switch (timeZone)
-    // {
-    //   case 0:
-    //     dateTime += "Z";
-    //     break;
-    //   case -7:
-    //     dateTime += "PDT";
-    //     break;
-    //   case -8:
-    //     dateTime += "PST";
-    //     break;     
-    // }
-  }
-  else
-  {
-    dateTime ="Time not set";
-  }
+      // zulu format
+      // dateTime = year + "-";
+      // if (month()<10) dateTime += "0";
+      // dateTime += month;
+      // dateTime += "-";
+      // if (day()<10) dateTime += "0";
+      // dateTime += day;
+      // dateTime += "T";
+      // if (timeClient.getHours()<10) dateTime += "0";
+      // dateTime += timeClient.getHours();
+      // dateTime += ":";
+      // if (timeClient.getMinutes()<10) dateTime += "0";
+      // dateTime += timeClient.getMinutes();
+      // dateTime += ":";
+      // if (timeClient.getSeconds()<10) dateTime += "0";
+      // dateTime += timeClient.getSeconds();
+      // switch (timeZone)
+      // {
+      //   case 0:
+      //     dateTime += "Z";
+      //     break;
+      //   case -7:
+      //     dateTime += "PDT";
+      //     break;
+      //   case -8:
+      //     dateTime += "PST";
+      //     break;     
+      // }
+    }
+    else
+    {
+      dateTime = "Time not set";
+    }
+  #else
+    dateTime = "Time not set";
+  #endif
   return dateTime;
 }
 
@@ -565,7 +583,7 @@ void debugMessage(String messageText)
 void deepSleep()
 // Powers down hardware in preparation for board deep sleep
 {
-  debugMessage(String("Going to sleep for ") + LOG_INTERVAL + " minutes");
+  debugMessage(String("Going to sleep for ") + SAMPLE_INTERVAL + " minute(s)");
   if (screenAvailable)
   {
     display.powerDown();
@@ -578,7 +596,7 @@ void deepSleep()
   envSensor.stopPeriodicMeasurement();
 
   nvStorage.end();
-  esp_sleep_enable_timer_wakeup(LOG_INTERVAL*LOG_INTERVAL_US_MODIFIER);
+  esp_sleep_enable_timer_wakeup(SAMPLE_INTERVAL*SAMPLE_INTERVAL_ESP_MODIFIER);
   esp_deep_sleep_start();
 }
 
@@ -596,7 +614,7 @@ void getWeather()
       String serverPath = String(OWM_SERVER) + OWM_WEATHER_PATH + OWM_LAT_LONG + "&units=imperial" + "&APPID=" + OWM_KEY;
   
       jsonBuffer = httpGETRequest(serverPath.c_str());
-      debugMessage(jsonBuffer);
+      //debugMessage(jsonBuffer);
   
       StaticJsonDocument<1024> doc;
   
@@ -645,7 +663,7 @@ void getWeather()
       serverPath = String(OWM_SERVER) + OWM_AQM_PATH + OWM_LAT_LONG + "&APPID=" + OWM_KEY;
   
       jsonBuffer = httpGETRequest(serverPath.c_str());
-      debugMessage(jsonBuffer);
+      //debugMessage(jsonBuffer);
   
       StaticJsonDocument<384> doc1;
   
@@ -680,7 +698,7 @@ void getWeather()
     sensorData.extHumidity = 10000;
     sensorData.extAQI = 10000;
   #endif
-  debugMessage(String("OWM->") + sensorData.extTemperature + "F," + sensorData.extHumidity + "%, " + sensorData.extAQI + " AQI");
+  debugMessage(String("Open Weather Map returned: ") + sensorData.extTemperature + "F, " + sensorData.extHumidity + "%, " + sensorData.extAQI + " AQI");
 }
 
 int initScreen()
@@ -738,20 +756,19 @@ void infoScreen(String messageText)
   display.setFont(&FreeSans9pt7b);
 
   // indoor info
-  if (sensorData.internalTemp!=10000)
-  {
-    display.setCursor(5,((display.height()*3/8)-10));
-    display.print(String("Temp ") + ((int) sensorData.internalTemp+.5) + "F, (" + (((int) sensorData.internalTemp +.5)- ((int) intermediateTemp + .5)) + ")";
-  }
-  if (sensorData.internalHumidity!=10000)
-  {
-    display.setCursor(5,((display.height()*5/8)-10));
-    display.print(String("Humid ") + ((int) sensorData.internalHumidity+.5) + "%, (" + (((int) sensorData.internalHumidity +.5)- ((int) intermediateHumidity + .5)) + ")";
-  }
+  int temperatureDelta = ((int)(sensorData.internalTemp +0.5)) - ((int) (intermediateTemp + 0.5));
+  int humidityDelta = ((int)(sensorData.internalHumidity +0.5)) - ((int) (intermediateHumidity + 0.5));
+
+  display.setCursor(5,((display.height()*3/8)-10));
+  display.print(String("Temp ") + (int)(sensorData.internalTemp+0.5) + "F (" + temperatureDelta + ")");
+
+  display.setCursor(5,((display.height()*5/8)-10));
+  display.print(String("Humid ") + (int)(sensorData.internalHumidity+0.5) + "% (" + humidityDelta + ")");
+
   if (sensorData.internalCO2!=10000)
   {
     display.setCursor(5,((display.height()*7/8)-10));
-    display.print(String("C02 ") + sensorData.internalCO2 + ", (" + (sensorData.internalHumidity - intermediateCO2) + ")");
+    display.print(String("C02 ") + sensorData.internalCO2 + " (" + (sensorData.internalCO2 - intermediateCO2) + ")");
   }
 
   // outdoor info
@@ -780,6 +797,7 @@ void infoScreen(String messageText)
 
   //update display
   display.display();
+  debugMessage("Screen updated");
 }
 
 void screenBatteryStatus()
@@ -842,56 +860,50 @@ void readSensor()
     debugMessage("Error reading SCD40 sensor");
     deepSleep();
   }
-  else
-  {
-    // convert C to F for temp
-    sensorData.internalTemp = (sensorData.internalTemp*1.8)+32;
-  }
+  // convert C to F for temp
+  sensorData.internalTemp = (sensorData.internalTemp*1.8)+32;
+  debugMessage(String("SCD40 environment sensor values: ") + sensorData.internalTemp + "F, " + sensorData.internalHumidity + "%, " + sensorData.internalCO2 + " ppm");
 
   // AHTX0
+  // no error handling?!
   // sensors_event_t sensorHumidity, sensorTemp;
   // envSensor.getEvent(&sensorHumidity, &sensorTemp);
-  // // no error handling?!
-  // sensorData.internalTemp = (int) sensorTemp.temperature+.5;
-  // sensorData.internalHumidity = (int) sensorHumidity.relative_humidity+.5;
+  // sensorData.internalTemp = sensorTemp.temperature;
+  // sensorData.internalHumidity = sensorHumidity.relative_humidity;
   // sensorData.internalCO2 = 10000;
+  // debugMessage(String("AHTX0 environment sensor values: ") + sensorData.internalTemp + "F, " + sensorData.internalHumidity + "%, " + sensorData.internalCO2 + " ppm");
+
 
   // bme280, SiH7021
-  // sensorData.internalTemp = (int) (envSensor.readTemperature()*1.8)+32;
-  // sensorData.internalHumidity = (int) envSensor.readHumidity();
+  // no error handling?!
+  // sensorData.internalTemp = (envSensor.readTemperature()*1.8)+32;
+  // sensorData.internalHumidity = envSensor.readHumidity();
   // sensorData.internalCO2 = 10000;
-
-  // SiH7021
-  // no error handling?
-  // sensorData.internalTemp = (int) (envSensor.readTemperature()*1.8)+32;
-  // sensorData.internalHumidity = (int) envSensor.readHumidity();
-  // sensorData.internalCO2 = 10000;
-
-  debugMessage(String("Sensor->") + sensorData.internalTemp + "F," + sensorData.internalHumidity + "%," + sensorData.internalCO2 + " ppm");
+  // debugMessage(String("BME280/SiH7021 environment sensor values: ") + sensorData.internalTemp + "F, " + sensorData.internalHumidity + "%, " + sensorData.internalCO2 + " ppm");
 }
 
 int readNVStorage()
 {
   int counter;
 
-  nvStorage.begin(air-quality, false);
+  nvStorage.begin("air-quality", false);
   // get previously stored values. If they don't exist, create them as zero
   counter = nvStorage.getInt("counter",1);
-  debugMessage(String("Sample count is ") + counter);
   // read value or insert current sensor reading if this is the first read from nv storage
-  intermediateTemp = nvStorage.getUInt("temp",sensorData.internalTemp);
-  intermediateHumidity = nvStorage.getUInt("humidity",sensorData.internalHumidity);
-  if (sensorData.internalCO2 = 10000)
+  intermediateTemp = nvStorage.getFloat("temp",sensorData.internalTemp);
+  intermediateHumidity = nvStorage.getFloat("humidity",sensorData.internalHumidity);
+  if (sensorData.internalCO2 == 10000)
   // there is no CO2 sensor value to use
   {
-    debugMessage(String("Intermediate values from nv storage are Temp:"+intermediateTemp+" Humd:"+intermediateHumidity);
+    debugMessage(String("Intermediate values FROM nv storage: Temp:")+intermediateTemp+", Humidity:"+intermediateHumidity);
   }
   else
   // include CO2 data
   {
     intermediateCO2 = nvStorage.getUInt("co2",sensorData.internalCO2);
-    debugMessage(String("Intermediate values from nv storage are Temp:"+intermediateTemp+" Humd:"+intermediateHumidity+" CO2:"+intermediateCO2);
+    debugMessage(String("Intermediate values FROM nv storage: Temp:")+intermediateTemp+", Humidity:"+intermediateHumidity+", CO2:"+intermediateCO2);
   }
+  debugMessage(String("Sample count FROM nv storage is ") + counter);
   return counter;
 }
 

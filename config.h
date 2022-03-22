@@ -1,24 +1,23 @@
 // conditional compile flags
-//#define DEBUG 	// Output to serial port
+#define DEBUG 	// Output to serial port
 //#define RJ45  	// use Ethernet
-#define WIFI    	// use WiFi
+//#define WIFI    	// use WiFi
 //#define MQTTLOG 	// log sensor data to MQTT broker
 //#define DWEET     // Post sensor readings to dweet.io
 //#define INFLUX  	// Log data to remote InfluxDB server
 
-// time between samples
+// sample timing in minutes
 #ifdef DEBUG
-	#define LOG_INTERVAL 1
+	#define SAMPLE_INTERVAL 1
 #else
-	#define LOG_INTERVAL 30
+	#define SAMPLE_INTERVAL 30
 #endif
-// number of samples captured before updating
-#define LOG_SAMPLES 3
-
-// millisecond modifier to minutes for logging interval (ARM)
-// #define LOG_INTERVAL_MS_MODIFIER 60000
-// microsecond modifier to minutes for logging interval (ESP)
-#define LOG_INTERVAL_US_MODIFIER 60000000
+// number of samples captured before logging
+#define SAMPLE_SIZE 3
+// millisecond modifier to minutes for sampling interval (ARM)
+// #define SAMPLE_INTERVAL_ARM_MODIFIER 60000
+// microsecond modifier to minutes for sampling interval (ESP)
+#define SAMPLE_INTERVAL_ESP_MODIFIER 60000000
 
 // set device ID; used by mqtt and screen
 #define CLIENT_ID "test_room"
