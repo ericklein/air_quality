@@ -2,9 +2,9 @@
 //#define DEBUG     // Output to serial port
 //#define RJ45    // use Ethernet
 #define WIFI    // use WiFi
-#define MQTTLOG // log sensor data to MQTT broker
-//#define DWEET     // Post sensor readings to dweet.io
-//#define INFLUX  // Log data to remote InfluxDB server
+//#define MQTTLOG // log sensor data to MQTT broker
+#define DWEET     // Post sensor readings to dweet.io
+#define INFLUX  // Log data to remote InfluxDB server
 
 // set logging interval in minutes
 #ifdef DEBUG
@@ -84,7 +84,8 @@ const int timeZone = -7;  // USA PDT
 
 #ifdef INFLUX
 	// Tags values for InfluxDB data points.  Should be customized to match your 
-	// InfluxDB data model, and can add more here and in post_influx.cpp if desired
+	// InfluxDB data model, and can add more here and in post_influx.cpp if desired.
+  // Server URL and access credentials are specified in secrets.h
 	#define DEVICE_NAME "airquality"
 	#define DEVICE_LOCATION "dining room"
 	#define DEVICE_SITE "indoor"
