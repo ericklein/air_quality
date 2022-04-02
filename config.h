@@ -1,30 +1,31 @@
 // conditional compile flags
-//#define DEBUG     // Output to serial port
-//#define RJ45    // use Ethernet
-#define WIFI    // use WiFi
-#define MQTTLOG // log sensor data to MQTT broker
+//#define DEBUG 	// Output to serial port
+//#define RJ45  	// use Ethernet
+#define WIFI    	// use WiFi
+//#define MQTTLOG 	// log sensor data to MQTT broker
 //#define DWEET     // Post sensor readings to dweet.io
-//#define INFLUX  // Log data to remote InfluxDB server
+//#define INFLUX  	// Log data to remote InfluxDB server
 
-// set logging interval in minutes
+// sample timing in minutes
 #ifdef DEBUG
-	#define LOG_INTERVAL 1
+	#define SAMPLE_INTERVAL 1
 #else
-	#define LOG_INTERVAL 30
+	#define SAMPLE_INTERVAL 5
 #endif
-
-// millisecond modifier to minutes for logging interval (ARM)
-// #define LOG_INTERVAL_MS_MODIFIER 60000
-// microsecond modifier to minutes for logging interval (ESP)
-#define LOG_INTERVAL_US_MODIFIER 60000000
+// number of samples captured before logging
+#define SAMPLE_SIZE 4
+// millisecond modifier to minutes for sampling interval (ARM)
+// #define SAMPLE_INTERVAL_ARM_MODIFIER 60000
+// microsecond modifier to minutes for sampling interval (ESP)
+#define SAMPLE_INTERVAL_ESP_MODIFIER 60000000
 
 // set device ID; used by mqtt and screen
 #define CLIENT_ID "test_room"
 
 // open weather map parameters
-#define OWM_SERVER 			  "http://api.openweathermap.org/data/2.5/"
+#define OWM_SERVER			"http://api.openweathermap.org/data/2.5/"
 #define OWM_WEATHER_PATH	"weather?"
-#define OWM_AQM_PATH		  "air_pollution?"
+#define OWM_AQM_PATH		"air_pollution?"
 
 // select time zone, used by NTPClient
 //const int timeZone = 0;  	// UTC
@@ -35,7 +36,6 @@ const int timeZone = -7;  // USA PDT
 
 #ifdef MQTTLOG
 	// set MQTT parameters
-	// #define MQTT_KEEP_ALIVE 	300 // needed?
 	#define MQTT_ATTEMPT_LIMIT 	3 	// number of connection attempts for MQTT broker
 
 	// #define MQTT_PUB_TOPIC1		"sircoolio/feeds/pocket-office.temperature"
@@ -48,30 +48,31 @@ const int timeZone = -7;  // USA PDT
 	// #define MQTT_PUB_TOPIC3		"sircoolio/feeds/master-bedroom.co2"
 	// #define MQTT_PUB_TOPIC4		"sircoolio/feeds/master-bedroom.battery-level"
 
-	#define MQTT_PUB_TOPIC1		"sircoolio/feeds/lab-office.temperature"
-	#define MQTT_PUB_TOPIC2		"sircoolio/feeds/lab-office.humidity"
-	#define MQTT_PUB_TOPIC3		"sircoolio/feeds/lab-office.co2"
-	#define MQTT_PUB_TOPIC4		"sircoolio/feeds/lab-office.battery-level"
+	// #define MQTT_PUB_TOPIC1		"sircoolio/feeds/lab-office.temperature"
+	// #define MQTT_PUB_TOPIC2		"sircoolio/feeds/lab-office.humidity"
+	// #define MQTT_PUB_TOPIC3		"sircoolio/feeds/lab-office.co2"
+	// #define MQTT_PUB_TOPIC4		"sircoolio/feeds/lab-office.battery-level"
 
 	// #define MQTT_PUB_TOPIC1		"sircoolio/feeds/kitchen.temperature"
 	// #define MQTT_PUB_TOPIC2		"sircoolio/feeds/kitchen.humidity"
 	// #define MQTT_PUB_TOPIC3		"sircoolio/feeds/kitchen.co2"
 	// #define MQTT_PUB_TOPIC4		"sircoolio/feeds/kitchen.battery-level"
 
-	// #define MQTT_PUB_TOPIC1		"sircoolio/feeds/test-room.temperature"
-	// #define MQTT_PUB_TOPIC2		"sircoolio/feeds/test-room.humidity"
-	// #define MQTT_PUB_TOPIC3		"sircoolio/feeds/test-room.co2"
-	// #define MQTT_PUB_TOPIC4		"sircoolio/feeds/test-room.battery-level"
+	#define MQTT_PUB_TOPIC1		"sircoolio/feeds/test-room.temperature"
+	#define MQTT_PUB_TOPIC2		"sircoolio/feeds/test-room.humidity"
+	#define MQTT_PUB_TOPIC3		"sircoolio/feeds/test-room.co2"
+	#define MQTT_PUB_TOPIC4		"sircoolio/feeds/test-room.battery-level"
 #endif
 
 // Battery parameters
 // based on a settings curve in the LC709203F datasheet
 // #define BATTERY_APA 0x08 // 100mAH
 // #define BATTERY_APA 0x0B // 200mAH
-// #define BATTERY_APA 0x10 // 500mAH
-#define BATTERY_APA 0x19 // 1000mAH
+#define BATTERY_APA 0x10 // 500mAH
+// #define BATTERY_APA 0x19 // 1000mAH
 // #define BATTERY_APA 0x1D // 1200mAH
 // #define BATTERY_APA 0x2D // 2000mAH
+// #define BATTERY_APA 0x32 // 2500mAH
 // #define BATTERY_APA 0x36 // 3000mAH
 
 // Post data to the internet via dweet.io.  Set DWEET_DEVICE to be a
