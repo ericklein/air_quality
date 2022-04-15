@@ -10,6 +10,10 @@
 // private credentials for network, MQTT, weather provider
 #include "secrets.h"
 
+// Generalized network handling 
+#include "aq_network.h"
+AQ_Network aq_network;
+
 // environment characteristics
 typedef struct
 {
@@ -69,11 +73,11 @@ ThinkInk_290_Grayscale4_T5 display(EPD_DC, EPD_RESET, EPD_CS, SRAM_CS, EPD_BUSY)
 #include "ArduinoJson.h"  // Needed by getWeather()
 
 // Networking subsystem functions (see aq_network.cpp)
-extern bool networkBegin();
-extern String dateTimeString();
-extern void networkStop();
-extern String httpGETRequest(const char* serverName);
-extern int httpPOSTRequest(String serverurl, String contenttype, String payload);
+// extern bool networkBegin();
+// extern String dateTimeString();
+// extern void networkStop();
+// extern String httpGETRequest(const char* serverName);
+// extern int httpPOSTRequest(String serverurl, String contenttype, String payload);
 
 #ifdef MQTTLOG
   // MQTT setup
@@ -127,17 +131,18 @@ void setup()
     debugMessage("Screen not detected");
   }
 
+  // Initialize environmental sensor.  Returns non-zero if initialization fails
   if (initSensor())
-  {
-    debugMessage("Environment sensor ready");
-    readSensor();
-  }
-  else
   {
     debugMessage("Environment sensor failed to initialize, going to sleep");
     if (screenAvailable)
       alertScreen("Environment sensor not detected");
     deepSleep();
+  }
+  else
+  {
+    debugMessage("Environment sensor ready");
+    readSensor();
   }
 
   if (lc.begin())
@@ -153,7 +158,7 @@ void setup()
   }
 
   // Setup whatever network connection is specified in config.h
-  internetAvailable = networkBegin();  
+  internetAvailable = aq_network.networkBegin();  
 
   // Implement a variety of internet services, if networking hardware is present and the
   // network is connected.  Services supported include:
@@ -173,11 +178,11 @@ void setup()
       if ((mqttSensorUpdate()) && (mqttBatteryUpdate()))
       {
         // Update screen and indicate MQTT update happened
-        infoScreen("Updated [+M]:" + dateTimeString());  
+        infoScreen("Updated [+M]:" + aq_network.dateTimeString());  
       }
     #else
       // Update screen if not posting via MQTT
-      infoScreen("Updated: " + dateTimeString());
+      infoScreen("Updated: " + aq_network.dateTimeString());
     #endif
 
     #ifdef DWEET
@@ -201,7 +206,7 @@ void setup()
   else
   {
     // update screen only (if no internet)
-    infoScreen("Updated: " + dateTimeString());
+    infoScreen("Updated: " + aq_network.dateTimeString());
   }
   deepSleep();
 }
@@ -267,7 +272,7 @@ void loop()
       }
       else
       {
-        debugMessage(String("MQTT battery percent publish failed at:") + dateTimeString());
+        debugMessage(String("MQTT battery percent publish failed at:") + aq_network.dateTimeString());
         return 0;
       }
       mqtt.disconnect();
@@ -291,20 +296,20 @@ void loop()
         {
           if(co2Pub.publish(sensorData.internalCO2))
           {
-            debugMessage("MQTT publish at " + dateTimeString() + "->" + CLIENT_ID + "," + sensorData.internalTemp + "," + sensorData.internalHumidity + "," + sensorData.internalCO2);
+            debugMessage("MQTT publish at " + aq_network.dateTimeString() + "->" + CLIENT_ID + "," + sensorData.internalTemp + "," + sensorData.internalHumidity + "," + sensorData.internalCO2);
             return 1;
           }
           else
           {
-            debugMessage("MQTT publish at  " + dateTimeString() + " , " + CLIENT_ID + " , " + sensorData.internalTemp + " , " + sensorData.internalHumidity);
-            debugMessage("MQTT CO2 publish failed at " + dateTimeString());
+            debugMessage("MQTT publish at  " + aq_network.dateTimeString() + " , " + CLIENT_ID + " , " + sensorData.internalTemp + " , " + sensorData.internalHumidity);
+            debugMessage("MQTT CO2 publish failed at " + aq_network.dateTimeString());
             return 0;
           }
         }
       }
       else
       {
-        debugMessage("MQTT temp and humidity publish failed at " + dateTimeString());
+        debugMessage("MQTT temp and humidity publish failed at " + aq_network.dateTimeString());
         return 0;   
       } 
     mqtt.disconnect();
@@ -330,7 +335,7 @@ void deepSleep()
     display.powerDown();
     digitalWrite(EPD_RESET, LOW); // hardware power down mode
   }
-  networkStop();  // End any active network connection (if supported)
+  aq_network.networkStop();  // End any active network connection (if supported)
   // SCD40 only
   envSensor.stopPeriodicMeasurement();
   esp_sleep_enable_timer_wakeup(LOG_INTERVAL*LOG_INTERVAL_US_MODIFIER);
@@ -350,7 +355,7 @@ void getWeather()
       // Get local temp and humidity
       String serverPath = String(OWM_SERVER) + OWM_WEATHER_PATH + OWM_LAT_LONG + "&units=imperial" + "&APPID=" + OWM_KEY;
   
-      jsonBuffer = httpGETRequest(serverPath.c_str());
+      jsonBuffer = aq_network.httpGETRequest(serverPath.c_str());
       debugMessage(jsonBuffer);
   
       StaticJsonDocument<1024> doc;
@@ -399,7 +404,7 @@ void getWeather()
       // Get local AQI
       serverPath = String(OWM_SERVER) + OWM_AQM_PATH + OWM_LAT_LONG + "&APPID=" + OWM_KEY;
   
-      jsonBuffer = httpGETRequest(serverPath.c_str());
+      jsonBuffer = aq_network.httpGETRequest(serverPath.c_str());
       debugMessage(jsonBuffer);
   
       StaticJsonDocument<384> doc1;
@@ -562,19 +567,24 @@ int initSensor()
 {
   //SCD40
   uint16_t error;
+  char errorMessage[256];
 
   Wire.begin();
   envSensor.begin(Wire);
+  
   error = envSensor.startPeriodicMeasurement();
   if (error)
   {
-    delay(5000); // allow the sensor to warm up
-    return 0;
+    // Failed to initialize SCD40
+    debugMessage("Error executing SCD40 startPeriodicMeasurement(): ");
+    errorToString(error, errorMessage, 256);
+    debugMessage(errorMessage);
+    return error;
   }
   else
   {
-    delay(5000);
-    return 1;
+    delay(5000);  // Give SCD40 time to warm up
+    return 0;     // error = 0 in this case
   }
   // ATHX0, SiH7021, BME280
   // if (envSensor.begin())

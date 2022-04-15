@@ -1,4 +1,5 @@
 #include "Arduino.h"
+#include "aq_network.h"
 
 // hardware and internet configuration parameters
 #include "config.h"
@@ -52,7 +53,7 @@ extern void debugMessage(String messageText);
 #endif
 
 // Converts system time into human readable strings. Depends on NTP service access
-String dateTimeString()
+String AQ_Network::dateTimeString()
 {
   #if defined(WIFI) || defined(RJ45)
     String dateTime;
@@ -126,7 +127,7 @@ String dateTimeString()
 // device can report accurate local time.  Returns boolean indicating whether network is
 // connected and available.  Depends on configuration #defines in config.h to determine
 // what network hardware is attached, and key network settings there as well (e.g. SSID).
-bool networkBegin()
+bool AQ_Network::networkBegin()
 {
   bool networkAvailable = false;
   
@@ -215,7 +216,7 @@ bool networkBegin()
 }
 
 
-String httpGETRequest(const char* serverName) 
+String AQ_Network::httpGETRequest(const char* serverName) 
 {
   String payload = "{}";
   
@@ -243,14 +244,14 @@ String httpGETRequest(const char* serverName)
   return payload;
 }
 
-void networkStop()
+void AQ_Network::networkStop()
 {
   #if defined(WIFI) || defined(RJ45)
     client.stop();
   #endif
 }
 
-int httpPOSTRequest(String serverurl, String contenttype, String payload)
+int AQ_Network::httpPOSTRequest(String serverurl, String contenttype, String payload)
 {
   int httpCode = -1;
   #if defined(WIFI) || defined(RJ45)
@@ -288,7 +289,7 @@ int httpPOSTRequest(String serverurl, String contenttype, String payload)
 // Utility functions that may be of use
 
 // Return local IP address as a String
-String getLocalIPString()
+String AQ_Network::getLocalIPString()
 {
   #if defined(WIFI) || defined(RJ45)
     return(client.localIP().toString());
@@ -298,7 +299,7 @@ String getLocalIPString()
 }
 
 // Return RSSI for WiFi network, simulate out-of-range value for non-WiFi
-long getWiFiRSSI()
+long AQ_Network::getWiFiRSSI()
 {
   #ifdef WIFI
     return(WiFi.RSSI());
@@ -308,7 +309,7 @@ long getWiFiRSSI()
 }
 
 // Returns true if WIFI defined in config.h, otherwise false
-bool isWireless()
+bool AQ_Network::isWireless()
 {
   #ifdef WIFI
     return(true);
@@ -318,7 +319,7 @@ bool isWireless()
 }
 
 // Returns true if RJ45 (Ethernet) defined in config.h, otherwise false
-bool isWired()
+bool AQ_Network::isWired()
 {
   #ifdef RJ45
     return(true);
@@ -328,7 +329,7 @@ bool isWired()
 }
 
 // Returns connection status (via Client class), or false if no network defined in config.h
-bool isConnected()
+bool AQ_Network::isConnected()
 {
   #if defined(WIFI) || defined(RJ45)
     return(client.connected());

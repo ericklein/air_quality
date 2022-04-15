@@ -4,7 +4,7 @@
 #define WIFI    // use WiFi
 //#define MQTTLOG // log sensor data to MQTT broker
 #define DWEET     // Post sensor readings to dweet.io
-#define INFLUX  // Log data to remote InfluxDB server
+//#define INFLUX  // Log data to remote InfluxDB server
 
 // set logging interval in minutes
 #ifdef DEBUG

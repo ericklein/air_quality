@@ -5,13 +5,16 @@
 // private credentials for network, MQTT, weather provider
 #include "secrets.h"
 
+#include "aq_network.h"
+extern AQ_Network aq_network;
+
 
 #ifdef DWEET
 #include <HTTPClient.h> 
 
 // Shared helper function we call here too...
 extern void debugMessage(String messageText);
-extern int httpPOSTRequest(String serverurl, String contenttype, String payload);
+// extern int httpPOSTRequest(String serverurl, String contenttype, String payload);
 extern bool batteryAvailable;
 extern bool internetAvailable;
 
@@ -54,7 +57,7 @@ void post_dweet(uint16_t co2, float tempF, float humidity, float battpct, float 
                        "\"humidity\":\""    + String(humidity, 2)      + "\"}";
 
   String postdata = device_info + battery_info + sensor_info;
-  int httpCode = httpPOSTRequest(dweeturl,"application/json",postdata);
+  int httpCode = aq_network.httpPOSTRequest(dweeturl,"application/json",postdata);
   
   // httpCode will be negative on error, but HTTP status might indicate failure
   if (httpCode > 0) {
