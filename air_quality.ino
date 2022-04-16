@@ -10,6 +10,10 @@
 // private credentials for network, MQTT, weather provider
 #include "secrets.h"
 
+// Generalized network handling
+#include "aq_network.h"
+AQ_Network aq_network;
+
 // read/write to ESP32 persistent storage
 #include <Preferences.h>
 Preferences nvStorage;
@@ -73,64 +77,26 @@ Adafruit_LC709203F lc;
 ThinkInk_290_Grayscale4_T5 display(EPD_DC, EPD_RESET, EPD_CS, SRAM_CS, EPD_BUSY);
 // colors are EPD_WHITE, EPD_BLACK, EPD_RED, EPD_GRAY, EPD_LIGHT, EPD_DARK
 
-//#include <TimeLib.h> // time related functions
+#include "ArduinoJson.h"  // Needed by getWeather()
 
-#ifdef WIFI
-  #if defined(ARDUINO_SAMD_MKRWIFI1010) || defined(ARDUINO_SAMD_NANO_33_IOT) || defined(ARDUINO_AVR_UNO_WIFI_REV2)
-    #include <WiFiNINA.h>
-  #elif defined(ARDUINO_SAMD_MKR1000)
-    #include <WiFi101.h>
-  #elif defined(ARDUINO_ESP8266_ESP12)
-    #include <ESP8266WiFi.h>
-  #else
-    #include <WiFi.h>
-  #endif
+#ifdef MQTTLOG
+  // MQTT setup
+  #include "Adafruit_MQTT.h"
+  #include "Adafruit_MQTT_Client.h"
+  Adafruit_MQTT_Client mqtt(&client, MQTT_BROKER, MQTT_PORT, CLIENT_ID, MQTT_USER, MQTT_PASS);
 
-  WiFiClient client;
-  //WiFiClientSecure client; // for SSL
-
-  // NTP support
-  #include <WiFiUdp.h>
-  WiFiUDP ntpUDP;
+  Adafruit_MQTT_Publish tempPub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC1,MQTT_QOS_1);
+  Adafruit_MQTT_Publish humidityPub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC2, MQTT_QOS_1);
+  Adafruit_MQTT_Publish co2Pub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC3, MQTT_QOS_1);
+  Adafruit_MQTT_Publish batteryLevelPub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC4, MQTT_QOS_1);
 #endif
 
-#ifdef RJ45
-  // Set MAC address. If unknown, be careful for duplicate addresses across projects.
-  byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
-  #include <SPI.h>
-  #include <Ethernet.h>
-  EthernetClient client;
-
-  // NTP support
-  #include <EthernetUdp.h>
-  EthernetUDP ntpUDP;
+#ifdef INFLUX
+  extern void post_influx(uint16_t co2, float tempF, float humidity);
 #endif
 
-#if defined(WIFI) || defined(RJ45)
-  // NTP setup
-  #include <NTPClient.h>
-  NTPClient timeClient(ntpUDP);
-
-  // used to retreive OWM information
-  #include <HTTPClient.h> 
-  #include "ArduinoJson.h"
-
-  #ifdef MQTTLOG
-    // MQTT setup
-    #include "Adafruit_MQTT.h"
-    #include "Adafruit_MQTT_Client.h"
-    Adafruit_MQTT_Client mqtt(&client, MQTT_BROKER, MQTT_PORT, CLIENT_ID, MQTT_USER, MQTT_PASS);
-
-    Adafruit_MQTT_Publish tempPub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC1,MQTT_QOS_1);
-    Adafruit_MQTT_Publish humidityPub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC2, MQTT_QOS_1);
-    Adafruit_MQTT_Publish co2Pub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC3, MQTT_QOS_1);
-    Adafruit_MQTT_Publish batteryLevelPub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC4, MQTT_QOS_1);
-  #endif
-
-  #ifdef INFLUX
-    extern void post_influx(uint16_t co2, float tempF, float humidity);
-  #endif
-
+#ifdef DWEET
+  extern void post_dweet(uint16_t co2, float tempF, float humidity, float battpct, float battv);
 #endif
 
 void setup()
@@ -167,7 +133,8 @@ void setup()
     debugMessage("Screen not detected");
   }
 
-  if (!initSensor())
+  // Initialize environmental sensor.  Returns non-zero if initialization fails
+  if (initSensor())
   {
     debugMessage("Environment sensor failed to initialize, going to sleep");
     if (screenAvailable)
@@ -175,6 +142,7 @@ void setup()
     deepSleep();
   }
 
+  // Environmental sensor available, so fetch values
   readSensor();
   sampleCounter = readNVStorage();
   nvStorage.putInt("counter",++sampleCounter);
@@ -234,82 +202,14 @@ void setup()
   {
     debugMessage("Battery monitor not detected");
   }
-
-  #ifdef WIFI
-    uint8_t tries;
-    #define MAX_TRIES 5
   
-    // set hostname has to come before WiFi.begin
-    WiFi.hostname(CLIENT_ID);
-    // WiFi.setHostname(CLIENT_ID); //for WiFiNINA
-    
-    // Connect to WiFi.  Prepared to wait a reasonable interval for the connection to
-    // succeed, but not forever.  Will check status and, if not connected, delay an
-    // increasing amount of time up to a maximum of MAX_TRIES delay intervals. 
-    WiFi.begin(WIFI_SSID, WIFI_PASS);
-    
-    for(tries=1;tries<=MAX_TRIES;tries++) 
-    {
-      debugMessage(String("Connection attempt ") + tries + " of " + MAX_TRIES + " to " + WIFI_SSID + " in " + (tries*10) + " seconds");
-      if(WiFi.status() == WL_CONNECTED) 
-      {
-        // Successful connection!
-        internetAvailable = true;
-        break;
-      }
-      // use of delay OK as this is initialization code
-      delay(tries*10000);   // Waiting longer each time we check for status
-    }
-    if(internetAvailable)
-    {
-      debugMessage("WiFi IP address is: " + ip2CharArray(WiFi.localIP()));
-      debugMessage("RSSI is: " + String(WiFi.RSSI()) + " dBm");  
-    }
-    else
-    {
-      // Couldn't connect, alas
-      debugMessage(String("Can not connect to WFii after ") + MAX_TRIES + " attempts");   
-    }
-  #endif
-
-  #ifdef RJ45
-    // Configure Ethernet CS pin, not needed if using default D10
-    //Ethernet.init(10);  // Most Arduino shields
-    //Ethernet.init(5);   // MKR ETH shield
-    //Ethernet.init(0);   // Teensy 2.0
-    //Ethernet.init(20);  // Teensy++ 2.0
-    //Ethernet.init(15);  // ESP8266 with Adafruit Featherwing Ethernet
-    //Ethernet.init(33);  // ESP32 with Adafruit Featherwing Ethernet
-  
-    // Initialize Ethernet and UDP
-    if (Ethernet.begin(mac) == 0)
-    {
-      // identified errors
-      if (Ethernet.hardwareStatus() == EthernetNoHardware)
-      {
-        debugMessage("Ethernet hardware not found");
-      }
-      else if (Ethernet.linkStatus() == LinkOFF)
-      {
-        debugMessage("Ethernet cable not connected");
-      }
-      else
-      {
-        // generic error
-        debugMessage("Failed to configure Ethernet");
-      }
-    }
-    else
-    {
-      debugMessage(String("Ethernet IP address is: ") + ip2CharArray(Ethernet.localIP()));
-      internetAvailable = true;
-    }
-  #endif
+  // Setup whatever network connection is specified in config.h
+  internetAvailable = aq_network.networkBegin();
 
   // Implement a variety of internet services, if networking hardware is present and the
   // network is connected.  Services supported include:
   //
-  //  NTP to get date and time information
+  //  NTP to get date and time information (via Network subsystem)
   //  Open Weather Map (OWM) to get local weather and AQI info
   //  MQTT to publish data to an MQTT broker on specified topics
   //  DWEET to publish data to the DWEET service
@@ -317,88 +217,45 @@ void setup()
   // Get local weather and air quality info from Open Weather Map
   getWeather();
 
-  #if defined(WIFI) || defined(RJ45)
-  // if there is a network interface (so networking code will compile)
-    if (internetAvailable)
-    // and internet is verified
-    {
-      // Get time from NTP
-      timeClient.begin();
-      // Set offset time in seconds to adjust for your timezone
-      timeClient.setTimeOffset(timeZone*60*60);
-      debugMessage("NTP time: " + dateTimeString());
+  if (internetAvailable)
+  // and internet is verified
+  {
 
-      #ifdef MQTTLOG
-        if ((mqttSensorUpdate()) && (mqttBatteryUpdate()))
-        {
-          infoScreen("Updated [+M] " + dateTimeString());     
-        }
-        else
-        {
-          infoScreen("Updated " + dateTimeString());
-        }
-      #endif
+    #ifdef MQTTLOG
+      if ((mqttSensorUpdate()) && (mqttBatteryUpdate()))
+      {
+        infoScreen("Updated [+M] " + aq_network.dateTimeString());     
+      }
+      else
+      {
+        infoScreen("Updated " + aq_network.dateTimeString());
+      }
+    #endif
 
-      // update screen only
-      infoScreen("Updated " + dateTimeString());
-
-      #ifdef DWEET
-        post_dweet(intermediateCO2, intermediateTemp, intermediateHumidity);
-      #endif
-    }
-    else
-    {
-      // update screen only
-      infoScreen("Updated " + dateTimeString());
-    }
-    deepSleep();
-  #else
     // update screen only
-    infoScreen("Updated " + dateTimeString());
-    deepSleep();
-  #endif
+    infoScreen("Updated " + aq_network.dateTimeString());
+
+    #ifdef DWEET
+      if(sensorData.internalCO2 != 10000) {
+        float battpct = lc.cellPercent();
+        float battv   = lc.cellVoltage();
+        post_dweet(sensorData.internalCO2, sensorData.internalTemp, sensorData.internalHumidity,
+          battpct, battv);
+      }
+    #endif
+  }
+  else
+  {
+    // update screen only
+    infoScreen("Updated " + aq_network.dateTimeString());
+  }
+  deepSleep();
 }
 
 void loop()
 {}
 
-#if defined(WIFI) || defined(RJ45)
-  String ip2CharArray(IPAddress ip) 
-  {
-    static char a[16];
-    sprintf(a, "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
-    return a;
-  }
-
-  String httpGETRequest(const char* serverName) 
-  {
-    HTTPClient http;
-  
-    // servername is domain name w/URL path or IP address w/URL path
-    http.begin(client, serverName);
-  
-    // Send HTTP POST request
-    int httpResponseCode = http.GET();
-  
-    String payload = "{}";
-  
-    if (httpResponseCode>0)
-    {
-      debugMessage("HTTP Response code: " + httpResponseCode);
-      payload = http.getString();
-    }
-    else
-    {
-      debugMessage("Error code: " + httpResponseCode);
-    }
-    // free resources
-    http.end();
-  
-    return payload;
-  }
-#endif
-
-#if ((defined(WIFI) || defined(RJ45)) && defined(MQTTLOG))
+#ifdef MQTTLOG
   void mqttConnect()
   // Connects and reconnects to MQTT broker, call as needed to maintain connection
   {
@@ -501,76 +358,6 @@ void loop()
   }
 #endif
 
-String dateTimeString()
-// Converts system time into human readable strings
-{
-  String dateTime;
-  String weekDays[7]={"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
-
-  #if defined(WIFI) || defined(RJ45)
-    if (timeClient.update())
-    {
-      // NTPClient doesn't include date information, get it from time structure
-      time_t epochTime = timeClient.getEpochTime();
-      struct tm *ptm = gmtime ((time_t *)&epochTime);
-      int day = ptm->tm_mday;
-      int month = ptm->tm_mon+1;
-      int year = ptm->tm_year+1900;
-
-      dateTime = weekDays[timeClient.getDay()];
-      dateTime += ", ";
-
-      if (month<10) dateTime += "0";
-      dateTime += month;
-      dateTime += "/";
-      if (day<10) dateTime += "0";
-      dateTime += day;
-      dateTime += " at ";
-      if (timeClient.getHours()<10) dateTime += "0";
-      dateTime += timeClient.getHours();
-      dateTime += ":";
-      if (timeClient.getMinutes()<10) dateTime += "0";
-      dateTime += timeClient.getMinutes();
-
-      // zulu format
-      // dateTime = year + "-";
-      // if (month()<10) dateTime += "0";
-      // dateTime += month;
-      // dateTime += "-";
-      // if (day()<10) dateTime += "0";
-      // dateTime += day;
-      // dateTime += "T";
-      // if (timeClient.getHours()<10) dateTime += "0";
-      // dateTime += timeClient.getHours();
-      // dateTime += ":";
-      // if (timeClient.getMinutes()<10) dateTime += "0";
-      // dateTime += timeClient.getMinutes();
-      // dateTime += ":";
-      // if (timeClient.getSeconds()<10) dateTime += "0";
-      // dateTime += timeClient.getSeconds();
-      // switch (timeZone)
-      // {
-      //   case 0:
-      //     dateTime += "Z";
-      //     break;
-      //   case -7:
-      //     dateTime += "PDT";
-      //     break;
-      //   case -8:
-      //     dateTime += "PST";
-      //     break;     
-      // }
-    }
-    else
-    {
-      dateTime = "Time not set";
-    }
-  #else
-    dateTime = "Time not set";
-  #endif
-  return dateTime;
-}
-
 void debugMessage(String messageText)
 // wraps Serial.println as #define conditional
 {
@@ -589,9 +376,7 @@ void deepSleep()
     display.powerDown();
     digitalWrite(EPD_RESET, LOW); // hardware power down mode
   }
-  #ifdef WIFI
-    client.stop();
-  #endif
+  aq_network.networkStop();
   // SCD40 only
   envSensor.stopPeriodicMeasurement();
 
@@ -613,7 +398,7 @@ void getWeather()
       // Get local temp and humidity
       String serverPath = String(OWM_SERVER) + OWM_WEATHER_PATH + OWM_LAT_LONG + "&units=imperial" + "&APPID=" + OWM_KEY;
   
-      jsonBuffer = httpGETRequest(serverPath.c_str());
+      jsonBuffer = aq_network.httpGETRequest(serverPath.c_str());
       //debugMessage(jsonBuffer);
   
       StaticJsonDocument<1024> doc;
@@ -662,7 +447,7 @@ void getWeather()
       // Get local AQI
       serverPath = String(OWM_SERVER) + OWM_AQM_PATH + OWM_LAT_LONG + "&APPID=" + OWM_KEY;
   
-      jsonBuffer = httpGETRequest(serverPath.c_str());
+      jsonBuffer = aq_network.httpGETRequest(serverPath.c_str());
       //debugMessage(jsonBuffer);
   
       StaticJsonDocument<384> doc1;
@@ -825,19 +610,24 @@ int initSensor()
 {
   //SCD40
   uint16_t error;
+  char errorMessage[256];
 
   Wire.begin();
   envSensor.begin(Wire);
+
   error = envSensor.startPeriodicMeasurement();
   if (error)
   {
-    delay(5000); // allow the sensor to warm up
-    return 0;
+    // Failed to initialize SCD40
+    debugMessage("Error executing SCD40 startPeriodicMeasurement(): ");
+    errorToString(error, errorMessage, 256);
+    debugMessage(errorMessage);
+    return error;
   }
   else
   {
-    delay(5000);
-    return 1;
+    delay(5000);  // Give SCD40 time to warm up
+    return 0;     // error = 0 in this case
   }
   // ATHX0, SiH7021, BME280
   // if (envSensor.begin())
@@ -906,62 +696,3 @@ int readNVStorage()
   debugMessage(String("Sample count FROM nv storage is ") + counter);
   return counter;
 }
-
-#ifdef DWEET
-// Post a dweet to report the various sensor reading.  This routine blocks while
-// talking to the network, so may take a while to execute.
-void post_dweet(uint16_t co2, float tempF, float humidity)
-{
-
-  if(WiFi.status() != WL_CONNECTED) {
-    debugMessage("Lost network connection to '" + String(WIFI_SSID) + "'!");
-    // show_disconnected();  / Future feature to display state of network connectivity (LED?)
-    return;
-  }
-
-  debugMessage("connecting to " + String(DWEET_HOST));
-
-  // Use WiFiClient class to create TCP connections
-  WiFiClient dweet_client;
-  const int httpPort = 80;
-  if (!dweet_client.connect(DWEET_HOST, httpPort)) {
-    debugMessage("connection failed: " + String(DWEET_HOST));
-    return;
-  }
-
-  // Use HTTP post and send a data payload as JSON
-  String device_info = "{\"rssi\":\""   + String(WiFi.RSSI())        + "\"," +
-                       "\"ipaddr\":\"" + WiFi.localIP().toString()  + "\",";
-  String battery_info;
-  if(batteryAvailable) {
-    battery_info = "\"battery_percent\":\"" + String(lc.cellPercent()) + "\"," +
-                   "\"battery_voltage\":\"" + String(lc.cellVoltage()) + "\",";
-  }
-  else {
-    battery_info = "";
-  }
-  String sensor_info = "\"co2\":\""         + String(co2)             + "\"," +
-                       "\"temperature\":\"" + String(tempF, 2)         + "\"," +
-                       "\"humidity\":\""    + String(humidity, 2)      + "\"}";
-
-  String postdata = device_info + battery_info + sensor_info;
-  dweet_client.println("POST /dweet/for/" + String(DWEET_DEVICE) + " HTTP/1.1");
-  dweet_client.println("Host: dweet.io");
-  dweet_client.println("Cache-Control: no-cache");
-  dweet_client.println("Content-Type: application/json");
-  dweet_client.print("Content-Length: ");
-  dweet_client.println(postdata.length());
-  dweet_client.println();
-  dweet_client.println(postdata);
-  debugMessage(postdata);
-  delay(1500);
-
-  // Fetch any reply from server and print as debug messages
-  while(dweet_client.available()) {
-    String line = dweet_client.readStringUntil('\r');
-    debugMessage(line);
-  }
-  dweet_client.stop();
-  debugMessage("closing connection for dweeting");
-}
-#endif
