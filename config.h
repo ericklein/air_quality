@@ -1,9 +1,9 @@
 // conditional compile flags
-//#define DEBUG 	// Output to serial port
+#define DEBUG 	// Output to serial port
 //#define RJ45  	// use Ethernet
 #define WIFI    	// use WiFi
 //#define MQTTLOG 	// log sensor data to MQTT broker
-#define DWEET     // Post sensor readings to dweet.io
+//#define DWEET     // Post sensor readings to dweet.io
 #define INFLUX  	// Log data to remote InfluxDB server
 
 // sample timing in minutes
@@ -13,14 +13,14 @@
 	#define SAMPLE_INTERVAL 5
 #endif
 // number of samples captured before logging
-#define SAMPLE_SIZE 4
+#define SAMPLE_SIZE 1
 // millisecond modifier to minutes for sampling interval (ARM)
 // #define SAMPLE_INTERVAL_ARM_MODIFIER 60000
 // microsecond modifier to minutes for sampling interval (ESP)
 #define SAMPLE_INTERVAL_ESP_MODIFIER 60000000
 
-// set device ID; used by mqtt and wifi, also tags data stored to InfluxDB
-#define CLIENT_ID "test_room"
+// set client ID; used by mqtt and wifi
+#define CLIENT_ID "AQ-test room"
 
 // Open Weather Map parameters
 #define OWM_SERVER			"http://api.openweathermap.org/data/2.5/"
@@ -90,9 +90,10 @@ const int timeZone = -7;  // USA PDT
   
 	// Standard set of tag values used for each sensor data point stored to InfluxDB.  Reuses
   // CLIENT_ID as defined anove here in config.h as well as device location (e.g., room in 
-  // the house) and site (indoors vs. outdoors, typically).  
-	#define DEVICE_LOCATION "dining room"
+  // the house) and site (indoors vs. outdoors, typically).
+	#define DEVICE_LOCATION "test room"
 	#define DEVICE_SITE "indoor"
+	#define DEVICE_TYPE "air quality"
 #endif
 
 // The following parameters are defined in secrets.h.

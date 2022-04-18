@@ -19,14 +19,14 @@ AQ_Network aq_network;
 Preferences nvStorage;
 
 int sampleCounter;
-float intermediateTemp;
+float intermediateTempF;
 float intermediateHumidity;
 uint16_t intermediateCO2;
 
 // environment characteristics
 typedef struct
 {
-  float internalTemp;
+  float internalTempF;
   float internalHumidity;
   uint16_t internalCO2;
   int extTemperature;
@@ -151,39 +151,39 @@ void setup()
   if (sampleCounter < SAMPLE_SIZE)
   // update intermediate sensor values and go back to sleep
   {
-    nvStorage.putFloat("temp",(sensorData.internalTemp+intermediateTemp));
+    nvStorage.putFloat("temp",(sensorData.internalTempF+intermediateTempF));
     nvStorage.putFloat("humidity",(sensorData.internalHumidity+intermediateHumidity));
     if (sensorData.internalCO2 == 10000)
     {
-    debugMessage(String("Intermediate values TO nv storage: Temp:")+(sensorData.internalTemp+intermediateTemp)+" Humidity:"+(sensorData.internalHumidity+intermediateHumidity));
+    debugMessage(String("Intermediate values TO nv storage: Temp:")+(sensorData.internalTempF+intermediateTempF)+" Humidity:"+(sensorData.internalHumidity+intermediateHumidity));
     }
     else
     {
       nvStorage.putUInt("co2",(sensorData.internalCO2+intermediateCO2));
-      debugMessage(String("Intermediate values TO nv storage: Temp:") + (sensorData.internalTemp+intermediateTemp) + " Humidity:" + (sensorData.internalHumidity+intermediateHumidity) + ", CO2:" + (sensorData.internalCO2+intermediateCO2));
+      debugMessage(String("Intermediate values TO nv storage: Temp:") + (sensorData.internalTempF+intermediateTempF) + " Humidity:" + (sensorData.internalHumidity+intermediateHumidity) + ", CO2:" + (sensorData.internalCO2+intermediateCO2));
     }
     deepSleep();
   }
   else
   {
     // average intermediate values
-    intermediateTemp = ((sensorData.internalTemp+intermediateTemp)/SAMPLE_SIZE);
+    intermediateTempF = ((sensorData.internalTempF+intermediateTempF)/SAMPLE_SIZE);
     intermediateHumidity = ((sensorData.internalHumidity+intermediateHumidity)/SAMPLE_SIZE);
     if (sensorData.internalCO2 != 10000)
     {
       intermediateCO2 = ((sensorData.internalCO2+intermediateCO2)/SAMPLE_SIZE);
     }
     // publish new averages to persistent storage
-    nvStorage.putFloat("temp",intermediateTemp);
+    nvStorage.putFloat("temp",intermediateTempF);
     nvStorage.putFloat("humidity",intermediateHumidity);
     if (sensorData.internalCO2 == 10000)
     {
-    debugMessage(String("Averaged values TO nv storage: Temp:")+(sensorData.internalTemp+intermediateTemp)+", Humidity:"+intermediateHumidity);
+    debugMessage(String("Averaged values TO nv storage: Temp:")+(sensorData.internalTempF+intermediateTempF)+", Humidity:"+intermediateHumidity);
     }
     else
     {
       nvStorage.putUInt("co2",intermediateCO2);
-      debugMessage(String("Averaged values TO nv storage: Temp:")+intermediateTemp+", Humidity:"+intermediateHumidity+", CO2:"+intermediateCO2);
+      debugMessage(String("Averaged values TO nv storage: Temp:")+intermediateTempF+", Humidity:"+intermediateHumidity+", CO2:"+intermediateCO2);
     }
     //reset and store sample count
     sampleCounter = 1;
@@ -239,7 +239,7 @@ void setup()
       if(sensorData.internalCO2 != 10000) {
         float battpct = lc.cellPercent();
         float battv   = lc.cellVoltage();
-        post_dweet(sensorData.internalCO2, sensorData.internalTemp, sensorData.internalHumidity,
+        post_dweet(sensorData.internalCO2, sensorData.internalTempF, sensorData.internalHumidity,
           battpct, battv);
       }
     #endif
@@ -323,7 +323,7 @@ void loop()
   int mqttSensorUpdate()
   // Publishes sensor data to MQTT broker
   {
-    if ((sensorData.internalCO2==10000)&&(sensorData.internalTemp==10000))
+    if ((sensorData.internalCO2==10000)&&(sensorData.internalTempF==10000))
     // no sensor data to publish
     {
       debugMessage("No sensor data to publish to MQTT broker");
@@ -331,18 +331,18 @@ void loop()
     else
     {
       mqttConnect();
-      if ((tempPub.publish(intermediateTemp)) && (humidityPub.publish(intermediateHumidity)))
+      if ((tempPub.publish(intermediateTempF)) && (humidityPub.publish(intermediateHumidity)))
       {
         if (sensorData.internalCO2!=10000)
         {
           if(co2Pub.publish(intermediateCO2))
           {
-            debugMessage("MQTT publish at " + dateTimeString() + "->" + CLIENT_ID + "," + intermediateTemp + "," + intermediateHumidity + "," + intermediateCO2);
+            debugMessage("MQTT publish at " + dateTimeString() + "->" + CLIENT_ID + "," + intermediateTempF + "," + intermediateHumidity + "," + intermediateCO2);
             return 1;
           }
           else
           {
-            debugMessage("MQTT publish at  " + dateTimeString() + " , " + CLIENT_ID + " , " + intermediateTemp + " , " + intermediateHumidity);
+            debugMessage("MQTT publish at  " + dateTimeString() + " , " + CLIENT_ID + " , " + intermediateTempF + " , " + intermediateHumidity);
             debugMessage("MQTT CO2 publish failed at " + dateTimeString());
             return 0;
           }
@@ -541,11 +541,11 @@ void infoScreen(String messageText)
   display.setFont(&FreeSans9pt7b);
 
   // indoor info
-  int temperatureDelta = ((int)(sensorData.internalTemp +0.5)) - ((int) (intermediateTemp + 0.5));
+  int temperatureDelta = ((int)(sensorData.internalTempF +0.5)) - ((int) (intermediateTempF + 0.5));
   int humidityDelta = ((int)(sensorData.internalHumidity +0.5)) - ((int) (intermediateHumidity + 0.5));
 
   display.setCursor(5,((display.height()*3/8)-10));
-  display.print(String("Temp ") + (int)(sensorData.internalTemp+0.5) + "F (" + temperatureDelta + ")");
+  display.print(String("Temp ") + (int)(sensorData.internalTempF+0.5) + "F (" + temperatureDelta + ")");
 
   display.setCursor(5,((display.height()*5/8)-10));
   display.print(String("Humid ") + (int)(sensorData.internalHumidity+0.5) + "% (" + humidityDelta + ")");
@@ -644,32 +644,32 @@ void readSensor()
 // reads environment sensor and stores data to environment global
 {
   // SCD40
-  uint8_t error = envSensor.readMeasurement(sensorData.internalCO2, sensorData.internalTemp, sensorData.internalHumidity);
+  uint8_t error = envSensor.readMeasurement(sensorData.internalCO2, sensorData.internalTempF, sensorData.internalHumidity);
   if (error)
   {
     debugMessage("Error reading SCD40 sensor");
     deepSleep();
   }
   // convert C to F for temp
-  sensorData.internalTemp = (sensorData.internalTemp*1.8)+32;
-  debugMessage(String("SCD40 environment sensor values: ") + sensorData.internalTemp + "F, " + sensorData.internalHumidity + "%, " + sensorData.internalCO2 + " ppm");
+  sensorData.internalTempF = (sensorData.internalTempF*1.8)+32;
+  debugMessage(String("SCD40 environment sensor values: ") + sensorData.internalTempF + "F, " + sensorData.internalHumidity + "%, " + sensorData.internalCO2 + " ppm");
 
   // AHTX0
   // no error handling?!
   // sensors_event_t sensorHumidity, sensorTemp;
   // envSensor.getEvent(&sensorHumidity, &sensorTemp);
-  // sensorData.internalTemp = sensorTemp.temperature;
+  // sensorData.internalTempF = sensorTemp.temperature;
   // sensorData.internalHumidity = sensorHumidity.relative_humidity;
   // sensorData.internalCO2 = 10000;
-  // debugMessage(String("AHTX0 environment sensor values: ") + sensorData.internalTemp + "F, " + sensorData.internalHumidity + "%, " + sensorData.internalCO2 + " ppm");
+  // debugMessage(String("AHTX0 environment sensor values: ") + sensorData.internalTempF + "F, " + sensorData.internalHumidity + "%, " + sensorData.internalCO2 + " ppm");
 
 
   // bme280, SiH7021
   // no error handling?!
-  // sensorData.internalTemp = (envSensor.readTemperature()*1.8)+32;
+  // sensorData.internalTempF = (envSensor.readTemperature()*1.8)+32;
   // sensorData.internalHumidity = envSensor.readHumidity();
   // sensorData.internalCO2 = 10000;
-  // debugMessage(String("BME280/SiH7021 environment sensor values: ") + sensorData.internalTemp + "F, " + sensorData.internalHumidity + "%, " + sensorData.internalCO2 + " ppm");
+  // debugMessage(String("BME280/SiH7021 environment sensor values: ") + sensorData.internalTempF + "F, " + sensorData.internalHumidity + "%, " + sensorData.internalCO2 + " ppm");
 }
 
 int readNVStorage()
@@ -680,18 +680,18 @@ int readNVStorage()
   // get previously stored values. If they don't exist, create them as zero
   counter = nvStorage.getInt("counter",1);
   // read value or insert current sensor reading if this is the first read from nv storage
-  intermediateTemp = nvStorage.getFloat("temp",sensorData.internalTemp);
+  intermediateTempF = nvStorage.getFloat("temp",sensorData.internalTempF);
   intermediateHumidity = nvStorage.getFloat("humidity",sensorData.internalHumidity);
   if (sensorData.internalCO2 == 10000)
   // there is no CO2 sensor value to use
   {
-    debugMessage(String("Intermediate values FROM nv storage: Temp:")+intermediateTemp+", Humidity:"+intermediateHumidity);
+    debugMessage(String("Intermediate values FROM nv storage: Temp:")+intermediateTempF+", Humidity:"+intermediateHumidity);
   }
   else
   // include CO2 data
   {
     intermediateCO2 = nvStorage.getUInt("co2",sensorData.internalCO2);
-    debugMessage(String("Intermediate values FROM nv storage: Temp:")+intermediateTemp+", Humidity:"+intermediateHumidity+", CO2:"+intermediateCO2);
+    debugMessage(String("Intermediate values FROM nv storage: Temp:")+intermediateTempF+", Humidity:"+intermediateHumidity+", CO2:"+intermediateCO2);
   }
   debugMessage(String("Sample count FROM nv storage is ") + counter);
   return counter;

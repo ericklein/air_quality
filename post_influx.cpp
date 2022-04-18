@@ -45,7 +45,7 @@ void post_influx(uint16_t co2, float tempF, float humidity)
   
   // Add constant Influx data point tags - only do once, will be added to all individual data points
   // Modify if required to reflect your InfluxDB data model (and set values in config.h)
-  dbenvdata.addTag("device", CLIENT_ID);
+  dbenvdata.addTag("device", DEVICE_TYPE);
   dbenvdata.addTag("location", DEVICE_LOCATION);
   dbenvdata.addTag("site", DEVICE_SITE);
 
