@@ -232,9 +232,6 @@ void setup()
       }
     #endif
 
-    // update screen only
-    infoScreen("Updated " + aq_network.dateTimeString());
-
     #ifdef DWEET
       if(sensorData.internalCO2 != 10000) {
         float battpct = lc.cellPercent();
@@ -243,6 +240,16 @@ void setup()
           battpct, battv);
       }
     #endif
+
+    #ifdef INFLUX
+      if(sensorData.internalCO2 != 10000)
+      {
+        post_influx(sensorData.internalCO2, sensorData.internalTempF, sensorData.internalHumidity);
+      }
+    #endif
+
+    // update screen only
+    infoScreen("Updated " + aq_network.dateTimeString());
   }
   else
   {
