@@ -51,7 +51,7 @@ SensirionI2CScd4x envSensor;
 //Adafruit_AHTX0 envSensor;
 
 // Si7021
-// #include "Adafruit_Si7021.h"
+// #include <Adafruit_Si7021.h>
 // Adafruit_Si7021 envSensor = Adafruit_Si7021();
 
 // BME680
@@ -61,17 +61,16 @@ SensirionI2CScd4x envSensor;
 // Adafruit_BME280 envSensor;
 
 // Battery voltage sensor
-#include "Adafruit_LC709203F.h"
+#include <Adafruit_LC709203F.h>
 Adafruit_LC709203F lc;
 
 // screen support
 // Adafruit MagTag
-#include <Adafruit_GFX.h>
-#include "Adafruit_ThinkInk.h"
+#include <Adafruit_ThinkInk.h>
 #include <Fonts/FreeSans9pt7b.h>
-#define EPD_DC      7   // can be any pin, but required!
-#define EPD_RESET   6   // can set to -1 and share with chip Reset (can't deep sleep)
-#define EPD_CS      8   // can be any pin, but required!
+// #define EPD_DC      7   // can be any pin, but required!
+// #define EPD_RESET   6   // can set to -1 and share with chip Reset (can't deep sleep)
+// #define EPD_CS      8   // can be any pin, but required!
 #define SRAM_CS     -1  // can set to -1 to not use a pin (uses a lot of RAM!)
 #define EPD_BUSY    5   // can set to -1 to not use a pin (will wait a fixed delay)
 ThinkInk_290_Grayscale4_T5 display(EPD_DC, EPD_RESET, EPD_CS, SRAM_CS, EPD_BUSY);
@@ -81,8 +80,8 @@ ThinkInk_290_Grayscale4_T5 display(EPD_DC, EPD_RESET, EPD_CS, SRAM_CS, EPD_BUSY)
 
 #ifdef MQTTLOG
   // MQTT setup
-  #include "Adafruit_MQTT.h"
-  #include "Adafruit_MQTT_Client.h"
+  #include <Adafruit_MQTT.h>
+  #include <Adafruit_MQTT_Client.h>
   Adafruit_MQTT_Client mqtt(&client, MQTT_BROKER, MQTT_PORT, CLIENT_ID, MQTT_USER, MQTT_PASS);
 
   Adafruit_MQTT_Publish tempPub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC1,MQTT_QOS_1);
@@ -122,16 +121,6 @@ void setup()
       debugMessage("Dweet device: " + String(DWEET_DEVICE));
     #endif
   #endif
-
-  if (initScreen())
-  {
-    debugMessage("Screen ready");
-    screenAvailable = true;
-  }
-  else
-  {
-    debugMessage("Screen not detected");
-  }
 
   // Initialize environmental sensor.  Returns non-zero if initialization fails
   if (initSensor())
@@ -189,6 +178,16 @@ void setup()
     sampleCounter = 1;
     nvStorage.putInt("counter",sampleCounter);
     debugMessage(String("Sample counter reset to ")+sampleCounter);
+  }
+
+  if (initScreen())
+  {
+    debugMessage("Screen ready");
+    screenAvailable = true;
+  }
+  else
+  {
+    debugMessage("Screen not detected");
   }
 
   if (lc.begin())

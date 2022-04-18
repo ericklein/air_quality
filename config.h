@@ -1,5 +1,5 @@
 // conditional compile flags
-#define DEBUG 	// Output to serial port
+//#define DEBUG 	// Output to serial port
 //#define RJ45  	// use Ethernet
 #define WIFI    	// use WiFi
 //#define MQTTLOG 	// log sensor data to MQTT broker
@@ -13,7 +13,7 @@
 	#define SAMPLE_INTERVAL 5
 #endif
 // number of samples captured before logging
-#define SAMPLE_SIZE 1
+#define SAMPLE_SIZE 3
 // millisecond modifier to minutes for sampling interval (ARM)
 // #define SAMPLE_INTERVAL_ARM_MODIFIER 60000
 // microsecond modifier to minutes for sampling interval (ESP)
