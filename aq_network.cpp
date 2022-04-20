@@ -8,6 +8,7 @@
 
 // Shared helper function we call here too...
 extern void debugMessage(String messageText);
+extern bool batteryAvailable;
 
 // Includes and defines specific to WiFi network connectivity
 #ifdef WIFI
@@ -52,6 +53,19 @@ extern void debugMessage(String messageText);
   #include <HTTPClient.h> 
 #endif
 
+// MQTT interface depends on the underlying network client object, which is defined and
+// managed here (so needs to be defined here).
+#ifdef MQTTLOG
+  // MQTT setup
+  #include <Adafruit_MQTT.h>
+  #include <Adafruit_MQTT_Client.h>
+  Adafruit_MQTT_Client aq_mqtt(&client, MQTT_BROKER, MQTT_PORT, CLIENT_ID, MQTT_USER, MQTT_PASS);
+#endif
+
+//****************************************************************************************************
+// AQ_Network Class and Member Functions 
+//
+
 // Converts system time into human readable strings. Depends on NTP service access
 String AQ_Network::dateTimeString()
 {
@@ -69,7 +83,7 @@ String AQ_Network::dateTimeString()
       int year = ptm->tm_year+1900;
   
       dateTime = weekDays[timeClient.getDay()];
-      dateTime += ",";
+      dateTime += ", ";
   
       if (month<10) dateTime += "0";
       dateTime += month;

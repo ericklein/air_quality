@@ -34,7 +34,7 @@ Point dbenvdata(INFLUX_ENV_MEASUREMENT);
 
 // Post data to Influx DB using the connection established during setup
 // Operates over the network, so may take a while to execute.
-void post_influx(uint16_t co2, float tempF, float humidity)
+boolean post_influx(uint16_t co2, float tempF, float humidity)
 {
   Serial.println("Saving data to Influx");
   #ifdef INFLUX_V1
@@ -53,6 +53,7 @@ void post_influx(uint16_t co2, float tempF, float humidity)
   boolean dbsuccess = false;
   uint8_t dbtries;
   for (dbtries = 1; dbtries <= 5; dbtries++) {
+    debugMessage(String("InfluxDB connection attempt ") + dbtries + " of 5 in " + (dbtries*10) + " seconds");
     if (dbclient.validateConnection()) {
       debugMessage("Connected to InfluxDB: " + dbclient.getServerUrl());
       dbsuccess = true;
@@ -62,7 +63,7 @@ void post_influx(uint16_t co2, float tempF, float humidity)
   }
   if(dbsuccess == false) {
     debugMessage("InfluxDB connection failed: " + dbclient.getLastErrorMessage());
-    return;
+    return(false);  // Failed...
   }
   else {
     // Connected, so store measured values into timeseries data point
@@ -75,8 +76,10 @@ void post_influx(uint16_t co2, float tempF, float humidity)
     // Write point via connection to InfluxDB host
     if (!dbclient.writePoint(dbenvdata)) {
       debugMessage("InfluxDB write failed: " + dbclient.getLastErrorMessage());
+      dbsuccess = false;  // So close...
     }
     dbclient.flushBuffer();  // Clear pending writes (before going to sleep)
   }
+  return(dbsuccess);
 }
 #endif

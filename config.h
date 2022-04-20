@@ -2,8 +2,8 @@
 //#define DEBUG 	// Output to serial port
 //#define RJ45  	// use Ethernet
 #define WIFI    	// use WiFi
-//#define MQTTLOG 	// log sensor data to MQTT broker
-//#define DWEET     // Post sensor readings to dweet.io
+#define MQTTLOG 	// log sensor data to MQTT broker
+#define DWEET     // Post sensor readings to dweet.io
 #define INFLUX  	// Log data to remote InfluxDB server
 
 // sample timing in minutes
