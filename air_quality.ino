@@ -80,7 +80,7 @@ ThinkInk_290_Grayscale4_T5 display(EPD_DC, EPD_RESET, EPD_CS, SRAM_CS, EPD_BUSY)
 #include "ArduinoJson.h"  // Needed by getWeather()
 
 #ifdef INFLUX
-  extern boolean post_influx(uint16_t co2, float tempF, float humidity);
+  extern boolean post_influx(uint16_t co2, float tempF, float humidity, float battery_p, float battery_v);
 #endif
 
 #ifdef DWEET
@@ -235,7 +235,7 @@ void setup()
       if(sensorData.internalCO2 != 10000) {
         float battpct = lc.cellPercent();
         float battv   = lc.cellVoltage();
-        post_dweet(averageCO2,averageTempF, averageHumidity,battpct,battv);
+        post_dweet(averageCO2,averageTempF, averageHumidity, battpct, battv);
         upd_flags += "D";
       }
     #endif
@@ -243,8 +243,10 @@ void setup()
     #ifdef INFLUX
       if(sensorData.internalCO2 != 10000)
       {
+        float battpct = lc.cellPercent();
+        float battv   = lc.cellVoltage();
         // Returns true if successful
-        if(post_influx(averageCO2,averageTempF, averageHumidity)) {
+        if(post_influx(averageCO2,averageTempF, averageHumidity, battpct, battv)) {
           upd_flags += "I";
         }
       }

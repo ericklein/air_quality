@@ -17,7 +17,6 @@ extern void debugMessage(String messageText);
 // and v2.X are supported here depending on configuration settings in secrets.h.  Code here
 // reflects a number of presumptions about the data schema and InfluxDB configuration:
 //
-// Presumes snesor
 
 #ifdef INFLUX_V1
 // InfluxDB client instance for InfluxDB 1
@@ -31,10 +30,11 @@ InfluxDBClient dbclient(INFLUXDB_URL, INFLUXDB_ORG, INFLUXDB_BUCKET, INFLUXDB_TO
 
 // InfluxDB Data point, binds to InfluxDB 'measurement' to use for data. See config.h for value used
 Point dbenvdata(INFLUX_ENV_MEASUREMENT);
+Point dbdevdata(INFLUX_DEV_MEASUREMENT);
 
 // Post data to Influx DB using the connection established during setup
 // Operates over the network, so may take a while to execute.
-boolean post_influx(uint16_t co2, float tempF, float humidity)
+boolean post_influx(uint16_t co2, float tempF, float humidity, float battery_p, float battery_v)
 {
   Serial.println("Saving data to Influx");
   #ifdef INFLUX_V1
@@ -45,9 +45,14 @@ boolean post_influx(uint16_t co2, float tempF, float humidity)
   
   // Add constant Influx data point tags - only do once, will be added to all individual data points
   // Modify if required to reflect your InfluxDB data model (and set values in config.h)
+  // First for environmental data
   dbenvdata.addTag("device", DEVICE_TYPE);
   dbenvdata.addTag("location", DEVICE_LOCATION);
   dbenvdata.addTag("site", DEVICE_SITE);
+  // And again for device data
+  dbdevdata.addTag("device", DEVICE_TYPE);
+  dbdevdata.addTag("location", DEVICE_LOCATION);
+  dbdevdata.addTag("site", DEVICE_SITE);
 
   // If confirmed connection to InfluxDB server, store our data values (with retries)
   boolean dbsuccess = false;
@@ -66,7 +71,7 @@ boolean post_influx(uint16_t co2, float tempF, float humidity)
     return(false);  // Failed...
   }
   else {
-    // Connected, so store measured values into timeseries data point
+    // Connected, so store sensor values into timeseries data point
     dbenvdata.clearFields();
     // Report sensor readings
     dbenvdata.addField("temperature", tempF);
@@ -78,6 +83,20 @@ boolean post_influx(uint16_t co2, float tempF, float humidity)
       debugMessage("InfluxDB write failed: " + dbclient.getLastErrorMessage());
       dbsuccess = false;  // So close...
     }
+
+    // Now store device information 
+    dbdevdata.clearFields();
+    // Report device readings
+    dbdevdata.addField("battery_pct", battery_p);
+    dbdevdata.addField("battery_volts", battery_v);
+    // dbdevdata.addField("rssi", rssi);
+    debugMessage("Writing: " + dbclient.pointToLineProtocol(dbdevdata));
+    // Write point via connection to InfluxDB host
+    if (!dbclient.writePoint(dbdevdata)) {
+      debugMessage("InfluxDB write failed: " + dbclient.getLastErrorMessage());
+      dbsuccess = false;  // So close...
+    }
+    
     dbclient.flushBuffer();  // Clear pending writes (before going to sleep)
   }
   return(dbsuccess);
