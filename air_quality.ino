@@ -18,15 +18,16 @@ AQ_Network aq_network;
 #include <Preferences.h>
 Preferences nvStorage;
 
+// Variables for accumulating averaged sensor readings
 int sampleCounter;
-float intermediateTemp;
-float intermediateHumidity;
-uint16_t intermediateCO2;
+float averageTempF;
+float averageHumidity;
+uint16_t averageCO2;
 
 // environment characteristics
 typedef struct
 {
-  float internalTemp;
+  float internalTempF;
   float internalHumidity;
   uint16_t internalCO2;
   int extTemperature;
@@ -51,7 +52,7 @@ SensirionI2CScd4x envSensor;
 //Adafruit_AHTX0 envSensor;
 
 // Si7021
-// #include "Adafruit_Si7021.h"
+// #include <Adafruit_Si7021.h>
 // Adafruit_Si7021 envSensor = Adafruit_Si7021();
 
 // BME680
@@ -61,17 +62,16 @@ SensirionI2CScd4x envSensor;
 // Adafruit_BME280 envSensor;
 
 // Battery voltage sensor
-#include "Adafruit_LC709203F.h"
+#include <Adafruit_LC709203F.h>
 Adafruit_LC709203F lc;
 
 // screen support
 // Adafruit MagTag
-#include <Adafruit_GFX.h>
-#include "Adafruit_ThinkInk.h"
+#include <Adafruit_ThinkInk.h>
 #include <Fonts/FreeSans9pt7b.h>
-#define EPD_DC      7   // can be any pin, but required!
-#define EPD_RESET   6   // can set to -1 and share with chip Reset (can't deep sleep)
-#define EPD_CS      8   // can be any pin, but required!
+// #define EPD_DC      7   // can be any pin, but required!
+// #define EPD_RESET   6   // can set to -1 and share with chip Reset (can't deep sleep)
+// #define EPD_CS      8   // can be any pin, but required!
 #define SRAM_CS     -1  // can set to -1 to not use a pin (uses a lot of RAM!)
 #define EPD_BUSY    5   // can set to -1 to not use a pin (will wait a fixed delay)
 ThinkInk_290_Grayscale4_T5 display(EPD_DC, EPD_RESET, EPD_CS, SRAM_CS, EPD_BUSY);
@@ -79,24 +79,18 @@ ThinkInk_290_Grayscale4_T5 display(EPD_DC, EPD_RESET, EPD_CS, SRAM_CS, EPD_BUSY)
 
 #include "ArduinoJson.h"  // Needed by getWeather()
 
-#ifdef MQTTLOG
-  // MQTT setup
-  #include "Adafruit_MQTT.h"
-  #include "Adafruit_MQTT_Client.h"
-  Adafruit_MQTT_Client mqtt(&client, MQTT_BROKER, MQTT_PORT, CLIENT_ID, MQTT_USER, MQTT_PASS);
-
-  Adafruit_MQTT_Publish tempPub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC1,MQTT_QOS_1);
-  Adafruit_MQTT_Publish humidityPub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC2, MQTT_QOS_1);
-  Adafruit_MQTT_Publish co2Pub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC3, MQTT_QOS_1);
-  Adafruit_MQTT_Publish batteryLevelPub = Adafruit_MQTT_Publish(&mqtt, MQTT_PUB_TOPIC4, MQTT_QOS_1);
-#endif
-
 #ifdef INFLUX
-  extern void post_influx(uint16_t co2, float tempF, float humidity);
+  extern boolean post_influx(uint16_t co2, float tempF, float humidity, float battery_p, float battery_v);
 #endif
 
 #ifdef DWEET
   extern void post_dweet(uint16_t co2, float tempF, float humidity, float battpct, float battv);
+#endif
+
+#ifdef MQTTLOG
+  extern void mqttConnect();
+  extern int mqttBatteryUpdate(float cellPercent);
+  extern int mqttSensorUpdate(uint16_t co2, float tempF, float humidity);
 #endif
 
 void setup()
@@ -104,10 +98,12 @@ void setup()
 {
   #ifdef DEBUG
     Serial.begin(115200);
+    /*
     while (!Serial)
     {
       // wait for serial port
     }
+    */
     // Confirm key site configuration parameters
     debugMessage("Air Quality started");
     debugMessage("---------------------------------");
@@ -122,16 +118,6 @@ void setup()
       debugMessage("Dweet device: " + String(DWEET_DEVICE));
     #endif
   #endif
-
-  if (initScreen())
-  {
-    debugMessage("Screen ready");
-    screenAvailable = true;
-  }
-  else
-  {
-    debugMessage("Screen not detected");
-  }
 
   // Initialize environmental sensor.  Returns non-zero if initialization fails
   if (initSensor())
@@ -149,46 +135,56 @@ void setup()
   debugMessage(String("Sample count TO nv storage is ") + sampleCounter);
 
   if (sampleCounter < SAMPLE_SIZE)
-  // update intermediate sensor values and go back to sleep
+  // update averaged sensor values and go back to sleep
   {
-    nvStorage.putFloat("temp",(sensorData.internalTemp+intermediateTemp));
-    nvStorage.putFloat("humidity",(sensorData.internalHumidity+intermediateHumidity));
+    nvStorage.putFloat("temp",(sensorData.internalTempF+averageTempF));
+    nvStorage.putFloat("humidity",(sensorData.internalHumidity+averageHumidity));
     if (sensorData.internalCO2 == 10000)
     {
-    debugMessage(String("Intermediate values TO nv storage: Temp:")+(sensorData.internalTemp+intermediateTemp)+" Humidity:"+(sensorData.internalHumidity+intermediateHumidity));
+      debugMessage(String("Intermediate values TO nv storage: Temp:")+(sensorData.internalTempF+averageTempF)+" Humidity:"+(sensorData.internalHumidity+averageHumidity));
     }
     else
     {
-      nvStorage.putUInt("co2",(sensorData.internalCO2+intermediateCO2));
-      debugMessage(String("Intermediate values TO nv storage: Temp:") + (sensorData.internalTemp+intermediateTemp) + " Humidity:" + (sensorData.internalHumidity+intermediateHumidity) + ", CO2:" + (sensorData.internalCO2+intermediateCO2));
+      nvStorage.putUInt("co2",(sensorData.internalCO2+averageCO2));
+      debugMessage(String("Intermediate values TO nv storage: Temp:") + (sensorData.internalTempF+averageTempF) + " Humidity:" + (sensorData.internalHumidity+averageHumidity) + ", CO2:" + (sensorData.internalCO2+averageCO2));
     }
     deepSleep();
   }
   else
   {
     // average intermediate values
-    intermediateTemp = ((sensorData.internalTemp+intermediateTemp)/SAMPLE_SIZE);
-    intermediateHumidity = ((sensorData.internalHumidity+intermediateHumidity)/SAMPLE_SIZE);
+    averageTempF = ((sensorData.internalTempF+averageTempF)/SAMPLE_SIZE);
+    averageHumidity = ((sensorData.internalHumidity+averageHumidity)/SAMPLE_SIZE);
     if (sensorData.internalCO2 != 10000)
     {
-      intermediateCO2 = ((sensorData.internalCO2+intermediateCO2)/SAMPLE_SIZE);
+      averageCO2 = ((sensorData.internalCO2+averageCO2)/SAMPLE_SIZE);
     }
     // publish new averages to persistent storage
-    nvStorage.putFloat("temp",intermediateTemp);
-    nvStorage.putFloat("humidity",intermediateHumidity);
+    nvStorage.putFloat("temp",averageTempF);
+    nvStorage.putFloat("humidity",averageHumidity);
     if (sensorData.internalCO2 == 10000)
     {
-    debugMessage(String("Averaged values TO nv storage: Temp:")+(sensorData.internalTemp+intermediateTemp)+", Humidity:"+intermediateHumidity);
+      debugMessage(String("Averaged values TO nv storage: Temp:")+averageTempF+", Humidity:"+averageHumidity);
     }
     else
     {
-      nvStorage.putUInt("co2",intermediateCO2);
-      debugMessage(String("Averaged values TO nv storage: Temp:")+intermediateTemp+", Humidity:"+intermediateHumidity+", CO2:"+intermediateCO2);
+      nvStorage.putUInt("co2",averageCO2);
+      debugMessage(String("Averaged values TO nv storage: Temp:")+averageTempF+", Humidity:"+averageHumidity+", CO2:"+averageCO2);
     }
     //reset and store sample count
     sampleCounter = 1;
     nvStorage.putInt("counter",sampleCounter);
     debugMessage(String("Sample counter reset to ")+sampleCounter);
+  }
+
+  if (initScreen())
+  {
+    debugMessage("Screen ready");
+    screenAvailable = true;
+  }
+  else
+  {
+    debugMessage("Screen not detected");
   }
 
   if (lc.begin())
@@ -217,146 +213,59 @@ void setup()
   // Get local weather and air quality info from Open Weather Map
   getWeather();
 
+  String upd_flags = "";  // To indicate whether services succeeded
   if (internetAvailable)
   // and internet is verified
   {
 
     #ifdef MQTTLOG
-      if ((mqttSensorUpdate()) && (mqttBatteryUpdate()))
-      {
-        infoScreen("Updated [+M] " + aq_network.dateTimeString());     
-      }
-      else
-      {
-        infoScreen("Updated " + aq_network.dateTimeString());
+      int sensor_pub = 0;
+      int batt_pub = 0;
+      if(sensorData.internalCO2 != 10000) {
+        sensor_pub = mqttSensorUpdate(averageCO2,averageTempF,averageHumidity);
+        batt_pub   = mqttBatteryUpdate(lc.cellPercent());
+        if(sensor_pub && batt_pub)
+        {
+          upd_flags += "M";
+        }
       }
     #endif
-
-    // update screen only
-    infoScreen("Updated " + aq_network.dateTimeString());
 
     #ifdef DWEET
       if(sensorData.internalCO2 != 10000) {
         float battpct = lc.cellPercent();
         float battv   = lc.cellVoltage();
-        post_dweet(sensorData.internalCO2, sensorData.internalTemp, sensorData.internalHumidity,
-          battpct, battv);
+        post_dweet(averageCO2,averageTempF, averageHumidity, battpct, battv);
+        upd_flags += "D";
+      }
+    #endif
+
+    #ifdef INFLUX
+      if(sensorData.internalCO2 != 10000)
+      {
+        float battpct = lc.cellPercent();
+        float battv   = lc.cellVoltage();
+        // Returns true if successful
+        if(post_influx(averageCO2,averageTempF, averageHumidity, battpct, battv)) {
+          upd_flags += "I";
+        }
       }
     #endif
   }
-  else
-  {
-    // update screen only
+
+  // Always update the screen, Internet or not
+  if(upd_flags == "") {
+    // None of the services succeeded (gasp!)
     infoScreen("Updated " + aq_network.dateTimeString());
+  }
+  else {
+    infoScreen("Updated [+"+ upd_flags + "] " + aq_network.dateTimeString());
   }
   deepSleep();
 }
 
 void loop()
 {}
-
-#ifdef MQTTLOG
-  void mqttConnect()
-  // Connects and reconnects to MQTT broker, call as needed to maintain connection
-  {
-    int8_t mqttErr;
-    int8_t tries = 1;
-  
-    // exit if already connected
-    if (mqtt.connected())
-    {
-      return;
-    }
-  
-    while ((mqttErr = mqtt.connect() != 0) && (tries<=MQTT_ATTEMPT_LIMIT))
-    {
-      // generic MQTT error
-      // debugMessage(mqtt.connectErrorString(mqttErr));
-  
-      // Adafruit IO connect errors
-      switch (mqttErr)
-      {
-        case 1: debugMessage("Adafruit MQTT: Wrong protocol"); break;
-        case 2: debugMessage("Adafruit MQTT: ID rejected"); break;
-        case 3: debugMessage("Adafruit MQTT: Server unavailable"); break;
-        case 4: debugMessage("Adafruit MQTT: Incorrect user or password"); break;
-        case 5: debugMessage("Adafruit MQTT: Not authorized"); break;
-        case 6: debugMessage("Adafruit MQTT: Failed to subscribe"); break;
-        default: debugMessage("Adafruit MQTT: GENERIC - Connection failed"); break;
-      }
-      debugMessage(String(MQTT_BROKER) + " connect attempt " + tries + " of " + MQTT_ATTEMPT_LIMIT + " happens in " + (tries*10) + " seconds");
-      mqtt.disconnect();
-      delay(tries*10000);
-      tries++;
-  
-      if (tries == MQTT_ATTEMPT_LIMIT)
-      {
-        debugMessage(String("Connection failed to MQTT broker: ") + MQTT_BROKER);
-      }
-    }
-    if (tries < MQTT_ATTEMPT_LIMIT)
-    {
-      debugMessage(String("Connected to MQTT broker ") + MQTT_BROKER);
-    }
-  }
-
-  int mqttBatteryUpdate()
-  {
-    if (batteryAvailable)
-    {
-      // stored so we don't call the function twice in the routine
-      float percent = lc.cellPercent();
-      if (batteryLevelPub.publish(percent))
-      {
-        debugMessage(String("MQTT battery percent publish with value:") + percent);
-        return 1;
-      }
-      else
-      {
-        debugMessage(String("MQTT battery percent publish failed at:") + dateTimeString());
-        return 0;
-      }
-      mqtt.disconnect();
-    }
-  }
-  
-  int mqttSensorUpdate()
-  // Publishes sensor data to MQTT broker
-  {
-    if ((sensorData.internalCO2==10000)&&(sensorData.internalTemp==10000))
-    // no sensor data to publish
-    {
-      debugMessage("No sensor data to publish to MQTT broker");
-    }
-    else
-    {
-      mqttConnect();
-      if ((tempPub.publish(intermediateTemp)) && (humidityPub.publish(intermediateHumidity)))
-      {
-        if (sensorData.internalCO2!=10000)
-        {
-          if(co2Pub.publish(intermediateCO2))
-          {
-            debugMessage("MQTT publish at " + dateTimeString() + "->" + CLIENT_ID + "," + intermediateTemp + "," + intermediateHumidity + "," + intermediateCO2);
-            return 1;
-          }
-          else
-          {
-            debugMessage("MQTT publish at  " + dateTimeString() + " , " + CLIENT_ID + " , " + intermediateTemp + " , " + intermediateHumidity);
-            debugMessage("MQTT CO2 publish failed at " + dateTimeString());
-            return 0;
-          }
-        }
-      }
-      else
-      {
-        debugMessage("MQTT temp and humidity publish failed at " + dateTimeString());
-        return 0;   
-      } 
-    mqtt.disconnect();
-    } 
-  }
-#endif
 
 void debugMessage(String messageText)
 // wraps Serial.println as #define conditional
@@ -541,11 +450,11 @@ void infoScreen(String messageText)
   display.setFont(&FreeSans9pt7b);
 
   // indoor info
-  int temperatureDelta = ((int)(sensorData.internalTemp +0.5)) - ((int) (intermediateTemp + 0.5));
-  int humidityDelta = ((int)(sensorData.internalHumidity +0.5)) - ((int) (intermediateHumidity + 0.5));
+  int temperatureDelta = ((int)(sensorData.internalTempF +0.5)) - ((int) (averageTempF + 0.5));
+  int humidityDelta = ((int)(sensorData.internalHumidity +0.5)) - ((int) (averageHumidity + 0.5));
 
   display.setCursor(5,((display.height()*3/8)-10));
-  display.print(String("Temp ") + (int)(sensorData.internalTemp+0.5) + "F (" + temperatureDelta + ")");
+  display.print(String("Temp ") + (int)(sensorData.internalTempF+0.5) + "F (" + temperatureDelta + ")");
 
   display.setCursor(5,((display.height()*5/8)-10));
   display.print(String("Humid ") + (int)(sensorData.internalHumidity+0.5) + "% (" + humidityDelta + ")");
@@ -553,7 +462,7 @@ void infoScreen(String messageText)
   if (sensorData.internalCO2!=10000)
   {
     display.setCursor(5,((display.height()*7/8)-10));
-    display.print(String("C02 ") + sensorData.internalCO2 + " (" + (sensorData.internalCO2 - intermediateCO2) + ")");
+    display.print(String("C02 ") + sensorData.internalCO2 + " (" + (sensorData.internalCO2 - averageCO2) + ")");
   }
 
   // outdoor info
@@ -644,32 +553,32 @@ void readSensor()
 // reads environment sensor and stores data to environment global
 {
   // SCD40
-  uint8_t error = envSensor.readMeasurement(sensorData.internalCO2, sensorData.internalTemp, sensorData.internalHumidity);
+  uint8_t error = envSensor.readMeasurement(sensorData.internalCO2, sensorData.internalTempF, sensorData.internalHumidity);
   if (error)
   {
     debugMessage("Error reading SCD40 sensor");
     deepSleep();
   }
   // convert C to F for temp
-  sensorData.internalTemp = (sensorData.internalTemp*1.8)+32;
-  debugMessage(String("SCD40 environment sensor values: ") + sensorData.internalTemp + "F, " + sensorData.internalHumidity + "%, " + sensorData.internalCO2 + " ppm");
+  sensorData.internalTempF = (sensorData.internalTempF*1.8)+32;
+  debugMessage(String("SCD40 environment sensor values: ") + sensorData.internalTempF + "F, " + sensorData.internalHumidity + "%, " + sensorData.internalCO2 + " ppm");
 
   // AHTX0
   // no error handling?!
   // sensors_event_t sensorHumidity, sensorTemp;
   // envSensor.getEvent(&sensorHumidity, &sensorTemp);
-  // sensorData.internalTemp = sensorTemp.temperature;
+  // sensorData.internalTempF = sensorTemp.temperature;
   // sensorData.internalHumidity = sensorHumidity.relative_humidity;
   // sensorData.internalCO2 = 10000;
-  // debugMessage(String("AHTX0 environment sensor values: ") + sensorData.internalTemp + "F, " + sensorData.internalHumidity + "%, " + sensorData.internalCO2 + " ppm");
+  // debugMessage(String("AHTX0 environment sensor values: ") + sensorData.internalTempF + "F, " + sensorData.internalHumidity + "%, " + sensorData.internalCO2 + " ppm");
 
 
   // bme280, SiH7021
   // no error handling?!
-  // sensorData.internalTemp = (envSensor.readTemperature()*1.8)+32;
+  // sensorData.internalTempF = (envSensor.readTemperature()*1.8)+32;
   // sensorData.internalHumidity = envSensor.readHumidity();
   // sensorData.internalCO2 = 10000;
-  // debugMessage(String("BME280/SiH7021 environment sensor values: ") + sensorData.internalTemp + "F, " + sensorData.internalHumidity + "%, " + sensorData.internalCO2 + " ppm");
+  // debugMessage(String("BME280/SiH7021 environment sensor values: ") + sensorData.internalTempF + "F, " + sensorData.internalHumidity + "%, " + sensorData.internalCO2 + " ppm");
 }
 
 int readNVStorage()
@@ -680,18 +589,18 @@ int readNVStorage()
   // get previously stored values. If they don't exist, create them as zero
   counter = nvStorage.getInt("counter",1);
   // read value or insert current sensor reading if this is the first read from nv storage
-  intermediateTemp = nvStorage.getFloat("temp",sensorData.internalTemp);
-  intermediateHumidity = nvStorage.getFloat("humidity",sensorData.internalHumidity);
+  averageTempF = nvStorage.getFloat("temp",sensorData.internalTempF);
+  averageHumidity = nvStorage.getFloat("humidity",sensorData.internalHumidity);
   if (sensorData.internalCO2 == 10000)
   // there is no CO2 sensor value to use
   {
-    debugMessage(String("Intermediate values FROM nv storage: Temp:")+intermediateTemp+", Humidity:"+intermediateHumidity);
+    debugMessage(String("Intermediate values FROM nv storage: Temp:")+averageTempF+", Humidity:"+averageHumidity);
   }
   else
   // include CO2 data
   {
-    intermediateCO2 = nvStorage.getUInt("co2",sensorData.internalCO2);
-    debugMessage(String("Intermediate values FROM nv storage: Temp:")+intermediateTemp+", Humidity:"+intermediateHumidity+", CO2:"+intermediateCO2);
+    averageCO2 = nvStorage.getUInt("co2",sensorData.internalCO2);
+    debugMessage(String("Intermediate values FROM nv storage: Temp:")+averageTempF+", Humidity:"+averageHumidity+", CO2:"+averageCO2);
   }
   debugMessage(String("Sample count FROM nv storage is ") + counter);
   return counter;

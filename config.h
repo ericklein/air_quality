@@ -2,9 +2,9 @@
 //#define DEBUG 	// Output to serial port
 //#define RJ45  	// use Ethernet
 #define WIFI    	// use WiFi
-//#define MQTTLOG 	// log sensor data to MQTT broker
+#define MQTTLOG 	// log sensor data to MQTT broker
 #define DWEET     // Post sensor readings to dweet.io
-//#define INFLUX  	// Log data to remote InfluxDB server
+#define INFLUX  	// Log data to remote InfluxDB server
 
 // sample timing in minutes
 #ifdef DEBUG
@@ -13,16 +13,16 @@
 	#define SAMPLE_INTERVAL 5
 #endif
 // number of samples captured before logging
-#define SAMPLE_SIZE 4
+#define SAMPLE_SIZE 3
 // millisecond modifier to minutes for sampling interval (ARM)
 // #define SAMPLE_INTERVAL_ARM_MODIFIER 60000
 // microsecond modifier to minutes for sampling interval (ESP)
 #define SAMPLE_INTERVAL_ESP_MODIFIER 60000000
 
-// set device ID; used by mqtt and screen
-#define CLIENT_ID "test_room"
+// set client ID; used by mqtt and wifi
+#define CLIENT_ID "AQ-test room"
 
-// open weather map parameters
+// Open Weather Map parameters
 #define OWM_SERVER			"http://api.openweathermap.org/data/2.5/"
 #define OWM_WEATHER_PATH	"weather?"
 #define OWM_AQM_PATH		"air_pollution?"
@@ -83,32 +83,45 @@ const int timeZone = -7;  // USA PDT
 	#define DWEET_DEVICE "makerhour-airquality"  // Must be unique across all of dweet.io
 #endif
 
-#ifdef INFLUX
-	// Tags values for InfluxDB data points.  Should be customized to match your 
-	// InfluxDB data model, and can add more here and in post_influx.cpp if desired
-	#define DEVICE_NAME "airquality"
-	#define DEVICE_LOCATION "dining room"
+#ifdef INFLUX  
+  // Name of Measurements expected/used in the Influx DB.
+  #define INFLUX_ENV_MEASUREMENT "weather"  // Used for environmental sensor data
+  #define INFLUX_DEV_MEASUREMENT "device"   // Used for logging AQI device data (e.g. battery)
+  
+	// Standard set of tag values used for each sensor data point stored to InfluxDB.  Reuses
+  // CLIENT_ID as defined anove here in config.h as well as device location (e.g., room in 
+  // the house) and site (indoors vs. outdoors, typically).
+	#define DEVICE_LOCATION "test room"
 	#define DEVICE_SITE "indoor"
+	#define DEVICE_TYPE "air quality"
 #endif
 
-// The following parameters are defined in secrets.h
-// #ifdef WIFI
-// 	// WiFi credentials
+// The following parameters are defined in secrets.h.
+// 	WiFi credentials (if WiFi enabled)
 // 	#define WIFI_SSID
 // 	#define WIFI_PASS       
-// #endif
 
-// 	open weather map
+// 	Open Weather Map
 // 	#define OWM_KEY
 //	#define OWM_LAT_LONG
 
+// If MQTT enabled
 // 	#define MQTT_PORT
 // 	#define MQTT_USER
 // 	#define MQTT_BROKER
 // 	#define MQTT_PASS
 
-// InfluxDB server, database, and access credentials
+// If InfluxDB data storage enabled
+// For an InfluxDB v1.X server:
+// #define INFLUX_V1
 // #define INFLUXDB_URL 
 // #define INFLUXDB_DB_NAME
 // #define INFLUXDB_USER
 // #define INFLUXDB_PASSWORD
+//
+// For an InfluxDB v2.X server:
+// #define INFLUX_V2
+// #define INFLUXDB_URL 
+// #define INFLUXDB_TOKEN
+// #define INFLUXDB_ORG
+// #define INFLUXDB_BUCKET
