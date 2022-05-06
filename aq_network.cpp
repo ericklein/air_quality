@@ -69,8 +69,9 @@ extern bool batteryAvailable;
 // Converts system time into human readable strings. Depends on NTP service access
 String AQ_Network::dateTimeString()
 {
+  String dateTime;
+
   #if defined(WIFI) || defined(RJ45)
-    String dateTime;
     String weekDays[7]={"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
   
     if (timeClient.update())
@@ -243,14 +244,15 @@ String AQ_Network::httpGETRequest(const char* serverName)
     // Send HTTP GET request
     int httpResponseCode = http.GET();
   
-    if (httpResponseCode>0)
+    if (httpResponseCode == HTTP_CODE_OK)
     {
-      debugMessage("HTTP Response code: " + httpResponseCode);
+      // HTTP reponse OK code
       payload = http.getString();
     }
     else
     {
-      debugMessage("Error code: " + httpResponseCode);
+      debugMessage("HTTP GET error code: " + httpResponseCode);
+      payload = "no payload to return";
     }
     // free resources
     http.end();

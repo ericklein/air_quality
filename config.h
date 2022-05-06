@@ -2,13 +2,14 @@
 //#define DEBUG 	// Output to serial port
 //#define RJ45  	// use Ethernet
 #define WIFI    	// use WiFi
-#define MQTTLOG 	// log sensor data to MQTT broker
-#define DWEET     // Post sensor readings to dweet.io
+//#define MQTTLOG 	// log sensor data to MQTT broker
+//#define DWEET     // Post sensor readings to dweet.io
 #define INFLUX  	// Log data to remote InfluxDB server
+#define	SCREEN		// use screen as output
 
 // sample timing in minutes
 #ifdef DEBUG
-	#define SAMPLE_INTERVAL 1
+	#define SAMPLE_INTERVAL 2
 #else
 	#define SAMPLE_INTERVAL 5
 #endif
@@ -58,10 +59,20 @@ const int timeZone = -7;  // USA PDT
 	// #define MQTT_PUB_TOPIC3		"sircoolio/feeds/kitchen.co2"
 	// #define MQTT_PUB_TOPIC4		"sircoolio/feeds/kitchen.battery-level"
 
+	// #define MQTT_PUB_TOPIC1		"sircoolio/feeds/cellar.temperature"
+	// #define MQTT_PUB_TOPIC2		"sircoolio/feeds/cellar.humidity"
+	// #define MQTT_PUB_TOPIC3		"sircoolio/feeds/cellar.co2"
+	// #define MQTT_PUB_TOPIC4		"sircoolio/feeds/cellar.battery-level"
+
 	#define MQTT_PUB_TOPIC1		"sircoolio/feeds/test-room.temperature"
 	#define MQTT_PUB_TOPIC2		"sircoolio/feeds/test-room.humidity"
 	#define MQTT_PUB_TOPIC3		"sircoolio/feeds/test-room.co2"
 	#define MQTT_PUB_TOPIC4		"sircoolio/feeds/test-room.battery-level"
+
+	// #define MQTT_PUB_TOPIC1		"sircoolio/feeds/test-headless.temperature"
+	// #define MQTT_PUB_TOPIC2		"sircoolio/feeds/test-headless.humidity"
+	// #define MQTT_PUB_TOPIC3		"sircoolio/feeds/test-headless.co2"
+	// #define MQTT_PUB_TOPIC4		"sircoolio/feeds/test-headless.battery-level"
 #endif
 
 // Battery parameters

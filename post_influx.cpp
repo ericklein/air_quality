@@ -76,7 +76,10 @@ boolean post_influx(uint16_t co2, float tempF, float humidity, float battery_p, 
     // Report sensor readings
     dbenvdata.addField("temperature", tempF);
     dbenvdata.addField("humidity", humidity);
-    dbenvdata.addField("co2", co2);
+    if (co2 !=10000)
+    {
+      dbenvdata.addField("co2", co2);
+    }
     debugMessage("Writing: " + dbclient.pointToLineProtocol(dbenvdata));
     // Write point via connection to InfluxDB host
     if (!dbclient.writePoint(dbenvdata)) {

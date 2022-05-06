@@ -52,9 +52,18 @@ void post_dweet(uint16_t co2, float tempF, float humidity, float battpct, float 
   else {
     battery_info = "";
   }
-  String sensor_info = "\"co2\":\""         + String(co2)             + "\"," +
+
+  if (co2 !=10000)
+  {
+    String sensor_info = "\"co2\":\""         + String(co2)             + "\"," +
                        "\"temperature\":\"" + String(tempF, 2)         + "\"," +
                        "\"humidity\":\""    + String(humidity, 2)      + "\"}";
+  }
+  else
+  {
+    String sensor_info = "\"temperature\":\"" + String(tempF, 2)         + "\"," +
+                       "\"humidity\":\""    + String(humidity, 2)      + "\"}";
+  }
 
   String postdata = device_info + battery_info + sensor_info;
   int httpCode = aq_network.httpPOSTRequest(dweeturl,"application/json",postdata);

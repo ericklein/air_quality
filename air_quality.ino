@@ -38,7 +38,6 @@ typedef struct
 // global for air characteristics
 envData sensorData;
 
-bool screenAvailable = false;
 bool batteryAvailable = false;
 bool internetAvailable = false;
 
@@ -55,9 +54,10 @@ SensirionI2CScd4x envSensor;
 // #include <Adafruit_Si7021.h>
 // Adafruit_Si7021 envSensor = Adafruit_Si7021();
 
-// BME680
+// BME280
 // #include <Adafruit_Sensor.h>
 // #include <Adafruit_BME280.h>
+// altitude calculation support
 // #define SEALEVELPRESSURE_HPA (1013.25)
 // Adafruit_BME280 envSensor;
 
@@ -66,16 +66,18 @@ SensirionI2CScd4x envSensor;
 Adafruit_LC709203F lc;
 
 // screen support
-// Adafruit MagTag
-#include <Adafruit_ThinkInk.h>
-#include <Fonts/FreeSans9pt7b.h>
-// #define EPD_DC      7   // can be any pin, but required!
-// #define EPD_RESET   6   // can set to -1 and share with chip Reset (can't deep sleep)
-// #define EPD_CS      8   // can be any pin, but required!
-#define SRAM_CS     -1  // can set to -1 to not use a pin (uses a lot of RAM!)
-#define EPD_BUSY    5   // can set to -1 to not use a pin (will wait a fixed delay)
-ThinkInk_290_Grayscale4_T5 display(EPD_DC, EPD_RESET, EPD_CS, SRAM_CS, EPD_BUSY);
-// colors are EPD_WHITE, EPD_BLACK, EPD_RED, EPD_GRAY, EPD_LIGHT, EPD_DARK
+#ifdef SCREEN
+  // Adafruit MagTag
+  #include <Adafruit_ThinkInk.h>
+  #include <Fonts/FreeSans9pt7b.h>
+  // #define EPD_DC      7   // can be any pin, but required!
+  // #define EPD_RESET   6   // can set to -1 and share with chip Reset (can't deep sleep)
+  // #define EPD_CS      8   // can be any pin, but required!
+  #define SRAM_CS     -1  // can set to -1 to not use a pin (uses a lot of RAM!)
+  #define EPD_BUSY    5   // can set to -1 to not use a pin (will wait a fixed delay)
+  ThinkInk_290_Grayscale4_T5 display(EPD_DC, EPD_RESET, EPD_CS, SRAM_CS, EPD_BUSY);
+  // colors are EPD_WHITE, EPD_BLACK, EPD_RED, EPD_GRAY, EPD_LIGHT, EPD_DARK
+#endif
 
 #include "ArduinoJson.h"  // Needed by getWeather()
 
@@ -96,14 +98,22 @@ ThinkInk_290_Grayscale4_T5 display(EPD_DC, EPD_RESET, EPD_CS, SRAM_CS, EPD_BUSY)
 void setup()
 // One time run of code, then deep sleep
 {
+  #if defined(ARDUINO_ADAFRUIT_FEATHER_ESP32S2)
+    // turn on the I2C power by setting pin to opposite of 'rest state'
+    // Rev B board is LOW to enable
+    // Rev C board is HIGH to enable
+    pinMode(PIN_I2C_POWER, INPUT);
+    delay(1);
+    bool polarity = digitalRead(PIN_I2C_POWER);
+    pinMode(PIN_I2C_POWER, OUTPUT);
+    digitalWrite(PIN_I2C_POWER, !polarity);
+  #endif
+
   #ifdef DEBUG
     Serial.begin(115200);
-    /*
-    while (!Serial)
-    {
-      // wait for serial port
-    }
-    */
+    // wait for serial port connection
+    while (!Serial);
+
     // Confirm key site configuration parameters
     debugMessage("Air Quality started");
     debugMessage("---------------------------------");
@@ -123,8 +133,7 @@ void setup()
   if (initSensor())
   {
     debugMessage("Environment sensor failed to initialize, going to sleep");
-    if (screenAvailable)
-      alertScreen("Environment sensor not detected");
+    alertScreen("Environment sensor not detected");
     deepSleep();
   }
 
@@ -139,65 +148,39 @@ void setup()
   {
     nvStorage.putFloat("temp",(sensorData.internalTempF+averageTempF));
     nvStorage.putFloat("humidity",(sensorData.internalHumidity+averageHumidity));
-    if (sensorData.internalCO2 == 10000)
-    {
-      debugMessage(String("Intermediate values TO nv storage: Temp:")+(sensorData.internalTempF+averageTempF)+" Humidity:"+(sensorData.internalHumidity+averageHumidity));
-    }
-    else
+    if (sensorData.internalCO2 != 10000)
     {
       nvStorage.putUInt("co2",(sensorData.internalCO2+averageCO2));
-      debugMessage(String("Intermediate values TO nv storage: Temp:") + (sensorData.internalTempF+averageTempF) + " Humidity:" + (sensorData.internalHumidity+averageHumidity) + ", CO2:" + (sensorData.internalCO2+averageCO2));
     }
+    debugMessage(String("Intermediate values TO nv storage: Temp:") + (sensorData.internalTempF+averageTempF) + " Humidity:" + (sensorData.internalHumidity+averageHumidity) + ", CO2:" + (sensorData.internalCO2+averageCO2));
     deepSleep();
   }
   else
   {
     // average intermediate values
     averageTempF = ((sensorData.internalTempF+averageTempF)/SAMPLE_SIZE);
+    nvStorage.putFloat("temp",averageTempF);
     averageHumidity = ((sensorData.internalHumidity+averageHumidity)/SAMPLE_SIZE);
+    nvStorage.putFloat("humidity",averageHumidity);
     if (sensorData.internalCO2 != 10000)
     {
       averageCO2 = ((sensorData.internalCO2+averageCO2)/SAMPLE_SIZE);
-    }
-    // publish new averages to persistent storage
-    nvStorage.putFloat("temp",averageTempF);
-    nvStorage.putFloat("humidity",averageHumidity);
-    if (sensorData.internalCO2 == 10000)
-    {
-      debugMessage(String("Averaged values TO nv storage: Temp:")+averageTempF+", Humidity:"+averageHumidity);
-    }
-    else
-    {
       nvStorage.putUInt("co2",averageCO2);
-      debugMessage(String("Averaged values TO nv storage: Temp:")+averageTempF+", Humidity:"+averageHumidity+", CO2:"+averageCO2);
     }
+    debugMessage(String("Averaged values TO nv storage: Temp:")+averageTempF+", Humidity:"+averageHumidity+", CO2:"+averageCO2);
     //reset and store sample count
     sampleCounter = 1;
     nvStorage.putInt("counter",sampleCounter);
     debugMessage(String("Sample counter reset to ")+sampleCounter);
   }
 
-  if (initScreen())
-  {
-    debugMessage("Screen ready");
-    screenAvailable = true;
-  }
-  else
-  {
-    debugMessage("Screen not detected");
-  }
+  #ifdef SCREEN
+    // there is no way to query screen for status
+    display.begin(THINKINK_GRAYSCALE4);
+    debugMessage("Display ready");
+  #endif
 
-  if (lc.begin())
-  // Check battery monitoring status
-  {
-    debugMessage("Battery monitor ready");
-    lc.setPackAPA(BATTERY_APA);
-    batteryAvailable = true;
-  }
-  else
-  {
-    debugMessage("Battery monitor not detected");
-  }
+  initBattery();
   
   // Setup whatever network connection is specified in config.h
   internetAvailable = aq_network.networkBegin();
@@ -217,43 +200,35 @@ void setup()
   if (internetAvailable)
   // and internet is verified
   {
-
     #ifdef MQTTLOG
       int sensor_pub = 0;
       int batt_pub = 0;
-      if(sensorData.internalCO2 != 10000) {
-        sensor_pub = mqttSensorUpdate(averageCO2,averageTempF,averageHumidity);
-        batt_pub   = mqttBatteryUpdate(lc.cellPercent());
-        if(sensor_pub && batt_pub)
-        {
-          upd_flags += "M";
-        }
+      sensor_pub = mqttSensorUpdate(averageCO2,averageTempF,averageHumidity);
+      batt_pub   = mqttBatteryUpdate(lc.cellPercent());
+      if(sensor_pub && batt_pub)
+      {
+        upd_flags += "M";
       }
     #endif
 
     #ifdef DWEET
-      if(sensorData.internalCO2 != 10000) {
         float battpct = lc.cellPercent();
         float battv   = lc.cellVoltage();
         post_dweet(averageCO2,averageTempF, averageHumidity, battpct, battv);
         upd_flags += "D";
-      }
     #endif
 
     #ifdef INFLUX
-      if(sensorData.internalCO2 != 10000)
-      {
         float battpct = lc.cellPercent();
         float battv   = lc.cellVoltage();
         // Returns true if successful
         if(post_influx(averageCO2,averageTempF, averageHumidity, battpct, battv)) {
           upd_flags += "I";
         }
-      }
     #endif
   }
 
-  // Always update the screen, Internet or not
+  // Update the screen if available
   if(upd_flags == "") {
     // None of the services succeeded (gasp!)
     infoScreen("Updated " + aq_network.dateTimeString());
@@ -280,14 +255,19 @@ void deepSleep()
 // Powers down hardware in preparation for board deep sleep
 {
   debugMessage(String("Going to sleep for ") + SAMPLE_INTERVAL + " minute(s)");
-  if (screenAvailable)
-  {
+  #ifdef SCREEN
     display.powerDown();
     digitalWrite(EPD_RESET, LOW); // hardware power down mode
-  }
+  #endif
   aq_network.networkStop();
   // SCD40 only
   envSensor.stopPeriodicMeasurement();
+
+  #if defined(ARDUINO_ADAFRUIT_FEATHER_ESP32S2)
+    // Rev B board is LOW to enable
+    // Rev C board is HIGH to enable
+    digitalWrite(PIN_I2C_POWER,HIGH);
+  #endif
 
   nvStorage.end();
   esp_sleep_enable_timer_wakeup(SAMPLE_INTERVAL*SAMPLE_INTERVAL_ESP_MODIFIER);
@@ -395,124 +375,139 @@ void getWeather()
   debugMessage(String("Open Weather Map returned: ") + sensorData.extTemperature + "F, " + sensorData.extHumidity + "%, " + sensorData.extAQI + " AQI");
 }
 
-int initScreen()
-{
-  // initalize epd screen
-  display.begin(THINKINK_GRAYSCALE4);
-  return 1;
-}
-
 void alertScreen(String messageText)
 // Display critical error message on screen
 {
-  display.clearBuffer();
-  display.setTextColor(EPD_BLACK);
-  display.setFont();  // resets to system default monospace font
-  display.setCursor(5,(display.height()/2));
-  display.print(messageText);
+  #ifdef SCREEN
+    display.clearBuffer();
+    display.setTextColor(EPD_BLACK);
+    display.setFont();  // resets to system default monospace font
+    display.setCursor(5,(display.height()/2));
+    display.print(messageText);
 
-  //update display
-  display.display();
+    //update display
+    display.display();
+  #endif
 }
 
 void infoScreen(String messageText)
 // Display environmental information on screen
 {
-  String aqiLabels[5]={"Good", "Fair", "Moderate", "Poor", "Very Poor"};
-  
-  display.clearBuffer();
+  #ifdef SCREEN
+    String aqiLabels[5]={"Good", "Fair", "Moderate", "Poor", "Very Poor"};
+    
+    display.clearBuffer();
 
-  // borders
-  // ThinkInk 2.9" epd is 296x128 pixels
-  // label border
-  display.drawLine(0,(display.height()/8),display.width(),(display.height()/8),EPD_GRAY);
-  // temperature area
-  display.drawLine(0,(display.height()*3/8),display.width(),(display.height()*3/8),EPD_GRAY);
-  // humidity area
-  display.drawLine(0,(display.height()*5/8),display.width(),(display.height()*5/8),EPD_GRAY);
-  // C02 area
-  display.drawLine(0,(display.height()*7/8),display.width(),(display.height()*7/8),EPD_GRAY);
-  // splitting sensor vs. outside values
-  display.drawLine((display.width()/2),0,(display.width()/2),(display.height()*7/8),EPD_GRAY);
+    // borders
+    // ThinkInk 2.9" epd is 296x128 pixels
+    // label border
+    display.drawLine(0,(display.height()/8),display.width(),(display.height()/8),EPD_GRAY);
+    // temperature area
+    display.drawLine(0,(display.height()*3/8),display.width(),(display.height()*3/8),EPD_GRAY);
+    // humidity area
+    display.drawLine(0,(display.height()*5/8),display.width(),(display.height()*5/8),EPD_GRAY);
+    // C02 area
+    display.drawLine(0,(display.height()*7/8),display.width(),(display.height()*7/8),EPD_GRAY);
+    // splitting sensor vs. outside values
+    display.drawLine((display.width()/2),0,(display.width()/2),(display.height()*7/8),EPD_GRAY);
 
-  // battery status
-  screenBatteryStatus();
+    // battery status
+    screenBatteryStatus();
 
-  display.setTextColor(EPD_BLACK);
+    display.setTextColor(EPD_BLACK);
 
-  // indoor and outdoor labels
-  display.setCursor(((display.width()/4)-10),((display.height()*1/8)-11));
-  display.print("Here");
-  display.setCursor(((display.width()*3/4-12)),((display.height()*1/8)-11));
-  display.print("Outside");
+    // indoor and outdoor labels
+    display.setCursor(((display.width()/4)-10),((display.height()*1/8)-11));
+    display.print("Here");
+    display.setCursor(((display.width()*3/4-12)),((display.height()*1/8)-11));
+    display.print("Outside");
 
-  display.setTextSize(1);
-  display.setFont(&FreeSans9pt7b);
+    display.setTextSize(1);
+    display.setFont(&FreeSans9pt7b);
 
-  // indoor info
-  int temperatureDelta = ((int)(sensorData.internalTempF +0.5)) - ((int) (averageTempF + 0.5));
-  int humidityDelta = ((int)(sensorData.internalHumidity +0.5)) - ((int) (averageHumidity + 0.5));
+    // indoor info
+    int temperatureDelta = ((int)(sensorData.internalTempF +0.5)) - ((int) (averageTempF + 0.5));
+    int humidityDelta = ((int)(sensorData.internalHumidity +0.5)) - ((int) (averageHumidity + 0.5));
 
-  display.setCursor(5,((display.height()*3/8)-10));
-  display.print(String("Temp ") + (int)(sensorData.internalTempF+0.5) + "F (" + temperatureDelta + ")");
+    display.setCursor(5,((display.height()*3/8)-10));
+    display.print(String("Temp ") + (int)(sensorData.internalTempF+0.5) + "F (" + temperatureDelta + ")");
 
-  display.setCursor(5,((display.height()*5/8)-10));
-  display.print(String("Humid ") + (int)(sensorData.internalHumidity+0.5) + "% (" + humidityDelta + ")");
+    display.setCursor(5,((display.height()*5/8)-10));
+    display.print(String("Humid ") + (int)(sensorData.internalHumidity+0.5) + "% (" + humidityDelta + ")");
 
-  if (sensorData.internalCO2!=10000)
+    if (sensorData.internalCO2!=10000)
+    {
+      display.setCursor(5,((display.height()*7/8)-10));
+      display.print(String("C02 ") + sensorData.internalCO2 + " (" + (sensorData.internalCO2 - averageCO2) + ")");
+    }
+
+    // outdoor info
+    if (sensorData.extTemperature!=10000)
+    {
+      display.setCursor(((display.width()/2)+5),((display.height()*3/8)-10));
+      display.print(String("Temp ") + sensorData.extTemperature + "F");
+    }
+    if (sensorData.extHumidity!=10000)
+    {
+      display.setCursor(((display.width()/2)+5),((display.height()*5/8)-10));
+      display.print(String("Humidity ") + sensorData.extHumidity + "%");
+    }
+    // air quality index (AQI)
+    if (sensorData.extAQI!=10000)
+    {
+      display.setCursor(((display.width()/2)+5),((display.height()*7/8)-10));
+      display.print("AQI ");
+      display.print(aqiLabels[(sensorData.extAQI-1)]);
+    }
+
+    // message
+    display.setFont();  // resets to system default monospace font
+    display.setCursor(5,(display.height()-10));
+    display.print(messageText);
+
+    //update display
+    display.display();
+    debugMessage("Screen updated");
+  #endif
+}
+
+void initBattery()
+{
+  if (lc.begin())
+  // Check battery monitoring status
   {
-    display.setCursor(5,((display.height()*7/8)-10));
-    display.print(String("C02 ") + sensorData.internalCO2 + " (" + (sensorData.internalCO2 - averageCO2) + ")");
+    debugMessage("Battery monitor ready");
+    lc.setPackAPA(BATTERY_APA);
+    batteryAvailable = true;
   }
-
-  // outdoor info
-  if (sensorData.extTemperature!=10000)
+  else
   {
-    display.setCursor(((display.width()/2)+5),((display.height()*3/8)-10));
-    display.print(String("Temp ") + sensorData.extTemperature + "F");
+    debugMessage("Battery monitor not detected");
   }
-  if (sensorData.extHumidity!=10000)
-  {
-    display.setCursor(((display.width()/2)+5),((display.height()*5/8)-10));
-    display.print(String("Humidity ") + sensorData.extHumidity + "%");
-  }
-  // air quality index (AQI)
-  if (sensorData.extAQI!=10000)
-  {
-    display.setCursor(((display.width()/2)+5),((display.height()*7/8)-10));
-    display.print("AQI ");
-    display.print(aqiLabels[(sensorData.extAQI-1)]);
-  }
-
-  // message
-  display.setFont();  // resets to system default monospace font
-  display.setCursor(5,(display.height()-10));
-  display.print(messageText);
-
-  //update display
-  display.display();
-  debugMessage("Screen updated");
 }
 
 void screenBatteryStatus()
 // Displays remaining battery % as graphic in lower right of screen
+// used in XXXScreen() routines 
 {
-  if (batteryAvailable)
-  {
-    // render battery percentage to screen
+  #ifdef SCREEN
+    if (batteryAvailable)
+    {
+      // render battery percentage to screen
 
-    int barHeight = 10;
-    int barWidth = 28;
-    // stored so we don't call the function twice in the routine
-    float percent = lc.cellPercent();
-    debugMessage("Battery is at " + String(percent) + " percent capacity");
-    debugMessage("Battery voltage: " + String(lc.cellVoltage()) + " v");
+      int barHeight = 10;
+      int barWidth = 28;
+      // stored so we don't call the function twice in the routine
+      float percent = lc.cellPercent();
+      debugMessage("Battery is at " + String(percent) + " percent capacity");
+      debugMessage("Battery voltage: " + String(lc.cellVoltage()) + " v");
 
-    //calculate fill
-    display.fillRect((display.width()-33),((display.height()*7/8)+4),(int((percent/100)*barWidth)),barHeight,EPD_GRAY);
-    // border
-    display.drawRect((display.width()-33),((display.height()*7/8)+4),barWidth,barHeight,EPD_BLACK);
-  }
+      //calculate fill
+      display.fillRect((display.width()-33),((display.height()*7/8)+4),(int((percent/100)*barWidth)),barHeight,EPD_GRAY);
+      // border
+      display.drawRect((display.width()-33),((display.height()*7/8)+4),barWidth,barHeight,EPD_BLACK);
+    }
+  #endif
 }
 
 int initSensor()
@@ -538,15 +533,18 @@ int initSensor()
     delay(5000);  // Give SCD40 time to warm up
     return 0;     // error = 0 in this case
   }
+
   // ATHX0, SiH7021, BME280
   // if (envSensor.begin())
-  //   {
-  //     return 1;
-  //   }
-  //   else
-  //   {
-  //     return 0;
-  //   }
+  // {
+  //   return 0;
+  // }
+  // else
+  // {
+  //   // ID of 0x56-0x58 or 0x60 is a BME 280, 0x61 is BME680, 0x77 is BME280 on ESP32S2 Feather
+  //   debugMessage(String("Environment sensorID is: 0x")+envSensor.sensorID());
+  //   return 1;
+  // }
 }
 
 void readSensor()
@@ -564,7 +562,6 @@ void readSensor()
   debugMessage(String("SCD40 environment sensor values: ") + sensorData.internalTempF + "F, " + sensorData.internalHumidity + "%, " + sensorData.internalCO2 + " ppm");
 
   // AHTX0
-  // no error handling?!
   // sensors_event_t sensorHumidity, sensorTemp;
   // envSensor.getEvent(&sensorHumidity, &sensorTemp);
   // sensorData.internalTempF = sensorTemp.temperature;
@@ -574,7 +571,6 @@ void readSensor()
 
 
   // bme280, SiH7021
-  // no error handling?!
   // sensorData.internalTempF = (envSensor.readTemperature()*1.8)+32;
   // sensorData.internalHumidity = envSensor.readHumidity();
   // sensorData.internalCO2 = 10000;
@@ -583,25 +579,41 @@ void readSensor()
 
 int readNVStorage()
 {
-  int counter;
+  int storedCounter;
+  float storedTempF;
+  float storedHumidity;
 
   nvStorage.begin("air-quality", false);
   // get previously stored values. If they don't exist, create them as zero
-  counter = nvStorage.getInt("counter",1);
+  storedCounter = nvStorage.getInt("counter",1);
   // read value or insert current sensor reading if this is the first read from nv storage
-  averageTempF = nvStorage.getFloat("temp",sensorData.internalTempF);
-  averageHumidity = nvStorage.getFloat("humidity",sensorData.internalHumidity);
-  if (sensorData.internalCO2 == 10000)
-  // there is no CO2 sensor value to use
+  storedTempF = nvStorage.getFloat("temp",sensorData.internalTempF);
+  // BME280 often issues nan when not configured properly
+  if (isnan(storedTempF))
   {
-    debugMessage(String("Intermediate values FROM nv storage: Temp:")+averageTempF+", Humidity:"+averageHumidity);
+    // bad value, replace with current temp
+    averageTempF = (sensorData.internalTempF*storedCounter);
+    debugMessage("Unexpected tempF value in nv storage replaced with multiple of current temperature");
   }
   else
-  // include CO2 data
   {
-    averageCO2 = nvStorage.getUInt("co2",sensorData.internalCO2);
-    debugMessage(String("Intermediate values FROM nv storage: Temp:")+averageTempF+", Humidity:"+averageHumidity+", CO2:"+averageCO2);
+    // good value, pass it along
+    averageTempF = storedTempF;
   }
-  debugMessage(String("Sample count FROM nv storage is ") + counter);
-  return counter;
+  storedHumidity = nvStorage.getFloat("humidity",sensorData.internalHumidity);
+  if (isnan(storedHumidity))
+  {
+    // bad value, replace with current temp
+    averageHumidity = (sensorData.internalHumidity*storedCounter);
+    debugMessage("Unexpected humidity value in nv storage replaced with multiple of current humidity");
+  }
+  else
+  {
+    // good value, pass it along
+    averageHumidity = storedHumidity;
+  }
+  averageCO2 = nvStorage.getUInt("co2",sensorData.internalCO2);
+  debugMessage(String("Intermediate values FROM nv storage: Temp:")+averageTempF+", Humidity:"+averageHumidity+", CO2:"+averageCO2);
+  debugMessage(String("Sample count FROM nv storage is ") + storedCounter);
+  return storedCounter;
 }
