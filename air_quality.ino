@@ -43,8 +43,8 @@ bool internetAvailable = false;
 
 // initialize environment sensors
 // SCD40; temp, humidity, CO2
-// #include <SensirionI2CScd4x.h>
-// SensirionI2CScd4x envSensor;
+#include <SensirionI2CScd4x.h>
+SensirionI2CScd4x envSensor;
 
 // AHTX0; temp, humidity
 //#include <Adafruit_AHTX0.h>
@@ -55,11 +55,11 @@ bool internetAvailable = false;
 // Adafruit_Si7021 envSensor = Adafruit_Si7021();
 
 // BME280
-#include <Adafruit_Sensor.h>
-#include <Adafruit_BME280.h>
+// #include <Adafruit_Sensor.h>
+// #include <Adafruit_BME280.h>
 // altitude calculation support
 // #define SEALEVELPRESSURE_HPA (1013.25)
-Adafruit_BME280 envSensor;
+// Adafruit_BME280 envSensor;
 
 // Battery voltage sensor
 #include <Adafruit_LC709203F.h>
@@ -261,7 +261,7 @@ void deepSleep()
   #endif
   aq_network.networkStop();
   // SCD40 only
-  //envSensor.stopPeriodicMeasurement();
+  envSensor.stopPeriodicMeasurement();
 
   #if defined(ARDUINO_ADAFRUIT_FEATHER_ESP32S2)
     // Rev B board is LOW to enable
@@ -512,54 +512,54 @@ void screenBatteryStatus()
 
 int initSensor()
 {
-  // //SCD40
-  // uint16_t error;
-  // char errorMessage[256];
+  //SCD40
+  uint16_t error;
+  char errorMessage[256];
 
-  // Wire.begin();
-  // envSensor.begin(Wire);
+  Wire.begin();
+  envSensor.begin(Wire);
 
-  // error = envSensor.startPeriodicMeasurement();
-  // if (error)
-  // {
-  //   // Failed to initialize SCD40
-  //   debugMessage("Error executing SCD40 startPeriodicMeasurement(): ");
-  //   errorToString(error, errorMessage, 256);
-  //   debugMessage(errorMessage);
-  //   return error;
-  // }
-  // else
-  // {
-  //   delay(5000);  // Give SCD40 time to warm up
-  //   return 0;     // error = 0 in this case
-  // }
-
-  // ATHX0, SiH7021, BME280
-  if (envSensor.begin())
+  error = envSensor.startPeriodicMeasurement();
+  if (error)
   {
-    return 0;
+    // Failed to initialize SCD40
+    debugMessage("Error executing SCD40 startPeriodicMeasurement(): ");
+    errorToString(error, errorMessage, 256);
+    debugMessage(errorMessage);
+    return error;
   }
   else
   {
-    // ID of 0x56-0x58 or 0x60 is a BME 280, 0x61 is BME680, 0x77 is BME280 on ESP32S2 Feather
-    debugMessage(String("Environment sensorID is: 0x")+envSensor.sensorID());
-    return 1;
+    delay(5000);  // Give SCD40 time to warm up
+    return 0;     // error = 0 in this case
   }
+
+  // ATHX0, SiH7021, BME280
+  // if (envSensor.begin())
+  // {
+  //   return 0;
+  // }
+  // else
+  // {
+  //   // ID of 0x56-0x58 or 0x60 is a BME 280, 0x61 is BME680, 0x77 is BME280 on ESP32S2 Feather
+  //   debugMessage(String("Environment sensorID is: 0x")+envSensor.sensorID());
+  //   return 1;
+  // }
 }
 
 void readSensor()
 // reads environment sensor and stores data to environment global
 {
   // SCD40
-  // uint8_t error = envSensor.readMeasurement(sensorData.internalCO2, sensorData.internalTempF, sensorData.internalHumidity);
-  // if (error)
-  // {
-  //   debugMessage("Error reading SCD40 sensor");
-  //   deepSleep();
-  // }
-  // // convert C to F for temp
-  // sensorData.internalTempF = (sensorData.internalTempF*1.8)+32;
-  // debugMessage(String("SCD40 environment sensor values: ") + sensorData.internalTempF + "F, " + sensorData.internalHumidity + "%, " + sensorData.internalCO2 + " ppm");
+  uint8_t error = envSensor.readMeasurement(sensorData.internalCO2, sensorData.internalTempF, sensorData.internalHumidity);
+  if (error)
+  {
+    debugMessage("Error reading SCD40 sensor");
+    deepSleep();
+  }
+  // convert C to F for temp
+  sensorData.internalTempF = (sensorData.internalTempF*1.8)+32;
+  debugMessage(String("SCD40 environment sensor values: ") + sensorData.internalTempF + "F, " + sensorData.internalHumidity + "%, " + sensorData.internalCO2 + " ppm");
 
   // AHTX0
   // sensors_event_t sensorHumidity, sensorTemp;
@@ -571,10 +571,10 @@ void readSensor()
 
 
   // bme280, SiH7021
-  sensorData.internalTempF = (envSensor.readTemperature()*1.8)+32;
-  sensorData.internalHumidity = envSensor.readHumidity();
-  sensorData.internalCO2 = 10000;
-  debugMessage(String("BME280/SiH7021 environment sensor values: ") + sensorData.internalTempF + "F, " + sensorData.internalHumidity + "%, " + sensorData.internalCO2 + " ppm");
+  // sensorData.internalTempF = (envSensor.readTemperature()*1.8)+32;
+  // sensorData.internalHumidity = envSensor.readHumidity();
+  // sensorData.internalCO2 = 10000;
+  // debugMessage(String("BME280/SiH7021 environment sensor values: ") + sensorData.internalTempF + "F, " + sensorData.internalHumidity + "%, " + sensorData.internalCO2 + " ppm");
 }
 
 int readNVStorage()
