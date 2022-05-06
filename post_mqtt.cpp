@@ -116,27 +116,18 @@ extern bool internetAvailable;
       result = 0;
     }
     
-    if(co2Pub.publish(co2))
+    if (co2 != 10000)
     {
-      debugMessage("MQTT publish: CO2 succeeded");
+      if(co2Pub.publish(co2))
+      {
+        debugMessage("MQTT publish: CO2 succeeded");
+      }
+      else
+      {
+        debugMessage("MQTT publish: CO2 failed");
+        result = 0;
+      }
     }
-    else {
-      debugMessage("MQTT publish: CO2 failed");
-      result = 0;
-    }
-    /*
-    if ((tempPub.publish(tempF)) && (humidityPub.publish(humidity)) && (co2Pub.publish(co2)) )
-    {
-      // All publishes succeeded
-      debugMessage("MQTT publish at " + aq_network.dateTimeString() + "->" + CLIENT_ID + "," + tempF + "," + humidity + "," + co2);
-      result = 1;
-  }
-    else
-    {
-      debugMessage("MQTT sensor update failed at " + aq_network.dateTimeString());
-      result = 0;
-    }
-    */
     aq_mqtt.disconnect();
     return(result);
   }
