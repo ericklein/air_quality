@@ -2,26 +2,30 @@
 //#define DEBUG 	// Output to serial port
 //#define RJ45  	// use Ethernet
 #define WIFI    	// use WiFi
-//#define MQTTLOG 	// log sensor data to MQTT broker
+#define MQTTLOG 	// log sensor data to MQTT broker
 //#define DWEET     // Post sensor readings to dweet.io
 #define INFLUX  	// Log data to remote InfluxDB server
 #define	SCREEN		// use screen as output
 
 // sample timing in minutes
 #ifdef DEBUG
-	#define SAMPLE_INTERVAL 2
+	#define SAMPLE_INTERVAL 1
 #else
-	#define SAMPLE_INTERVAL 5
+	#define SAMPLE_INTERVAL 10
 #endif
 // number of samples captured before logging
-#define SAMPLE_SIZE 3
+#ifdef DEBUG
+  #define SAMPLE_SIZE 2 // do not set to 1, GitHub issue #54
+#else
+  #define SAMPLE_SIZE 6
+#endif
 // millisecond modifier to minutes for sampling interval (ARM)
 // #define SAMPLE_INTERVAL_ARM_MODIFIER 60000
 // microsecond modifier to minutes for sampling interval (ESP)
 #define SAMPLE_INTERVAL_ESP_MODIFIER 60000000
 
 // set client ID; used by mqtt and wifi
-#define CLIENT_ID "AQ-test room"
+#define CLIENT_ID "AQ-test-room"
 
 // Open Weather Map parameters
 #define OWM_SERVER			"http://api.openweathermap.org/data/2.5/"
@@ -34,6 +38,17 @@
 //const int timeZone = -4;  // USA EDT
 //const int timeZone = -8;  // USA PST
 const int timeZone = -7;  // USA PDT
+
+// Battery parameters
+// based on a settings curve in the LC709203F datasheet
+// #define BATTERY_APA 0x08 // 100mAH
+// #define BATTERY_APA 0x0B // 200mAH
+//#define BATTERY_APA 0x10 // 500mAH
+// #define BATTERY_APA 0x19 // 1000mAH
+// #define BATTERY_APA 0x1D // 1200mAH
+// #define BATTERY_APA 0x2D // 2000mAH
+ #define BATTERY_APA 0x32 // 2500mAH
+// #define BATTERY_APA 0x36 // 3000mAH
 
 #ifdef MQTTLOG
 	// set MQTT parameters
@@ -75,25 +90,6 @@ const int timeZone = -7;  // USA PDT
 	// #define MQTT_PUB_TOPIC4		"sircoolio/feeds/test-headless.battery-level"
 #endif
 
-// Battery parameters
-// based on a settings curve in the LC709203F datasheet
-// #define BATTERY_APA 0x08 // 100mAH
-// #define BATTERY_APA 0x0B // 200mAH
-#define BATTERY_APA 0x10 // 500mAH
-// #define BATTERY_APA 0x19 // 1000mAH
-// #define BATTERY_APA 0x1D // 1200mAH
-// #define BATTERY_APA 0x2D // 2000mAH
-// #define BATTERY_APA 0x32 // 2500mAH
-// #define BATTERY_APA 0x36 // 3000mAH
-
-// Post data to the internet via dweet.io.  Set DWEET_DEVICE to be a
-// unique name you want associated with this reporting device, allowing
-// data to be easily retrieved through the web or Dweet's REST API.
-#ifdef DWEET
-	#define DWEET_HOST "dweet.io"   // Typically dweet.io
-	#define DWEET_DEVICE "makerhour-airquality"  // Must be unique across all of dweet.io
-#endif
-
 #ifdef INFLUX  
   // Name of Measurements expected/used in the Influx DB.
   #define INFLUX_ENV_MEASUREMENT "weather"  // Used for environmental sensor data
@@ -105,6 +101,14 @@ const int timeZone = -7;  // USA PDT
 	#define DEVICE_LOCATION "test room"
 	#define DEVICE_SITE "indoor"
 	#define DEVICE_TYPE "air quality"
+#endif
+
+// Post data to the internet via dweet.io.  Set DWEET_DEVICE to be a
+// unique name you want associated with this reporting device, allowing
+// data to be easily retrieved through the web or Dweet's REST API.
+#ifdef DWEET
+	#define DWEET_HOST "dweet.io"   // Typically dweet.io
+	#define DWEET_DEVICE "makerhour-airquality"  // Must be unique across all of dweet.io
 #endif
 
 // The following parameters are defined in secrets.h.
