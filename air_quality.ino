@@ -70,11 +70,13 @@ Adafruit_LC709203F lc;
   // Adafruit MagTag
   #include <Adafruit_ThinkInk.h>
   #include <Fonts/FreeSans9pt7b.h>
-  // #define EPD_DC      7   // can be any pin, but required!
+  #include <Fonts/FreeSans12pt7b.h>
   // #define EPD_RESET   6   // can set to -1 and share with chip Reset (can't deep sleep)
+  // #define EPD_DC      7   // can be any pin, but required!
   // #define EPD_CS      8   // can be any pin, but required!
   #define SRAM_CS     -1  // can set to -1 to not use a pin (uses a lot of RAM!)
-  #define EPD_BUSY    5   // can set to -1 to not use a pin (will wait a fixed delay)
+  //#define EPD_BUSY    5   // can set to -1 to not use a pin (will wait a fixed delay)
+  #define EPD_BUSY    -1   // can set to -1 to not use a pin (will wait a fixed delay)
   ThinkInk_290_Grayscale4_T5 display(EPD_DC, EPD_RESET, EPD_CS, SRAM_CS, EPD_BUSY);
   // colors are EPD_WHITE, EPD_BLACK, EPD_RED, EPD_GRAY, EPD_LIGHT, EPD_DARK
 #endif
@@ -133,7 +135,7 @@ void setup()
   if (initSensor())
   {
     debugMessage("Environment sensor failed to initialize, going to sleep");
-    alertScreen("Environment sensor not detected");
+    alertScreen("Env sensor not detected");
     deepSleep();
   }
 
@@ -169,7 +171,7 @@ void setup()
     }
     debugMessage(String("Averaged values TO nv storage: Temp:")+averageTempF+", Humidity:"+averageHumidity+", CO2:"+averageCO2);
     //reset and store sample count
-    sampleCounter = 1;
+    sampleCounter = 0;
     nvStorage.putInt("counter",sampleCounter);
     debugMessage(String("Sample counter reset to ")+sampleCounter);
   }
@@ -229,11 +231,13 @@ void setup()
   }
 
   // Update the screen if available
-  if(upd_flags == "") {
+  if (upd_flags == "") 
+  {
     // None of the services succeeded (gasp!)
     infoScreen("Updated " + aq_network.dateTimeString());
   }
-  else {
+  else
+  {
     infoScreen("Updated [+"+ upd_flags + "] " + aq_network.dateTimeString());
   }
   deepSleep();
@@ -296,42 +300,44 @@ void getWeather()
   
       if (httpError)
       {
-        debugMessage("Unable to parse weather JSON object");
+        debugMessage("Unable to parse OWM weather JSON object");
         debugMessage(String(httpError.c_str()));
         sensorData.extTemperature = 10000;
         sensorData.extHumidity = 10000;
       }
-  
-      //JsonObject weather_0 = doc["weather"][0];
-      // int weather_0_id = weather_0["id"]; // 804
-      // const char* weather_0_main = weather_0["main"]; // "Clouds"
-      // const char* weather_0_description = weather_0["description"]; // "overcast clouds"
-      // const char* weather_0_icon = weather_0["icon"]; // "04n"
-  
-      JsonObject main = doc["main"];
-      sensorData.extTemperature = main["temp"];
-      // float main_feels_like = main["feels_like"]; // 21.31
-      // float main_temp_min = main["temp_min"]; // 18.64
-      // float main_temp_max = main["temp_max"]; // 23.79
-      // int main_pressure = main["pressure"]; // 1010
-      sensorData.extHumidity = main["humidity"]; // 81
-  
-      // int visibility = doc["visibility"]; // 10000
-  
-      // JsonObject wind = doc["wind"];
-      // float wind_speed = wind["speed"]; // 1.99
-      // int wind_deg = wind["deg"]; // 150
-      // float wind_gust = wind["gust"]; // 5.99
-  
-      // int clouds_all = doc["clouds"]["all"]; // 90
-  
-      // long sys_sunrise = sys["sunrise"]; // 1640620588
-      // long sys_sunset = sys["sunset"]; // 1640651017
-  
-      // int timezone = doc["timezone"]; // -28800
-      // long id = doc["id"]; // 5803139
-      // const char* name = doc["name"]; // "Mercer Island"
-      // int cod = doc["cod"]; // 200
+      else
+      {
+        //JsonObject weather_0 = doc["weather"][0];
+        // int weather_0_id = weather_0["id"]; // 804
+        // const char* weather_0_main = weather_0["main"]; // "Clouds"
+        // const char* weather_0_description = weather_0["description"]; // "overcast clouds"
+        // const char* weather_0_icon = weather_0["icon"]; // "04n"
+    
+        JsonObject main = doc["main"];
+        sensorData.extTemperature = main["temp"];
+        // float main_feels_like = main["feels_like"]; // 21.31
+        // float main_temp_min = main["temp_min"]; // 18.64
+        // float main_temp_max = main["temp_max"]; // 23.79
+        // int main_pressure = main["pressure"]; // 1010
+        sensorData.extHumidity = main["humidity"]; // 81
+    
+        // int visibility = doc["visibility"]; // 10000
+    
+        // JsonObject wind = doc["wind"];
+        // float wind_speed = wind["speed"]; // 1.99
+        // int wind_deg = wind["deg"]; // 150
+        // float wind_gust = wind["gust"]; // 5.99
+    
+        // int clouds_all = doc["clouds"]["all"]; // 90
+    
+        // long sys_sunrise = sys["sunrise"]; // 1640620588
+        // long sys_sunset = sys["sunset"]; // 1640651017
+    
+        // int timezone = doc["timezone"]; // -28800
+        // long id = doc["id"]; // 5803139
+        // const char* name = doc["name"]; // "Mercer Island"
+        // int cod = doc["cod"]; // 200
+      }
   
       // Get local AQI
       serverPath = String(OWM_SERVER) + OWM_AQM_PATH + OWM_LAT_LONG + "&APPID=" + OWM_KEY;
@@ -345,27 +351,35 @@ void getWeather()
   
       if (httpError)
       {
-        debugMessage("Unable to parse air quality JSON object");
+        debugMessage("Unable to parse OWM air quality JSON object");
         debugMessage(String(httpError.c_str()));
         sensorData.extAQI = 10000;
       }
-  
-      // double coord_lon = doc1["coord"]["lon"]; // -122.2221
-      // float coord_lat = doc1["coord"]["lat"]; // 47.5707
-  
-      JsonObject list_0 = doc1["list"][0];
-  
-      sensorData.extAQI = list_0["main"]["aqi"]; // 2
-  
-      // JsonObject list_0_components = list_0["components"];
-      // float list_0_components_co = list_0_components["co"]; // 453.95
-      // float list_0_components_no = list_0_components["no"]; // 0.47
-      // float list_0_components_no2 = list_0_components["no2"]; // 52.09
-      // float list_0_components_o3 = list_0_components["o3"]; // 17.17
-      // float list_0_components_so2 = list_0_components["so2"]; // 7.51
-      // float list_0_components_pm2_5 = list_0_components["pm2_5"]; // 8.04
-      // float list_0_components_pm10 = list_0_components["pm10"]; // 9.96
-      // float list_0_components_nh3 = list_0_components["nh3"]; // 0.86
+      else
+      {
+        // double coord_lon = doc1["coord"]["lon"]; // -122.2221
+        // float coord_lat = doc1["coord"]["lat"]; // 47.5707
+    
+        JsonObject list_0 = doc1["list"][0];
+    
+        sensorData.extAQI = list_0["main"]["aqi"]; // 2
+    
+        // JsonObject list_0_components = list_0["components"];
+        // float list_0_components_co = list_0_components["co"]; // 453.95
+        // float list_0_components_no = list_0_components["no"]; // 0.47
+        // float list_0_components_no2 = list_0_components["no2"]; // 52.09
+        // float list_0_components_o3 = list_0_components["o3"]; // 17.17
+        // float list_0_components_so2 = list_0_components["so2"]; // 7.51
+        // float list_0_components_pm2_5 = list_0_components["pm2_5"]; // 8.04
+        // float list_0_components_pm10 = list_0_components["pm10"]; // 9.96
+        // float list_0_components_nh3 = list_0_components["nh3"]; // 0.86
+      }
+    }
+    else
+    {
+      sensorData.extTemperature = 10000;
+      sensorData.extHumidity = 10000;
+      sensorData.extAQI = 10000;
     }
   #else
     sensorData.extTemperature = 10000;
@@ -381,8 +395,8 @@ void alertScreen(String messageText)
   #ifdef SCREEN
     display.clearBuffer();
     display.setTextColor(EPD_BLACK);
-    display.setFont();  // resets to system default monospace font
-    display.setCursor(5,(display.height()/2));
+    display.setFont(&FreeSans12pt7b);
+    display.setCursor(20,(display.height()/2+6));
     display.print(messageText);
 
     //update display
