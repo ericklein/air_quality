@@ -1,5 +1,5 @@
 // conditional compile flags
-//#define DEBUG 	// Output to serial port
+#define DEBUG 	// Output to serial port
 //#define RJ45  	// use Ethernet
 #define WIFI    	// use WiFi
 #define MQTTLOG 	// log sensor data to MQTT broker
