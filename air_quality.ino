@@ -71,12 +71,11 @@ Adafruit_LC709203F lc;
 #include <Adafruit_ThinkInk.h>
 #include <Fonts/FreeSans9pt7b.h>
 #include <Fonts/FreeSans12pt7b.h>
-// #define EPD_RESET   6   // can set to -1 and share with chip Reset (can't deep sleep)
-// #define EPD_DC      7   // can be any pin, but required!
-// #define EPD_CS      8   // can be any pin, but required!
-#define SRAM_CS -1  // can set to -1 to not use a pin (uses a lot of RAM!)
+#define EPD_RESET   6   // can set to -1 and share with chip Reset (can't deep sleep)
+#define EPD_DC      7   // can be any pin, but required!
+#define EPD_CS      8   // can be any pin, but required!
+#define SRAM_CS     -1  // can set to -1 to not use a pin (uses a lot of RAM!)
 #define EPD_BUSY    5   // can set to -1 to not use a pin (will wait a fixed delay)
-//#define EPD_BUSY -1  // can set to -1 to not use a pin (will wait a fixed delay)
 ThinkInk_290_Grayscale4_T5 display(EPD_DC, EPD_RESET, EPD_CS, SRAM_CS, EPD_BUSY);
 // colors are EPD_WHITE, EPD_BLACK, EPD_RED, EPD_GRAY, EPD_LIGHT, EPD_DARK
 #endif
