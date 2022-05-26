@@ -71,6 +71,7 @@ Adafruit_LC709203F lc;
 #include <Adafruit_ThinkInk.h>
 #include <Fonts/FreeSans9pt7b.h>
 #include <Fonts/FreeSans12pt7b.h>
+// These are set in the MagTag board definition. Uncomment and change for other epd.
 // #define EPD_RESET   6   // can set to -1 and share with chip Reset (can't deep sleep)
 // #define EPD_DC      7   // can be any pin, but required!
 // #define EPD_CS      8   // can be any pin, but required!
