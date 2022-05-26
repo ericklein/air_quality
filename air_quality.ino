@@ -18,8 +18,8 @@ AQ_Network aq_network;
 #include <Preferences.h>
 Preferences nvStorage;
 
-// Variables for accumulating averaged sensor readings
-int sampleCounter;
+// Global variables
+// accumulating sensor readings
 float averageTempF;
 float averageHumidity;
 uint16_t averageCO2;
@@ -145,6 +145,7 @@ void setup()
   }
 
   // Environmental sensor available, so fetch values
+  int sampleCounter;
   readSensor();
   sampleCounter = readNVStorage();
   nvStorage.putInt("counter", ++sampleCounter);
@@ -163,17 +164,16 @@ void setup()
   } else {
     // average intermediate values
     averageTempF = ((sensorData.internalTempF + averageTempF) / SAMPLE_SIZE);
-    nvStorage.putFloat("temp", averageTempF);
     averageHumidity = ((sensorData.internalHumidity + averageHumidity) / SAMPLE_SIZE);
-    nvStorage.putFloat("humidity", averageHumidity);
     if (sensorData.internalCO2 != 10000) {
       averageCO2 = ((sensorData.internalCO2 + averageCO2) / SAMPLE_SIZE);
-      nvStorage.putUInt("co2", averageCO2);
     }
-    debugMessage(String("Averaged values TO nv storage: Temp:") + averageTempF + ", Humidity:" + averageHumidity + ", CO2:" + averageCO2);
-    //reset and store sample count
-    sampleCounter = 0;
-    nvStorage.putInt("counter", sampleCounter);
+    debugMessage(String("Averaged values Temp:") + averageTempF + ", Humidity:" + averageHumidity + ", CO2:" + averageCO2);
+    //reset and store sample set variables
+    nvStorage.putInt("counter", 0);
+    nvStorage.putFloat("temp",0);
+    nvStorage.putFloat("humidity",0);
+    nvStorage.putFloat("co2",0);
     debugMessage(String("Sample counter reset to ") + sampleCounter);
   }
 
