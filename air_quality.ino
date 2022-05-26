@@ -148,12 +148,13 @@ void setup()
   int sampleCounter;
   readSensor();
   sampleCounter = readNVStorage();
-  nvStorage.putInt("counter", ++sampleCounter);
-  debugMessage(String("Sample count TO nv storage is ") + sampleCounter);
+  sampleCounter++;
 
   if (sampleCounter < SAMPLE_SIZE)
   // add to the accumulating, intermediate sensor values and go back to sleep
   {
+    nvStorage.putInt("counter", sampleCounter);
+    debugMessage(String("Sample count TO nv storage is ") + sampleCounter);
     nvStorage.putFloat("temp", (sensorData.internalTempF + averageTempF));
     nvStorage.putFloat("humidity", (sensorData.internalHumidity + averageHumidity));
     if (sensorData.internalCO2 != 10000) {
@@ -161,20 +162,23 @@ void setup()
     }
     debugMessage(String("Intermediate values TO nv storage: Temp:") + (sensorData.internalTempF + averageTempF) + " Humidity:" + (sensorData.internalHumidity + averageHumidity) + ", CO2:" + (sensorData.internalCO2 + averageCO2));
     deepSleep();
-  } else {
+  } 
+  else
+  {
     // average intermediate values
     averageTempF = ((sensorData.internalTempF + averageTempF) / SAMPLE_SIZE);
     averageHumidity = ((sensorData.internalHumidity + averageHumidity) / SAMPLE_SIZE);
-    if (sensorData.internalCO2 != 10000) {
+    if (sensorData.internalCO2 != 10000) 
+    {
       averageCO2 = ((sensorData.internalCO2 + averageCO2) / SAMPLE_SIZE);
     }
-    debugMessage(String("Averaged values Temp:") + averageTempF + ", Humidity:" + averageHumidity + ", CO2:" + averageCO2);
+    debugMessage(String("Averaged values Temp:") + averageTempF + "F, Humidity:" + averageHumidity + ", CO2:" + averageCO2);
     //reset and store sample set variables
     nvStorage.putInt("counter", 0);
     nvStorage.putFloat("temp",0);
     nvStorage.putFloat("humidity",0);
-    nvStorage.putFloat("co2",0);
-    debugMessage(String("Sample counter reset to ") + sampleCounter);
+    nvStorage.putUInt("co2",0);
+    debugMessage("Intermediate values in nv storage reset to zero");
   }
 
   initBattery();
