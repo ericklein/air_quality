@@ -71,9 +71,9 @@ Adafruit_LC709203F lc;
 #include <Adafruit_ThinkInk.h>
 #include <Fonts/FreeSans9pt7b.h>
 #include <Fonts/FreeSans12pt7b.h>
-#define EPD_RESET   6   // can set to -1 and share with chip Reset (can't deep sleep)
-#define EPD_DC      7   // can be any pin, but required!
-#define EPD_CS      8   // can be any pin, but required!
+// #define EPD_RESET   6   // can set to -1 and share with chip Reset (can't deep sleep)
+// #define EPD_DC      7   // can be any pin, but required!
+// #define EPD_CS      8   // can be any pin, but required!
 #define SRAM_CS     -1  // can set to -1 to not use a pin (uses a lot of RAM!)
 #define EPD_BUSY    5   // can set to -1 to not use a pin (will wait a fixed delay)
 ThinkInk_290_Grayscale4_T5 display(EPD_DC, EPD_RESET, EPD_CS, SRAM_CS, EPD_BUSY);
@@ -112,7 +112,8 @@ void setup()
 
   #ifdef SCREEN
     // there is no way to query screen for status
-    display.begin(THINKINK_GRAYSCALE4);
+    //display.begin(THINKINK_GRAYSCALE4);
+    display.begin(THINKINK_MONO);
     debugMessage("Display ready");
   #endif
 
@@ -390,70 +391,124 @@ void infoScreen(String messageText)
 {
 #ifdef SCREEN
   String aqiLabels[5] = { "Good", "Fair", "Moderate", "Poor", "Very Poor" };
-
+  String co2Labels[3]={"Good","Poor","Bad"};
+  int co2range;
+  
   display.clearBuffer();
+  display.setTextColor(EPD_BLACK);
 
   // borders
   // ThinkInk 2.9" epd is 296x128 pixels
   // label border
-  display.drawLine(0, (display.height() / 8), display.width(), (display.height() / 8), EPD_GRAY);
-  // temperature area
-  display.drawLine(0, (display.height() * 3 / 8), display.width(), (display.height() * 3 / 8), EPD_GRAY);
-  // humidity area
-  display.drawLine(0, (display.height() * 5 / 8), display.width(), (display.height() * 5 / 8), EPD_GRAY);
-  // C02 area
-  display.drawLine(0, (display.height() * 7 / 8), display.width(), (display.height() * 7 / 8), EPD_GRAY);
+  display.drawLine(0,(display.height()/8),display.width(),(display.height()/8),EPD_GRAY);
+  // horizontal temp/humidity border
+  // display.drawLine(0,(display.height()*3/8),display.width(),(display.height()*3/8),EPD_GRAY);
+  // horizontal humidity/AQ border
+  // display.drawLine(0,(display.height()*5/8),display.width(),(display.height()*5/8),EPD_GRAY);
+  // horizontal AQ/message text border
+  display.drawLine(0,(display.height()*7/8),display.width(),(display.height()*7/8),EPD_GRAY);
   // splitting sensor vs. outside values
-  display.drawLine((display.width() / 2), 0, (display.width() / 2), (display.height() * 7 / 8), EPD_GRAY);
-
+  display.drawLine((display.width()/2),0,(display.width()/2),(display.height()*7/8),EPD_GRAY);
   // battery status
   screenBatteryStatus();
 
-  display.setTextColor(EPD_BLACK);
-
   // indoor and outdoor labels
-  display.setCursor(((display.width() / 4) - 10), ((display.height() * 1 / 8) - 11));
+  display.setFont();
+  display.setCursor(((display.width()/4)-10),((display.height()*1/8)-11));
   display.print("Here");
-  display.setCursor(((display.width() * 3 / 4 - 12)), ((display.height() * 1 / 8) - 11));
+  display.setCursor(((display.width()*3/4-12)),((display.height()*1/8)-11));
   display.print("Outside");
 
-  display.setTextSize(1);
   display.setFont(&FreeSans9pt7b);
 
   // indoor info
-  int temperatureDelta = ((int)(sensorData.internalTempF + 0.5)) - ((int)(averageTempF + 0.5));
-  int humidityDelta = ((int)(sensorData.internalHumidity + 0.5)) - ((int)(averageHumidity + 0.5));
+  int temperatureDelta = ((int)(sensorData.internalTempF +0.5)) - ((int) (averageTempF + 0.5));
+  int humidityDelta = ((int)(sensorData.internalHumidity +0.5)) - ((int) (averageHumidity + 0.5));
 
-  display.setCursor(5, ((display.height() * 3 / 8) - 10));
-  display.print(String("Temp ") + (int)(sensorData.internalTempF + 0.5) + "F (" + temperatureDelta + ")");
+  display.setCursor(5,((display.height()*3/8)-10));
+  display.print(String("TMP ") + (int)(sensorData.internalTempF+0.5) + "F");
+  if (temperatureDelta!=0)
+  {
+    if(temperatureDelta>0)
+    {
+      // upward triangle (left pt, right pt, bottom pt)
+      display.fillTriangle(90,((display.height()*3/8)-10),110,((display.height()*3/8)-10),100,(((display.height()*3/8)-10)-9), EPD_BLACK);
+    }
+    else
+    {
+      // (left pt, right pt, bottom pt)
+      display.fillTriangle(90,(((display.height()*3/8)-10)-9),110,(((display.height()*3/8)-10)-9),100,((display.height()*3/8)-10), EPD_BLACK);
+    }
+    display.setCursor(112,((display.height()*3/8)-10));
+    display.print(abs(temperatureDelta));
+  }
 
-  display.setCursor(5, ((display.height() * 5 / 8) - 10));
-  display.print(String("Humid ") + (int)(sensorData.internalHumidity + 0.5) + "% (" + humidityDelta + ")");
+  display.setCursor(5,((display.height()*5/8)-10));
+  display.print(String("HMD ") + (int)(sensorData.internalHumidity+0.5) + "%");
+  if (humidityDelta!=0)
+  {
+    if(humidityDelta>0)
+    {
+      // upward triangle (left pt, right pt, bottom pt)
+      display.fillTriangle(90,((display.height()*5/8)-10),110,((display.height()*5/8)-10),100,(((display.height()*5/8)-10)-9), EPD_BLACK);
+    }
+    else
+    {
+      // (left pt, right pt, bottom pt)
+      display.fillTriangle(90,(((display.height()*5/8)-10)-9),110,(((display.height()*5/8)-10)-9),100,((display.height()*5/8)-10), EPD_BLACK);
+    }
+    display.setCursor(112,((display.height()*5/8)-10));
+    display.print(abs(humidityDelta));
+  }
 
-  if (sensorData.internalCO2 != 10000) {
-    display.setCursor(5, ((display.height() * 7 / 8) - 10));
-    display.print(String("C02 ") + sensorData.internalCO2 + " (" + (sensorData.internalCO2 - averageCO2) + ")");
+  if (sensorData.internalCO2!=10000)
+  {
+    co2range = 2;
+    if (sensorData.internalCO2<1001)
+    {co2range = 0;}
+    else if ((sensorData.internalCO2>1000)&&(sensorData.internalCO2<2001))
+    {co2range = 1;}
+    display.setCursor(5,((display.height()*7/8)-10));
+    display.print(String("C02 ") + co2Labels[co2range]);
+    if ((sensorData.internalCO2-averageCO2)!=0)
+    {
+      if(sensorData.internalCO2-averageCO2>0)
+      {
+          // upward triangle (left pt, right pt, bottom pt)
+          display.fillTriangle(90,((display.height()*7/8)-10),110,((display.height()*7/8)-10),100,(((display.height()*7/8)-10)-9), EPD_BLACK);
+      }
+        else
+      {
+          // (left pt, right pt, bottom pt)
+          display.fillTriangle(90,(((display.height()*7/8)-10)-9),110,(((display.height()*7/8)-10)-9),100,((display.height()*7/8)-10), EPD_BLACK);
+      }
+      display.setCursor(112,((display.height()*7/8)-10));
+      display.print(abs(sensorData.internalCO2 - averageCO2));
+    }
   }
 
   // outdoor info
-  if (sensorData.extTemperature != 10000) {
-    display.setCursor(((display.width() / 2) + 5), ((display.height() * 3 / 8) - 10));
-    display.print(String("Temp ") + sensorData.extTemperature + "F");
+  if (sensorData.extTemperature!=10000)
+  {
+    display.setCursor(((display.width()/2)+5),((display.height()*3/8)-10));
+    display.print(String("TMP ") + sensorData.extTemperature + "F");
   }
-  if (sensorData.extHumidity != 10000) {
-    display.setCursor(((display.width() / 2) + 5), ((display.height() * 5 / 8) - 10));
-    display.print(String("Humidity ") + sensorData.extHumidity + "%");
+  if (sensorData.extHumidity!=10000)
+  {
+    display.setCursor(((display.width()/2)+5),((display.height()*5/8)-10));
+    display.print(String("HMD ") + sensorData.extHumidity + "%");
   }
   // air quality index (AQI)
-  if (sensorData.extAQI != 10000) {
-    display.setCursor(((display.width() / 2) + 5), ((display.height() * 7 / 8) - 10));
+  if (sensorData.extAQI!=10000)
+  {
+    display.setCursor(((display.width()/2)+5),((display.height()*7/8)-10));
     display.print("AQI ");
-    display.print(aqiLabels[(sensorData.extAQI - 1)]);
+    display.print(aqiLabels[(sensorData.extAQI-1)]);
   }
 
   // message
   display.setFont();  // resets to system default monospace font
-  display.setCursor(5, (display.height() - 10));
+  display.setCursor(5,(display.height()-10));
   display.print(messageText);
 
   //update display
