@@ -212,16 +212,18 @@ void setup()
     }
 #endif
 
+  float battpct, battv;
 #ifdef DWEET
-    float battpct = lc.cellPercent();
-    float battv = lc.cellVoltage();
+    battpct = lc.cellPercent();
+    battv = lc.cellVoltage();
     post_dweet(averageCO2, averageTempF, averageHumidity, battpct, battv);
     upd_flags += "D";
 #endif
 
+
 #ifdef INFLUX
-    float battpct = lc.cellPercent();
-    float battv = lc.cellVoltage();
+    battpct = lc.cellPercent();
+    battv = lc.cellVoltage();
     // Returns true if successful
     if (post_influx(averageCO2, averageTempF, averageHumidity, battpct, battv)) {
       upd_flags += "I";

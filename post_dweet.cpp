@@ -53,15 +53,16 @@ void post_dweet(uint16_t co2, float tempF, float humidity, float battpct, float 
     battery_info = "";
   }
 
+  String sensor_info;
   if (co2 !=10000)
   {
-    String sensor_info = "\"co2\":\""         + String(co2)             + "\"," +
+    sensor_info = "\"co2\":\""         + String(co2)             + "\"," +
                        "\"temperature\":\"" + String(tempF, 2)         + "\"," +
                        "\"humidity\":\""    + String(humidity, 2)      + "\"}";
   }
   else
   {
-    String sensor_info = "\"temperature\":\"" + String(tempF, 2)         + "\"," +
+    sensor_info = "\"temperature\":\"" + String(tempF, 2)         + "\"," +
                        "\"humidity\":\""    + String(humidity, 2)      + "\"}";
   }
 
