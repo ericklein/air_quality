@@ -1,5 +1,5 @@
 // conditional compile flags
-#define DEBUG 	// Output to serial port
+//#define DEBUG 	// Output to serial port
 //#define RJ45  	// use Ethernet
 #define WIFI    	// use WiFi
 #define MQTTLOG 	// log sensor data to MQTT broker
@@ -25,7 +25,8 @@
 #define SAMPLE_INTERVAL_ESP_MODIFIER 60000000
 
 // set client ID; used by mqtt and wifi
-#define CLIENT_ID "AQ-test-room"
+//#define CLIENT_ID "AQ-test-room"
+#define CLIENT_ID "AQ-lab-office"
 
 // Open Weather Map parameters
 #define OWM_SERVER			"http://api.openweathermap.org/data/2.5/"
@@ -43,11 +44,11 @@ const int timeZone = -7;  // USA PDT
 // based on a settings curve in the LC709203F datasheet
 // #define BATTERY_APA 0x08 // 100mAH
 // #define BATTERY_APA 0x0B // 200mAH
-//#define BATTERY_APA 0x10 // 500mAH
+#define BATTERY_APA 0x10 // 500mAH
 // #define BATTERY_APA 0x19 // 1000mAH
 // #define BATTERY_APA 0x1D // 1200mAH
 // #define BATTERY_APA 0x2D // 2000mAH
- #define BATTERY_APA 0x32 // 2500mAH
+//#define BATTERY_APA 0x32 // 2500mAH
 // #define BATTERY_APA 0x36 // 3000mAH
 
 #ifdef MQTTLOG
@@ -64,10 +65,10 @@ const int timeZone = -7;  // USA PDT
 	// #define MQTT_PUB_TOPIC3		"sircoolio/feeds/master-bedroom.co2"
 	// #define MQTT_PUB_TOPIC4		"sircoolio/feeds/master-bedroom.battery-level"
 
-	// #define MQTT_PUB_TOPIC1		"sircoolio/feeds/lab-office.temperature"
-	// #define MQTT_PUB_TOPIC2		"sircoolio/feeds/lab-office.humidity"
-	// #define MQTT_PUB_TOPIC3		"sircoolio/feeds/lab-office.co2"
-	// #define MQTT_PUB_TOPIC4		"sircoolio/feeds/lab-office.battery-level"
+	#define MQTT_PUB_TOPIC1		"sircoolio/feeds/lab-office.temperature"
+	#define MQTT_PUB_TOPIC2		"sircoolio/feeds/lab-office.humidity"
+	#define MQTT_PUB_TOPIC3		"sircoolio/feeds/lab-office.co2"
+	#define MQTT_PUB_TOPIC4		"sircoolio/feeds/lab-office.battery-level"
 
 	// #define MQTT_PUB_TOPIC1		"sircoolio/feeds/kitchen.temperature"
 	// #define MQTT_PUB_TOPIC2		"sircoolio/feeds/kitchen.humidity"
@@ -79,10 +80,10 @@ const int timeZone = -7;  // USA PDT
 	// #define MQTT_PUB_TOPIC3		"sircoolio/feeds/cellar.co2"
 	// #define MQTT_PUB_TOPIC4		"sircoolio/feeds/cellar.battery-level"
 
-	#define MQTT_PUB_TOPIC1		"sircoolio/feeds/test-room.temperature"
-	#define MQTT_PUB_TOPIC2		"sircoolio/feeds/test-room.humidity"
-	#define MQTT_PUB_TOPIC3		"sircoolio/feeds/test-room.co2"
-	#define MQTT_PUB_TOPIC4		"sircoolio/feeds/test-room.battery-level"
+	// #define MQTT_PUB_TOPIC1		"sircoolio/feeds/test-room.temperature"
+	// #define MQTT_PUB_TOPIC2		"sircoolio/feeds/test-room.humidity"
+	// #define MQTT_PUB_TOPIC3		"sircoolio/feeds/test-room.co2"
+	// #define MQTT_PUB_TOPIC4		"sircoolio/feeds/test-room.battery-level"
 
 	// #define MQTT_PUB_TOPIC1		"sircoolio/feeds/test-headless.temperature"
 	// #define MQTT_PUB_TOPIC2		"sircoolio/feeds/test-headless.humidity"
@@ -98,7 +99,8 @@ const int timeZone = -7;  // USA PDT
 	// Standard set of tag values used for each sensor data point stored to InfluxDB.  Reuses
   // CLIENT_ID as defined anove here in config.h as well as device location (e.g., room in 
   // the house) and site (indoors vs. outdoors, typically).
-	#define DEVICE_LOCATION "test room"
+	//#define DEVICE_LOCATION "test room"
+	#define DEVICE_LOCATION "lab-office"
 	#define DEVICE_SITE "indoor"
 	#define DEVICE_TYPE "air quality"
 #endif
