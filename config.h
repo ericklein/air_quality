@@ -111,6 +111,8 @@ const int timeZone = -7;  // USA PDT
 	//#define DEVICE_LOCATION "cellar"
 	#define DEVICE_SITE "indoor"
 	#define DEVICE_TYPE "air quality"
+
+	#define INFLUX_ATTEMPT_LIMIT 	5 	// max connection attempts to Influxdb
 #endif
 
 // Post data to the internet via dweet.io.  Set DWEET_DEVICE to be a

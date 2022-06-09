@@ -84,11 +84,11 @@ ThinkInk_290_Grayscale4_T5 display(EPD_DC, EPD_RESET, EPD_CS, SRAM_CS, EPD_BUSY)
 #include "ArduinoJson.h"  // Needed by getWeather()
 
 #ifdef INFLUX
-extern boolean post_influx(uint16_t co2, float tempF, float humidity, float battery_p, float battery_v);
+extern boolean post_influx(uint16_t co2, float tempF, float humidity, float battery_p, float battery_v, int rssi);
 #endif
 
 #ifdef DWEET
-extern void post_dweet(uint16_t co2, float tempF, float humidity, float battpct, float battv);
+extern void post_dweet(uint16_t co2, float tempF, float humidity, float battpct, float battv, int rssi);
 #endif
 
 #ifdef MQTTLOG
@@ -229,13 +229,13 @@ void setup()
     #endif
 
     #ifdef DWEET
-      post_dweet(averageCO2, averageTempF, averageHumidity, battpct, battv);
+      post_dweet(averageCO2, averageTempF, averageHumidity, battpct, battv, rssi);
       upd_flags += "D";
     #endif
 
     #ifdef INFLUX
       // Returns true if successful
-      if (post_influx(averageCO2, averageTempF, averageHumidity, battpct, battv)) {
+      if (post_influx(averageCO2, averageTempF, averageHumidity, battpct, battv, rssi)) {
         upd_flags += "I";
       }
     #endif
