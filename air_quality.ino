@@ -93,7 +93,7 @@ extern void post_dweet(uint16_t co2, float tempF, float humidity, float battpct,
 
 #ifdef MQTTLOG
 extern void mqttConnect();
-extern int mqttBatteryUpdate(float cellPercent);
+extern int mqttDeviceInfoUpdate(float cellPercent, float cellVoltage, int rssi);
 extern int mqttSensorUpdate(uint16_t co2, float tempF, float humidity);
 #endif
 
@@ -200,35 +200,45 @@ void setup()
 
   String upd_flags = "";  // To indicate whether services succeeded
   if (internetAvailable)
-  // and internet is verified
   {
-#ifdef MQTTLOG
-    int sensor_pub = 0;
-    int batt_pub = 0;
-    sensor_pub = mqttSensorUpdate(averageCO2, averageTempF, averageHumidity);
-    batt_pub = mqttBatteryUpdate(lc.cellPercent());
-    if (sensor_pub && batt_pub) {
-      upd_flags += "M";
+    float battpct, battv;
+    int rssi;
+
+    rssi = aq_network.getWiFiRSSI();
+
+    if (batteryAvailable)
+    {
+      battpct = lc.cellPercent(); // buffered to prevent issues associated with repeated calls within short time
+      battv = lc.cellVoltage();
     }
-#endif
-
-  float battpct, battv;
-#ifdef DWEET
-    battpct = lc.cellPercent();
-    battv = lc.cellVoltage();
-    post_dweet(averageCO2, averageTempF, averageHumidity, battpct, battv);
-    upd_flags += "D";
-#endif
-
-
-#ifdef INFLUX
-    battpct = lc.cellPercent();
-    battv = lc.cellVoltage();
-    // Returns true if successful
-    if (post_influx(averageCO2, averageTempF, averageHumidity, battpct, battv)) {
-      upd_flags += "I";
+    else
+    {
+      // Error values
+      battpct = 10000;
+      battv = 10000;
     }
-#endif
+
+    #ifdef MQTTLOG
+      int sensor_pub = 0;
+      int device_pub = 0;
+      sensor_pub = mqttSensorUpdate(averageCO2, averageTempF, averageHumidity);
+      device_pub = mqttDeviceInfoUpdate(battpct, battv, rssi);
+      if (sensor_pub && device_pub) {
+        upd_flags += "M";
+      }
+    #endif
+
+    #ifdef DWEET
+      post_dweet(averageCO2, averageTempF, averageHumidity, battpct, battv);
+      upd_flags += "D";
+    #endif
+
+    #ifdef INFLUX
+      // Returns true if successful
+      if (post_influx(averageCO2, averageTempF, averageHumidity, battpct, battv)) {
+        upd_flags += "I";
+      }
+    #endif
   }
 
   // Update the screen if available
