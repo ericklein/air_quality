@@ -1,10 +1,10 @@
 // conditional compile flags
-//#define DEBUG 	// Output to serial port
+#define DEBUG 	// Output to serial port
 //#define RJ45  	// use Ethernet
 #define WIFI    	// use WiFi
-#define MQTTLOG 	// log sensor data to MQTT broker
+//#define MQTTLOG 	// log sensor data to MQTT broker
 //#define DWEET     // Post sensor readings to dweet.io
-#define INFLUX  	// Log data to remote InfluxDB server
+//#define INFLUX  	// Log data to remote InfluxDB server
 #define	SCREEN		// use screen as output
 
 // sample timing in minutes
@@ -15,7 +15,7 @@
 #endif
 // number of samples captured before logging
 #ifdef DEBUG
-  #define SAMPLE_SIZE 1
+  #define SAMPLE_SIZE 2
 #else
   #define SAMPLE_SIZE 6
 #endif
