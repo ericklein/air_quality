@@ -132,6 +132,7 @@ void setup()
       debugMessage("ESP microsecond modified is active");
     #endif
       debugMessage("Site lat/long: " + String(OWM_LAT_LONG));
+      debugMessage("Site altitude: " + String(SITE_ALTITUDE));
       debugMessage("Client ID: " + String(CLIENT_ID));
     #ifdef DWEET
       debugMessage("Dweet device: " + String(DWEET_DEVICE));
@@ -147,7 +148,12 @@ void setup()
 
   // Environmental sensor available, so fetch values
   int sampleCounter;
-  readSensor();
+  if(readSensor())
+  {
+    debugMessage("Environment sensor failed to read, going to sleep");
+    alertScreen("Env sensor no data");
+    deepSleep();
+  }
   sampleCounter = readNVStorage();
   sampleCounter++;
 
@@ -234,9 +240,9 @@ void setup()
   // Update the screen if available
   if (upd_flags == "") {
     // None of the services succeeded (gasp!)
-    infoScreen("Updated " + aq_network.dateTimeString());
+    infoScreen(aq_network.dateTimeString());
   } else {
-    infoScreen("Updated [+" + upd_flags + "] " + aq_network.dateTimeString());
+    infoScreen("[+" + upd_flags + "] " + aq_network.dateTimeString());
   }
   deepSleep();
 }
@@ -263,6 +269,7 @@ void deepSleep()
   aq_network.networkStop();
   // SCD40 only
   envSensor.stopPeriodicMeasurement();
+  envSensor.powerDown();
 
 #if defined(ARDUINO_ADAFRUIT_FEATHER_ESP32S2)
   // Rev B board is LOW to enable
@@ -566,13 +573,14 @@ int initSensor() {
 
   Wire.begin();
   envSensor.begin(Wire);
+  envSensor.wakeUp();
+  envSensor.setSensorAltitude(SITE_ALTITUDE); // optimizes CO2 reading
 
   error = envSensor.startPeriodicMeasurement();
   if (error) {
     // Failed to initialize SCD40
-    debugMessage("Error executing SCD40 startPeriodicMeasurement(): ");
     errorToString(error, errorMessage, 256);
-    debugMessage(errorMessage);
+    debugMessage(String(errorMessage) + "executing SCD40 startPeriodicMeasurement()");
     return error;
   } else {
     delay(5000);  // Give SCD40 time to warm up
@@ -592,18 +600,23 @@ int initSensor() {
   // }
 }
 
-void readSensor()
+uint16_t readSensor()
 // reads environment sensor and stores data to environment global
 {
   // SCD40
-  uint8_t error = envSensor.readMeasurement(sensorData.internalCO2, sensorData.internalTempF, sensorData.internalHumidity);
+  uint16_t error;
+  char errorMessage[256];
+
+  error = envSensor.readMeasurement(sensorData.internalCO2, sensorData.internalTempF, sensorData.internalHumidity);
   if (error) {
-    debugMessage("Error reading SCD40 sensor");
-    deepSleep();
+    errorToString(error, errorMessage, 256);
+    debugMessage(String(errorMessage) + "executing SCD40 readMeasurement()");
+    return error;
   }
   // convert C to F for temp
   sensorData.internalTempF = (sensorData.internalTempF * 1.8) + 32;
   debugMessage(String("SCD40 environment sensor values: ") + sensorData.internalTempF + "F, " + sensorData.internalHumidity + "%, " + sensorData.internalCO2 + " ppm");
+  return 0;
 
   // AHTX0
   // sensors_event_t sensorHumidity, sensorTemp;
@@ -612,7 +625,6 @@ void readSensor()
   // sensorData.internalHumidity = sensorHumidity.relative_humidity;
   // sensorData.internalCO2 = 10000;
   // debugMessage(String("AHTX0 environment sensor values: ") + sensorData.internalTempF + "F, " + sensorData.internalHumidity + "%, " + sensorData.internalCO2 + " ppm");
-
 
   // bme280, SiH7021
   // sensorData.internalTempF = (envSensor.readTemperature()*1.8)+32;

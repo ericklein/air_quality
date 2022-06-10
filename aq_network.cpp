@@ -73,7 +73,7 @@ String AQ_Network::dateTimeString()
 
   #if defined(WIFI) || defined(RJ45)
     String weekDays[7]={"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
-  
+
     if (timeClient.update())
     {
       // NTPClient doesn't include date information, get it from time structure
@@ -84,19 +84,35 @@ String AQ_Network::dateTimeString()
       int year = ptm->tm_year+1900;
   
       dateTime = weekDays[timeClient.getDay()];
-      dateTime += ", ";
+      // dateTime += ", ";
   
-      if (month<10) dateTime += "0";
-      dateTime += month;
-      dateTime += "-";
-      if (day<10) dateTime += "0";
-      dateTime += day;
+      // if (month<10) dateTime += "0";
+      // dateTime += month;
+      // dateTime += "-";
+      // if (day<10) dateTime += "0";
+      // dateTime += day;
       dateTime += " at ";
       if (timeClient.getHours()<10) dateTime += "0";
       dateTime += timeClient.getHours();
       dateTime += ":";
       if (timeClient.getMinutes()<10) dateTime += "0";
       dateTime += timeClient.getMinutes();
+      
+      // long human readable
+      // dateTime = weekDays[timeClient.getDay()];
+      // dateTime += ", ";
+  
+      // if (month<10) dateTime += "0";
+      // dateTime += month;
+      // dateTime += "-";
+      // if (day<10) dateTime += "0";
+      // dateTime += day;
+      // dateTime += " at ";
+      // if (timeClient.getHours()<10) dateTime += "0";
+      // dateTime += timeClient.getHours();
+      // dateTime += ":";
+      // if (timeClient.getMinutes()<10) dateTime += "0";
+      // dateTime += timeClient.getMinutes();
   
       // zulu format
       // dateTime = year + "-";
@@ -128,11 +144,11 @@ String AQ_Network::dateTimeString()
       // }
     }
     else {
-      dateTime ="Time not set";
+      dateTime ="Can't reach time service";
     }
   #else
     // If no network defined
-    dateTime ="No time service";
+    dateTime ="No network to set time";
   #endif
   
   return dateTime;
