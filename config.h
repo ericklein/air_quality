@@ -133,7 +133,9 @@ const int timeZone = -7;  // USA PDT
 
 // 	Open Weather Map
 // 	#define OWM_KEY
-//	#define OWM_LAT_LONG
+//	#define OWM_LAT_LONG  // example "lat=47.9001&lon=-122.4001"
+
+//	#define SITE_ELEVATION // in meters
 
 // If MQTT enabled
 // 	#define MQTT_PORT
