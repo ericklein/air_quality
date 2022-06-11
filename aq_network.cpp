@@ -148,7 +148,6 @@ bool AQ_Network::networkBegin()
   
   #ifdef WIFI
     uint8_t tries;
-    #define MAX_TRIES 5
   
     // set hostname has to come before WiFi.begin
     WiFi.hostname(CLIENT_ID);
@@ -156,12 +155,12 @@ bool AQ_Network::networkBegin()
     
     // Connect to WiFi.  Prepared to wait a reasonable interval for the connection to
     // succeed, but not forever.  Will check status and, if not connected, delay an
-    // increasing amount of time up to a maximum of MAX_TRIES delay intervals. 
+    // increasing amount of time up to a maximum of WIFI_ATTEMPT_LIMIT delay intervals. 
     WiFi.begin(WIFI_SSID, WIFI_PASS);
     
-    for(tries=1;tries<=MAX_TRIES;tries++) 
+    for(tries=1;tries<=WIFI_ATTEMPT_LIMIT;tries++) 
     {
-      debugMessage(String("Connection attempt ") + tries + " of " + MAX_TRIES + " to " + WIFI_SSID + " in " + (tries*10) + " seconds");
+      debugMessage(String("Connection attempt ") + tries + " of " + WIFI_ATTEMPT_LIMIT + " to " + WIFI_SSID + " in " + (tries*10) + " seconds");
       if(WiFi.status() == WL_CONNECTED) 
       {
         // Successful connection!
@@ -174,12 +173,12 @@ bool AQ_Network::networkBegin()
     if(networkAvailable)
     {
       debugMessage("WiFi IP address is: " + WiFi.localIP().toString());
-      debugMessage("RSSI is: " + String(WiFi.RSSI()) + " dBm");  
+      debugMessage("RSSI is: " + String(getWiFiRSSI()) + " dBm");  
     }
     else
     {
       // Couldn't connect, alas
-      debugMessage(String("Can not connect to WFii after ") + MAX_TRIES + " attempts");   
+      debugMessage(String("Can not connect to WFii after ") + WIFI_ATTEMPT_LIMIT + " attempts");   
     }
   #endif
 
@@ -212,7 +211,7 @@ bool AQ_Network::networkBegin()
     }
     else
     {
-      debugMessage(String("Ethernet IP address is: ") + Ethernet.localIP().toString()));
+      debugMessage(String("Ethernet IP address is: ") + Ethernet.localIP().toString());
       networkAvailable = true;
     }
   #endif
@@ -315,7 +314,7 @@ String AQ_Network::getLocalIPString()
 }
 
 // Return RSSI for WiFi network, simulate out-of-range value for non-WiFi
-long AQ_Network::getWiFiRSSI()
+int AQ_Network::getWiFiRSSI()
 {
   #ifdef WIFI
     return(WiFi.RSSI());

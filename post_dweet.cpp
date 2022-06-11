@@ -20,7 +20,7 @@ extern bool internetAvailable;
 
 // Post a dweet to report the various sensor reading.  This routine blocks while
 // talking to the network, so may take a while to execute.
-void post_dweet(uint16_t co2, float tempF, float humidity, float battpct, float battv)
+void post_dweet(uint16_t co2, float tempF, float humidity, float battpct, float battv, int rssi)
 {
 
   /*
@@ -42,10 +42,10 @@ void post_dweet(uint16_t co2, float tempF, float humidity, float battpct, float 
   */
 
   // Use HTTP post and send a data payload as JSON
-  String device_info = "{\"rssi\":\""   + String(WiFi.RSSI())        + "\"," +
+  String device_info = "{\"rssi\":\""   + String(rssi)        + "\"," +
                        "\"ipaddr\":\"" + WiFi.localIP().toString()  + "\",";
   String battery_info;
-  if(batteryAvailable) {
+  if((battpct !=10000)&&(battv != 10000)) {
     battery_info = "\"battery_percent\":\"" + String(battpct) + "\"," +
                    "\"battery_voltage\":\"" + String(battv)   + "\",";
   }

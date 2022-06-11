@@ -65,35 +65,61 @@ extern bool internetAvailable;
     }
   }
 
-  int mqttBatteryUpdate(float cellPercent)
+  int mqttDeviceInfoUpdate(float cellPercent, float cellVoltage, int rssi)
   {
-    // Adafruit_MQTT_Publish batteryLevelPub = Adafruit_MQTT_Publish(&aq_mqtt, MQTT_PUB_TOPIC4, MQTT_QOS_1);
-    Adafruit_MQTT_Publish batteryLevelPub = Adafruit_MQTT_Publish(&aq_mqtt, MQTT_PUB_TOPIC4);
+    Adafruit_MQTT_Publish batteryPercentPub = Adafruit_MQTT_Publish(&aq_mqtt, MQTT_PUB_TOPIC4, MQTT_QOS_1); // if problematic, remove QOS parameter
+    Adafruit_MQTT_Publish batteryVoltagePub = Adafruit_MQTT_Publish(&aq_mqtt, MQTT_PUB_TOPIC5, MQTT_QOS_1);
+    Adafruit_MQTT_Publish rssiLevelPub = Adafruit_MQTT_Publish(&aq_mqtt, MQTT_PUB_TOPIC6, MQTT_QOS_1);
+    int result = 1;
 
-    if (batteryAvailable)
-    {    
-      mqttConnect();
-      if (batteryLevelPub.publish(cellPercent))
+    mqttConnect();
+
+    if (cellPercent != 10000)
+    {
+      if (batteryPercentPub.publish(cellPercent))
       {
-        debugMessage(String("MQTT battery percent publish with value:") + cellPercent);
-        return 1;
+        debugMessage("MQTT publish: Battery Percent succeeded");
       }
       else
       {
-        debugMessage(String("MQTT battery percent publish failed at:") + aq_network.dateTimeString());
-        return 0;
+        debugMessage("MQTT publish: Battery Percent failed");
+        result = 0;
       }
-      aq_mqtt.disconnect();
     }
-    return 0;
+
+    if (cellVoltage != 10000)
+    {
+      if (batteryVoltagePub.publish(cellVoltage))
+      {
+        debugMessage("MQTT publish: Battery Voltage succeeded");
+      }
+      else
+      {
+        debugMessage("MQTT publish: Battery Percent failed");
+        result = 0;
+      }
+    }
+
+    if (rssiLevelPub.publish(rssi))
+    {
+      debugMessage("MQTT publish: WiFi RSSI succeeded");
+    }
+    else
+    {
+      debugMessage("MQTT publish: WiFi RSSI failed");
+      result = 0;
+    }
+
+    aq_mqtt.disconnect();
+    return(result);
   }
   
   int mqttSensorUpdate(uint16_t co2, float tempF, float humidity)
   // Publishes sensor data to MQTT broker
   {
-    Adafruit_MQTT_Publish tempPub = Adafruit_MQTT_Publish(&aq_mqtt, MQTT_PUB_TOPIC1);
-    Adafruit_MQTT_Publish humidityPub = Adafruit_MQTT_Publish(&aq_mqtt, MQTT_PUB_TOPIC2);
-    Adafruit_MQTT_Publish co2Pub = Adafruit_MQTT_Publish(&aq_mqtt, MQTT_PUB_TOPIC3);
+    Adafruit_MQTT_Publish tempPub = Adafruit_MQTT_Publish(&aq_mqtt, MQTT_PUB_TOPIC1, MQTT_QOS_1);
+    Adafruit_MQTT_Publish humidityPub = Adafruit_MQTT_Publish(&aq_mqtt, MQTT_PUB_TOPIC2, MQTT_QOS_1);
+    Adafruit_MQTT_Publish co2Pub = Adafruit_MQTT_Publish(&aq_mqtt, MQTT_PUB_TOPIC3, MQTT_QOS_1);
     int result = 1;
     
     mqttConnect();

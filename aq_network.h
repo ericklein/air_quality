@@ -11,7 +11,7 @@ class AQ_Network {
     String httpGETRequest(const char* serverName);
     int httpPOSTRequest(String serverurl, String contenttype, String payload);
     String getLocalIPString();
-    long getWiFiRSSI();
+    int getWiFiRSSI();
     bool isWireless();
     bool isWired();
     bool isConnected();
