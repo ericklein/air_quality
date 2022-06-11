@@ -43,18 +43,19 @@ const int timeZone = -7;  // USA PDT
 // based on a settings curve in the LC709203F datasheet
 // #define BATTERY_APA 0x08 // 100mAH
 // #define BATTERY_APA 0x0B // 200mAH
-#define BATTERY_APA 0x10 // 500mAH
+// #define BATTERY_APA 0x10 // 500mAH
 // #define BATTERY_APA 0x19 // 1000mAH
 // #define BATTERY_APA 0x1D // 1200mAH
-//#define BATTERY_APA 0x2D // 2000mAH
-//#define BATTERY_APA 0x32 // 2500mAH
+#define BATTERY_APA 0x2D // 2000mAH
+// #define BATTERY_APA 0x32 // 2500mAH
 // #define BATTERY_APA 0x36 // 3000mAH
 
 // set client ID; used by mqtt and wifi
 //#define CLIENT_ID "AQ-test-room"
-#define CLIENT_ID "AQ-lab-office"
+//#define CLIENT_ID "AQ-lab-office"
 //#define CLIENT_ID "AQ-kitchen"
-//#define CLIENT_ID "AQ-cellar"
+#define CLIENT_ID "AQ-cellar"
+//#define CLIENT_ID "AQ-master-bedroom"
 
 #ifdef MQTTLOG
 	// set MQTT parameters
@@ -64,28 +65,36 @@ const int timeZone = -7;  // USA PDT
 	// #define MQTT_PUB_TOPIC2		"sircoolio/feeds/pocket-office.humidity"
 	// #define MQTT_PUB_TOPIC3		"sircoolio/feeds/pocket-office.co2"
 	// #define MQTT_PUB_TOPIC4		"sircoolio/feeds/pocket-office.battery-level"
+	// #define MQTT_PUB_TOPIC5		"sircoolio/feeds/pocket-office.battery-voltage"
+	// #define MQTT_PUB_TOPIC6		"sircoolio/feeds/pocket-office.rssi"
 
 	// #define MQTT_PUB_TOPIC1		"sircoolio/feeds/master-bedroom.temperature"
 	// #define MQTT_PUB_TOPIC2		"sircoolio/feeds/master-bedroom.humidity"
 	// #define MQTT_PUB_TOPIC3		"sircoolio/feeds/master-bedroom.co2"
 	// #define MQTT_PUB_TOPIC4		"sircoolio/feeds/master-bedroom.battery-level"
+	// #define MQTT_PUB_TOPIC5		"sircoolio/feeds/master-bedroom.battery-voltage"
+	// #define MQTT_PUB_TOPIC6		"sircoolio/feeds/master-bedroom.rssi"
 
-	#define MQTT_PUB_TOPIC1		"sircoolio/feeds/lab-office.temperature"
-	#define MQTT_PUB_TOPIC2		"sircoolio/feeds/lab-office.humidity"
-	#define MQTT_PUB_TOPIC3		"sircoolio/feeds/lab-office.co2"
-	#define MQTT_PUB_TOPIC4		"sircoolio/feeds/lab-office.battery-level"
-	#define MQTT_PUB_TOPIC5		"sircoolio/feeds/lab-office.battery-voltage"
-	#define MQTT_PUB_TOPIC6		"sircoolio/feeds/lab-office.rssi"
+	// #define MQTT_PUB_TOPIC1		"sircoolio/feeds/lab-office.temperature"
+	// #define MQTT_PUB_TOPIC2		"sircoolio/feeds/lab-office.humidity"
+	// #define MQTT_PUB_TOPIC3		"sircoolio/feeds/lab-office.co2"
+	// #define MQTT_PUB_TOPIC4		"sircoolio/feeds/lab-office.battery-level"
+	// #define MQTT_PUB_TOPIC5		"sircoolio/feeds/lab-office.battery-voltage"
+	// #define MQTT_PUB_TOPIC6		"sircoolio/feeds/lab-office.rssi"
 
 	// #define MQTT_PUB_TOPIC1		"sircoolio/feeds/kitchen.temperature"
 	// #define MQTT_PUB_TOPIC2		"sircoolio/feeds/kitchen.humidity"
 	// #define MQTT_PUB_TOPIC3		"sircoolio/feeds/kitchen.co2"
 	// #define MQTT_PUB_TOPIC4		"sircoolio/feeds/kitchen.battery-level"
+	// #define MQTT_PUB_TOPIC5		"sircoolio/feeds/kitchen.battery-voltage"
+	// #define MQTT_PUB_TOPIC6		"sircoolio/feeds/kitchen.rssi"
 
-	// #define MQTT_PUB_TOPIC1		"sircoolio/feeds/cellar.temperature"
-	// #define MQTT_PUB_TOPIC2		"sircoolio/feeds/cellar.humidity"
-	// #define MQTT_PUB_TOPIC3		"sircoolio/feeds/cellar.co2"
-	// #define MQTT_PUB_TOPIC4		"sircoolio/feeds/cellar.battery-level"
+	#define MQTT_PUB_TOPIC1		"sircoolio/feeds/cellar.temperature"
+	#define MQTT_PUB_TOPIC2		"sircoolio/feeds/cellar.humidity"
+	#define MQTT_PUB_TOPIC3		"sircoolio/feeds/cellar.co2"
+	#define MQTT_PUB_TOPIC4		"sircoolio/feeds/cellar.battery-level"
+	#define MQTT_PUB_TOPIC5		"sircoolio/feeds/cellar.battery-voltage"
+	#define MQTT_PUB_TOPIC6		"sircoolio/feeds/cellar.rssi"
 
 	// #define MQTT_PUB_TOPIC1		"sircoolio/feeds/test-room.temperature"
 	// #define MQTT_PUB_TOPIC2		"sircoolio/feeds/test-room.humidity"
@@ -98,6 +107,9 @@ const int timeZone = -7;  // USA PDT
 	// #define MQTT_PUB_TOPIC2		"sircoolio/feeds/test-headless.humidity"
 	// #define MQTT_PUB_TOPIC3		"sircoolio/feeds/test-headless.co2"
 	// #define MQTT_PUB_TOPIC4		"sircoolio/feeds/test-headless.battery-level"
+	// #define MQTT_PUB_TOPIC5		"sircoolio/feeds/test-headless.battery-voltage"
+	// #define MQTT_PUB_TOPIC6		"sircoolio/feeds/test-headless.rssi"
+
 #endif
 
 #ifdef INFLUX  
@@ -110,8 +122,10 @@ const int timeZone = -7;  // USA PDT
   // the house) and site (indoors vs. outdoors, typically).
 	//#define DEVICE_LOCATION "test room"
 	//#define DEVICE_LOCATION "kitchen"
-	//#define DEVICE_LOCATION "cellar"
-	#define DEVICE_LOCATION "lab-office"
+	#define DEVICE_LOCATION "cellar"
+	//#define DEVICE_LOCATION "lab-office"
+	//#define DEVICE_LOCATION "master bedroom"
+
 	#define DEVICE_SITE "indoor"
 	#define DEVICE_TYPE "air quality"
 
