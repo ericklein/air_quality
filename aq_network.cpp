@@ -82,13 +82,6 @@ String AQ_Network::dateTimeString() {
     int year = ptm->tm_year + 1900;
 
     dateTime = weekDays[timeClient.getDay()];
-    // dateTime += ", ";
-
-    // if (month<10) dateTime += "0";
-    // dateTime += month;
-    // dateTime += "-";
-    // if (day<10) dateTime += "0";
-    // dateTime += day;
     dateTime += " at ";
     if (timeClient.getHours() < 10) dateTime += "0";
     dateTime += timeClient.getHours();

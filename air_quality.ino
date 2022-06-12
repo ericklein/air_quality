@@ -46,6 +46,11 @@ bool internetAvailable = false;
 // #include <SensirionI2CScd4x.h>
 // SensirionI2CScd4x envSensor;
 
+// unified Adafruit sensor setup
+// AHTX0; temp, humidity
+//#include <Adafruit_AHTX0.h>
+//Adafruit_AHTX0 envSensor;
+
 // BME280; temp, humidity
 #include <Adafruit_BME280.h>
 Adafruit_BME280 envSensor; // i2c interface
