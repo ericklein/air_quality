@@ -46,11 +46,6 @@ bool internetAvailable = false;
 // #include <SensirionI2CScd4x.h>
 // SensirionI2CScd4x envSensor;
 
-// unified Adafruit sensor setup
-// AHTX0; temp, humidity
-//#include <Adafruit_AHTX0.h>
-//Adafruit_AHTX0 envSensor;
-
 // BME280; temp, humidity
 #include <Adafruit_BME280.h>
 Adafruit_BME280 envSensor; // i2c interface
@@ -63,34 +58,34 @@ Adafruit_LC709203F lc;
 
 // screen support
 #ifdef SCREEN
-// Adafruit MagTag
-#include <Adafruit_ThinkInk.h>
-#include <Fonts/FreeSans9pt7b.h>
-#include <Fonts/FreeSans12pt7b.h>
-// These are set in the MagTag board definition. Uncomment and change for other epd.
-// #define EPD_RESET   6   // can set to -1 and share with chip Reset (can't deep sleep)
-// #define EPD_DC      7   // can be any pin, but required!
-// #define EPD_CS      8   // can be any pin, but required!
-#define SRAM_CS     -1  // can set to -1 to not use a pin (uses a lot of RAM!)
-#define EPD_BUSY    5   // can set to -1 to not use a pin (will wait a fixed delay)
-ThinkInk_290_Grayscale4_T5 display(EPD_DC, EPD_RESET, EPD_CS, SRAM_CS, EPD_BUSY);
-// colors are EPD_WHITE, EPD_BLACK, EPD_RED, EPD_GRAY, EPD_LIGHT, EPD_DARK
+  // Adafruit MagTag
+  #include <Adafruit_ThinkInk.h>
+  #include <Fonts/FreeSans9pt7b.h>
+  #include <Fonts/FreeSans12pt7b.h>
+  // These are set in the MagTag board definition. Uncomment and change for other epd.
+  // #define EPD_RESET   6   // can set to -1 and share with chip Reset (can't deep sleep)
+  // #define EPD_DC      7   // can be any pin, but required!
+  // #define EPD_CS      8   // can be any pin, but required!
+  #define SRAM_CS     -1  // can set to -1 to not use a pin (uses a lot of RAM!)
+  #define EPD_BUSY    5   // can set to -1 to not use a pin (will wait a fixed delay)
+  ThinkInk_290_Grayscale4_T5 display(EPD_DC, EPD_RESET, EPD_CS, SRAM_CS, EPD_BUSY);
+  // colors are EPD_WHITE, EPD_BLACK, EPD_RED, EPD_GRAY, EPD_LIGHT, EPD_DARK
 #endif
 
 #include "ArduinoJson.h"  // Needed by getWeather()
 
 #ifdef INFLUX
-extern boolean post_influx(uint16_t co2, float tempF, float humidity, float battery_p, float battery_v, int rssi);
+  extern boolean post_influx(uint16_t co2, float tempF, float humidity, float battery_p, float battery_v, int rssi);
 #endif
 
 #ifdef DWEET
-extern void post_dweet(uint16_t co2, float tempF, float humidity, float battpct, float battv, int rssi);
+  extern void post_dweet(uint16_t co2, float tempF, float humidity, float battpct, float battv, int rssi);
 #endif
 
 #ifdef MQTTLOG
-extern void mqttConnect();
-extern int mqttDeviceInfoUpdate(float cellPercent, float cellVoltage, int rssi);
-extern int mqttSensorUpdate(uint16_t co2, float tempF, float humidity);
+  extern void mqttConnect();
+  extern int mqttDeviceInfoUpdate(float cellPercent, float cellVoltage, int rssi);
+  extern int mqttSensorUpdate(uint16_t co2, float tempF, float humidity);
 #endif
 
 void setup()
@@ -136,7 +131,8 @@ void setup()
   #endif
 
   // Initialize environmental sensor.  Returns non-zero if initialization fails
-  if (initSensor()) {
+  if (initSensor()) 
+  {
     debugMessage("Environment sensor failed to initialize, going to sleep");
     alertScreen("Env sensor not detected");
     deepSleep();
@@ -613,6 +609,15 @@ int initSensor()
 uint16_t readSensor()
 // reads environment sensor and stores data to environment global
 {
+  // AHTX0, BME280
+  sensors_event_t temp_event, humidity_event;
+  envSensor_temp->getEvent(&temp_event);
+  envSensor_humidity->getEvent(&humidity_event);
+ 
+  sensorData.internalTempF = (temp_event.temperature * 1.8) +32;
+  sensorData.internalHumidity = humidity_event.relative_humidity;
+  sensorData.internalCO2 = 10000;
+
   // SCD40
   // uint16_t error;
   // char errorMessage[256];
@@ -624,24 +629,11 @@ uint16_t readSensor()
   //   debugMessage(String(errorMessage) + "executing SCD40 readMeasurement()");
   //   return error;
   // }
-  // // convert C to F for temp
+  // convert C to F for temp
   // sensorData.internalTempF = (sensorData.internalTempF * 1.8) + 32;
-  // debugMessage(String("SCD40 environment sensor values: ") + sensorData.internalTempF + "F, " + sensorData.internalHumidity + "%, " + sensorData.internalCO2 + " ppm");
-  // return 0;
 
-  // AHTX0, BME280
-  sensors_event_t sensorHumidity, sensorTemp;
-  envSensor.getEvent(&sensorHumidity, &sensorTemp);
-  sensorData.internalTempF = sensorTemp.temperature;
-  sensorData.internalHumidity = sensorHumidity.relative_humidity;
-  sensorData.internalCO2 = 10000;
   debugMessage(String("environment sensor values: ") + sensorData.internalTempF + "F, " + sensorData.internalHumidity + "%, " + sensorData.internalCO2 + " ppm");
-
-  // bme280, SiH7021
-  // sensorData.internalTempF = (envSensor.readTemperature()*1.8)+32;
-  // sensorData.internalHumidity = envSensor.readHumidity();
-  // sensorData.internalCO2 = 10000;
-  // debugMessage(String("BME280/SiH7021 environment sensor values: ") + sensorData.internalTempF + "F, " + sensorData.internalHumidity + "%, " + sensorData.internalCO2 + " ppm");
+  return 0;
 }
 
 int readNVStorage() {
