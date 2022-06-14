@@ -67,12 +67,20 @@ Adafruit_LC709203F lc;
   #include <Adafruit_ThinkInk.h>
   #include <Fonts/FreeSans9pt7b.h>
   #include <Fonts/FreeSans12pt7b.h>
-  // These are set in the MagTag board definition. Uncomment and change for other epd.
-  // #define EPD_RESET   6   // can set to -1 and share with chip Reset (can't deep sleep)
-  // #define EPD_DC      7   // can be any pin, but required!
-  // #define EPD_CS      8   // can be any pin, but required!
-  #define SRAM_CS     -1  // can set to -1 to not use a pin (uses a lot of RAM!)
-  #define EPD_BUSY    5   // can set to -1 to not use a pin (will wait a fixed delay)
+  // MagTag board definition
+  // // #define EPD_RESET   6   // can set to -1 and share with chip Reset (can't deep sleep)
+  // // #define EPD_DC      7   // can be any pin, but required!
+  // // #define EPD_CS      8   // can be any pin, but required!
+  // #define SRAM_CS     -1  // can set to -1 to not use a pin (uses a lot of RAM!)
+  // #define EPD_BUSY    5   // can set to -1 to not use a pin (will wait a fixed delay)
+
+  // ESP32S2 w/BME280 board definition
+  #define EPD_RESET   -1   // can set to -1 and share with chip Reset (can't deep sleep)
+  #define EPD_DC      10   // can be any pin, but required!
+  #define EPD_CS      9   // can be any pin, but required!
+  #define SRAM_CS     6  // can set to -1 to not use a pin (uses a lot of RAM!)
+  #define EPD_BUSY    -1   // can set to -1 to not use a pin (will wait a fixed delay)
+
   ThinkInk_290_Grayscale4_T5 display(EPD_DC, EPD_RESET, EPD_CS, SRAM_CS, EPD_BUSY);
   // colors are EPD_WHITE, EPD_BLACK, EPD_RED, EPD_GRAY, EPD_LIGHT, EPD_DARK
 #endif
@@ -121,15 +129,12 @@ void setup()
 
     // Confirm key site configuration parameters
     debugMessage("Air Quality started");
-    debugMessage("---------------------------------");
-    debugMessage(String(SAMPLE_INTERVAL) + " minute sample interval");
-    debugMessage(String(SAMPLE_SIZE) + " samples before logging");
-    #ifdef SAMPLE_INTERVAL_ESP_MODIFIER
-      debugMessage("ESP microsecond modified is active");
-    #endif
-      debugMessage("Site lat/long: " + String(OWM_LAT_LONG));
-      debugMessage("Site altitude: " + String(SITE_ALTITUDE));
-      debugMessage("Client ID: " + String(CLIENT_ID));
+    // debugMessage("---------------------------------");
+    // debugMessage(String(SAMPLE_INTERVAL) + " minute sample interval");
+    // debugMessage(String(SAMPLE_SIZE) + " samples before logging");
+    // debugMessage("Site lat/long: " + String(OWM_LAT_LONG));
+    // debugMessage("Site altitude: " + String(SITE_ALTITUDE));
+    // debugMessage("Client ID: " + String(CLIENT_ID));
     #ifdef DWEET
       debugMessage("Dweet device: " + String(DWEET_DEVICE));
     #endif
@@ -601,9 +606,9 @@ int initSensor()
   // ATHX0, BME280
   if (envSensor.begin())
   {
-        // ID of 0x56-0x58 or 0x60 is a BME 280, 0x61 is BME680, 0x77 is BME280 on ESP32S2 Feather
-        debugMessage(String("Environment sensor ready, ID is: 0x")+envSensor.sensorID());
-        return 0;
+    // ID of 0x56-0x58 or 0x60 is a BME 280, 0x61 is BME680, 0x77 is BME280 on ESP32S2 Feather
+    debugMessage(String("Environment sensor ready, ID is: ")+envSensor.sensorID());
+    return 0;
   }
   else
   {
