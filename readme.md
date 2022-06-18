@@ -4,19 +4,19 @@ Air Quality samples and logs temperature, humidity, and if sensor available, co2
 ### Configuring targets
 - Set parameters in secrets.h (see config.h for list of required parameters)
 - Set parameters in config.h
-- Switch screen types in SCREEN routines in air_quality.ino
-- Switch sensor types if needed in/near CO2_SENSOR in air_quality.ino
+- Switch between AHT2x/BME280 and SCD40 in multiple locations within air_quality.ino
 
-### Software Dependencies
+### External Software Dependencies
 - add library for appropriate sensor from known, working BOM
-	- Sensirion I2C SCD4x library (#define CO2_SENSOR)
+	- Sensirion I2C SCD4x library or Adafruit Unified Sensor + appropriate hardware (AHT2x or BME280) library
 	- Adafruit LC709203F library (#define BATTERY)
 	- Adafruit EPD library (MagTag)
+	- Arduino_json (parsing OWM data)
 - include all dependencies to these libraries
 
 ### known, working BOM
 - MCU
-	- ESP32S2. ESP8266
+	- ESP32, ESP8266
 	- ARM(m0,m4)
 		- deepSleep() not implemented
 - Ethernet
@@ -26,24 +26,29 @@ Air Quality samples and logs temperature, humidity, and if sensor available, co2
 	- esp32s2 boards
 - environment sensor
 	- AHT20 temp/humidity sensor: https://www.adafruit.com/product/4566, https://www.adafruit.com/product/5183
-	- SiH7021 temp/humidity sensor: https://www.adafruit.com/product/3251
 	- SCD40 True CO2, Temperature and Humidity Sensor: https://www.adafruit.com/product/5187
-	- DHT11,21 -> see code history
+	- BME280 temp/humidity sensor: https://www.adafruit.com/product/2652
 - battery monitor
 	- LC709203F battery voltage monitor: https://www.adafruit.com/product/4712
 - screen
 	- Adafruit MagTag (EPD): https://www.adafruit.com/product/4800
 	- LCD and OLED screens -> see code history before 02/2022
 - battery
-	- Adafruit 2000mA battery: https://www.adafruit.com/product/2011
+	- Adafruit battery: https://www.adafruit.com/product/2011
 
 ### Information Sources
+- Most information is kept in the "supporting material" folder, which is not synched to GitHub. Maybe I should do that? ping author if you want more info on CO2 measurements, etc.
+
 - SD card
 	- https://github.com/adafruit/Light-and-Temp-logger/blob/master/lighttemplogger.ino
 - NTP
 	- https://github.com/PaulStoffregen/Time/tree/master/examples/TimeNTP
 - Sensors 
 	- https://learn.adafruit.com/adafruit-aht20
+	- https://cdn-learn.adafruit.com/assets/assets/000/104/015/original/Sensirion_CO2_Sensors_SCD4x_Datasheet.pdf?1629489682
+	- https://github.com/Sensirion/arduino-i2c-scd4x
+	- https://github.com/sparkfun/SparkFun_SCD4x_Arduino_Library
+	- https://emariete.com/en/sensor-co2-sensirion-scd40-scd41-2/
 - Ethernet
 	- https://docs.particle.io/datasheets/accessories/gen3-accessories/
 	- https://www.adafruit.com/product/4003#:~:text=Description%2D-,Description,along%20with%20a%20Feather%20accessory
@@ -62,4 +67,3 @@ Air Quality samples and logs temperature, humidity, and if sensor available, co2
 - See GitHub Issues for project
 
 ### Questions
-- [Q]012622: does SparkFun or Adafruit have a sensor measurement API that is consistent across temp/humidity sensors? [readEnvironment]
