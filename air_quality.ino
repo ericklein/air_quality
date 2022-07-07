@@ -24,27 +24,103 @@ float averageTempF;
 float averageHumidity;
 uint16_t averageCO2;
 
-// environment characteristics
+// environment sensor data
 typedef struct
 {
   float internalTempF;
   float internalHumidity;
   uint16_t internalCO2;
-  int extTemperature;
-  int extHumidity;
-  int extAQI;
 } envData;
 
 // global for air characteristics
 envData sensorData;
+
+// Open Weather Map Current data
+typedef struct
+{
+  // "lon": 8.54
+  float lon;
+  // "lat": 47.37
+  float lat;
+  // "id": 521
+  uint16_t weatherId;
+  // "main": "Rain"
+  String main;
+  // "description": "shower rain"
+  String description;
+  // "icon": "09d"
+  String icon;
+  String iconMeteoCon;
+  // "temp": 290.56
+  float temp;
+  // "pressure": 1013
+  uint16_t pressure;
+  // "humidity": 87
+  uint16_t humidity;
+  // "temp_min": 289.15
+  float tempMin;
+  // "temp_max": 292.15
+  float tempMax;
+  // visibility: 10000
+  uint16_t visibility;
+  // "wind": {"speed": 1.5}
+  float windSpeed;
+  // "wind": {deg: 226.505}
+  float windDeg;
+  // "clouds": {"all": 90}
+  uint8_t clouds;
+  // "dt": 1527015000
+  time_t observationTime;
+  // "country": "CH"
+  String country;
+  // "sunrise": 1526960448
+  time_t sunrise;
+  // "sunset": 1527015901
+  time_t sunset;
+  // "name": "Zurich"
+  String cityName;
+  time_t timezone;
+} OpenWeatherMapCurrentData;
+
+// global for OWM current data
+OpenWeatherMapCurrentData owmCurrentData;
+
+typedef struct
+{
+  // "lon": 8.54
+  float lon;
+  // "lat": 47.37
+  float lat;
+  // "aqi": 2
+  uint16_t aqi;
+  // "co": 453.95
+  float co;
+  // "no": 0.47
+  float no;
+  // "no2": 52.09
+  float no2;
+  // "o3": 17.17
+  float o3;
+  // "so2": 7.51
+  float so2;
+  // "pm2.5": 8.04
+  float pm2_5;
+  // "pm10": 9.96
+  float pm10;
+  // "nh3": 0.86
+  float nh3;
+} OpenWeatherMapAirQuality;
+
+// global for OWM current data
+OpenWeatherMapAirQuality owmAirQuality;
 
 bool batteryAvailable = false;
 bool internetAvailable = false;
 
 // initialize environment sensors
 // SCD40; temp, humidity, CO2
-// #include <SensirionI2CScd4x.h>
-// SensirionI2CScd4x envSensor;
+#include <SensirionI2CScd4x.h>
+SensirionI2CScd4x envSensor;
 
 // unified Adafruit sensor setup
 // AHTX0; temp, humidity
@@ -52,10 +128,10 @@ bool internetAvailable = false;
 //Adafruit_AHTX0 envSensor;
 
 // BME280; temp, humidity
-#include <Adafruit_BME280.h>
-Adafruit_BME280 envSensor; // i2c interface
-Adafruit_Sensor *envSensor_temp = envSensor.getTemperatureSensor();
-Adafruit_Sensor *envSensor_humidity = envSensor.getHumiditySensor();
+// #include <Adafruit_BME280.h>
+// Adafruit_BME280 envSensor; // i2c interface
+// Adafruit_Sensor *envSensor_temp = envSensor.getTemperatureSensor();
+// Adafruit_Sensor *envSensor_humidity = envSensor.getHumiditySensor();
 
 // Battery voltage sensor
 #include <Adafruit_LC709203F.h>
@@ -63,23 +139,30 @@ Adafruit_LC709203F lc;
 
 // screen support
 #ifdef SCREEN
-  // Adafruit MagTag
   #include <Adafruit_ThinkInk.h>
+
+  #include "Fonts/meteocons48pt7b.h"
+  #include "Fonts/meteocons24pt7b.h"
+  #include "Fonts/meteocons20pt7b.h"
+  #include "Fonts/meteocons16pt7b.h"
+
   #include <Fonts/FreeSans9pt7b.h>
   #include <Fonts/FreeSans12pt7b.h>
+  #include <Fonts/FreeSans18pt7b.h>
+
   // MagTag board definition
-  // // #define EPD_RESET   6   // can set to -1 and share with chip Reset (can't deep sleep)
-  // // #define EPD_DC      7   // can be any pin, but required!
-  // // #define EPD_CS      8   // can be any pin, but required!
-  // #define SRAM_CS     -1  // can set to -1 to not use a pin (uses a lot of RAM!)
-  // #define EPD_BUSY    5   // can set to -1 to not use a pin (will wait a fixed delay)
+  // #define EPD_RESET   6   // can set to -1 and share with chip Reset (can't deep sleep)
+  // #define EPD_DC      7   // can be any pin, but required!
+  // #define EPD_CS      8   // can be any pin, but required!
+  #define SRAM_CS     -1  // can set to -1 to not use a pin (uses a lot of RAM!)
+  #define EPD_BUSY    5   // can set to -1 to not use a pin (will wait a fixed delay)
 
   // ESP32S2 w/BME280 board definition
-  #define EPD_RESET   -1   // can set to -1 and share with chip Reset (can't deep sleep)
-  #define EPD_DC      10   // can be any pin, but required!
-  #define EPD_CS      9   // can be any pin, but required!
-  #define SRAM_CS     6  // can set to -1 to not use a pin (uses a lot of RAM!)
-  #define EPD_BUSY    -1   // can set to -1 to not use a pin (will wait a fixed delay)
+  // #define EPD_RESET   -1   // can set to -1 and share with chip Reset (can't deep sleep)
+  // #define EPD_DC      10   // can be any pin, but required!
+  // #define EPD_CS      9   // can be any pin, but required!
+  // #define SRAM_CS     6  // can set to -1 to not use a pin (uses a lot of RAM!)
+  // #define EPD_BUSY    -1   // can set to -1 to not use a pin (will wait a fixed delay)
 
   ThinkInk_290_Grayscale4_T5 display(EPD_DC, EPD_RESET, EPD_CS, SRAM_CS, EPD_BUSY);
   // colors are EPD_WHITE, EPD_BLACK, EPD_RED, EPD_GRAY, EPD_LIGHT, EPD_DARK
@@ -204,7 +287,16 @@ void setup()
   //  DWEET to publish data to the DWEET service
 
   // Get local weather and air quality info from Open Weather Map
-  getWeather();
+  if (!getOWMWeather())
+  {
+    owmCurrentData.temp = 10000;
+    owmCurrentData.humidity = 10000;
+  }
+
+  if (!getOWMAQI())
+  {
+    owmAirQuality.aqi = 10000;
+  }
 
   String upd_flags = "";  // To indicate whether services succeeded
   if (internetAvailable)
@@ -280,8 +372,8 @@ void deepSleep()
 #endif
   aq_network.networkStop();
   // SCD40 only
-  // envSensor.stopPeriodicMeasurement();
-  // envSensor.powerDown();
+  envSensor.stopPeriodicMeasurement();
+  envSensor.powerDown();
 
 #if defined(ARDUINO_ADAFRUIT_FEATHER_ESP32S2)
   // Rev B board is LOW to enable
@@ -294,107 +386,128 @@ void deepSleep()
   esp_deep_sleep_start();
 }
 
-void getWeather()
+bool getOWMWeather()
 // retrieves weather from Open Weather Map APIs and stores data to environment global
 {
-#if defined(WIFI) || defined(RJ45)
-  // if there is a network interface (so it will compile)
-  if (internetAvailable)
-  // and internet is verified
-  {
-    String jsonBuffer;
+  #if defined(WIFI) || defined(RJ45)
+    // if there is a network interface (so it will compile)
+    if (internetAvailable)
+    // and internet is verified
+    {
+      String jsonBuffer;
 
-    // Get local temp and humidity
-    String serverPath = String(OWM_SERVER) + OWM_WEATHER_PATH + OWM_LAT_LONG + "&units=imperial" + "&APPID=" + OWM_KEY;
+      // Get local temp and humidity
+      String serverPath = String(OWM_SERVER) + OWM_WEATHER_PATH + OWM_LAT_LONG + "&units=imperial" + "&APPID=" + OWM_KEY;
 
-    jsonBuffer = aq_network.httpGETRequest(serverPath.c_str());
-    //debugMessage(jsonBuffer);
+      jsonBuffer = aq_network.httpGETRequest(serverPath.c_str());
+      debugMessage(jsonBuffer);
 
-    StaticJsonDocument<1024> doc;
+      DynamicJsonDocument doc(2000);
+      //StaticJsonDocument<2000> doc;
 
-    DeserializationError httpError = deserializeJson(doc, jsonBuffer);
+      DeserializationError error = deserializeJson(doc, jsonBuffer);
 
-    if (httpError) {
-      debugMessage("Unable to parse OWM weather JSON object");
-      debugMessage(String(httpError.c_str()));
-      sensorData.extTemperature = 10000;
-      sensorData.extHumidity = 10000;
-    } else {
-      //JsonObject weather_0 = doc["weather"][0];
-      // int weather_0_id = weather_0["id"]; // 804
-      // const char* weather_0_main = weather_0["main"]; // "Clouds"
-      // const char* weather_0_description = weather_0["description"]; // "overcast clouds"
-      // const char* weather_0_icon = weather_0["icon"]; // "04n"
+      if (error)
+      {
+        debugMessage("deserializeJson failed: ");
+        debugMessage(String(error.c_str()));
+        return false;
+      }
+      
+      int code = (int) doc["cod"];
+      if(code != 200)
+      {
+        debugMessage(String("OpenWeatherMap error: ") + (const char *)doc["message"]);
+        return false;
+      }
 
-      JsonObject main = doc["main"];
-      sensorData.extTemperature = main["temp"];
-      // float main_feels_like = main["feels_like"]; // 21.31
-      // float main_temp_min = main["temp_min"]; // 18.64
-      // float main_temp_max = main["temp_max"]; // 23.79
-      // int main_pressure = main["pressure"]; // 1010
-      sensorData.extHumidity = main["humidity"];  // 81
+      owmCurrentData.lat = (float) doc["coord"]["lat"];
+      owmCurrentData.lon = (float) doc["coord"]["lon"];
+      
+      owmCurrentData.main = (const char*) doc["weather"][0]["main"];  
+      owmCurrentData.description = (const char*) doc["weather"][0]["description"];
+      owmCurrentData.icon = (const char*) doc["weather"][0]["icon"];
+      
+      owmCurrentData.cityName = (const char*) doc["name"];
+      owmCurrentData.visibility = (uint16_t) doc["visibility"];
+      owmCurrentData.timezone = (time_t) doc["timezone"];
+      
+      owmCurrentData.country = (const char*) doc["sys"]["country"];
+      owmCurrentData.observationTime = (time_t) doc["dt"];
+      owmCurrentData.sunrise = (time_t) doc["sys"]["sunrise"];
+      owmCurrentData.sunset = (time_t) doc["sys"]["sunset"];
+      
+      owmCurrentData.temp = (float) doc["main"]["temp"];
+      owmCurrentData.pressure = (uint16_t) doc["main"]["pressure"];
+      owmCurrentData.humidity = (uint8_t) doc["main"]["humidity"];
+      owmCurrentData.tempMin = (float) doc["main"]["temp_min"];
+      owmCurrentData.tempMax = (float) doc["main"]["temp_max"];
 
-      // int visibility = doc["visibility"]; // 10000
-
-      // JsonObject wind = doc["wind"];
-      // float wind_speed = wind["speed"]; // 1.99
-      // int wind_deg = wind["deg"]; // 150
-      // float wind_gust = wind["gust"]; // 5.99
-
-      // int clouds_all = doc["clouds"]["all"]; // 90
-
-      // long sys_sunrise = sys["sunrise"]; // 1640620588
-      // long sys_sunset = sys["sunset"]; // 1640651017
-
-      // int timezone = doc["timezone"]; // -28800
-      // long id = doc["id"]; // 5803139
-      // const char* name = doc["name"]; // "Mercer Island"
-      // int cod = doc["cod"]; // 200
+      owmCurrentData.windSpeed = (float) doc["wind"]["speed"];
+      owmCurrentData.windDeg = (float) doc["wind"]["deg"];
+      debugMessage(String("Open Weather Map returned: ") + owmCurrentData.temp + "F, " + owmCurrentData.humidity + "%");
+      return true;
     }
+  #endif
+  return false;
+}
 
-    // Get local AQI
-    serverPath = String(OWM_SERVER) + OWM_AQM_PATH + OWM_LAT_LONG + "&APPID=" + OWM_KEY;
+bool getOWMAQI()
+{
+  // retrieves weather from Open Weather Map APIs and stores data to environment global
+  #if defined(WIFI) || defined(RJ45)
+    // if there is a network interface (so it will compile)
+    if (internetAvailable)
+    // and internet is verified
+    {
+      String jsonBuffer;
 
-    jsonBuffer = aq_network.httpGETRequest(serverPath.c_str());
-    //debugMessage(jsonBuffer);
+      // Get local AQI
+      String serverPath = String(OWM_SERVER) + OWM_AQM_PATH + OWM_LAT_LONG + "&APPID=" + OWM_KEY;
 
-    StaticJsonDocument<384> doc1;
+      jsonBuffer = aq_network.httpGETRequest(serverPath.c_str());
+      debugMessage(jsonBuffer);
 
-    httpError = deserializeJson(doc1, jsonBuffer);
+      DynamicJsonDocument doc(384);
+      //StaticJsonDocument<384> doc;
 
-    if (httpError) {
-      debugMessage("Unable to parse OWM air quality JSON object");
-      debugMessage(String(httpError.c_str()));
-      sensorData.extAQI = 10000;
-    } else {
-      // double coord_lon = doc1["coord"]["lon"]; // -122.2221
-      // float coord_lat = doc1["coord"]["lat"]; // 47.5707
+      DeserializationError error = deserializeJson(doc, jsonBuffer);
 
-      JsonObject list_0 = doc1["list"][0];
+      if (error)
+      {
+        debugMessage("deserializeJson failed: ");
+        debugMessage(String(error.c_str()));
+        return false;
+      }
+    
+      int code = (int) doc["cod"];
+      if(code != 200)
+      {
+        debugMessage(String("OpenWeatherMap error: ") + (const char *)doc["message"]);
+        return false;
+      }
 
-      sensorData.extAQI = list_0["main"]["aqi"];  // 2
+      // owmAirQuality.lon = (float) doc1["coord"]["lon"];
+      // owmAirQuality.lat = (float) doc1["coord"]["lat"];
+
+      JsonObject list_0 = doc["list"][0];
+
+      owmAirQuality.aqi = list_0["main"]["aqi"];
 
       // JsonObject list_0_components = list_0["components"];
-      // float list_0_components_co = list_0_components["co"]; // 453.95
-      // float list_0_components_no = list_0_components["no"]; // 0.47
-      // float list_0_components_no2 = list_0_components["no2"]; // 52.09
-      // float list_0_components_o3 = list_0_components["o3"]; // 17.17
-      // float list_0_components_so2 = list_0_components["so2"]; // 7.51
-      // float list_0_components_pm2_5 = list_0_components["pm2_5"]; // 8.04
-      // float list_0_components_pm10 = list_0_components["pm10"]; // 9.96
-      // float list_0_components_nh3 = list_0_components["nh3"]; // 0.86
+      // owmAirQuality.co = (float) list_0_components["co"]
+      // owmAirQuality.no = (float) list_0_components["no"]
+      // owmAirQuality.no2 = (float) list_0_components["no2"]
+      // owmAirQuality.o3 = (float) list_0_components["o3"]
+      // owmAirQuality.so2 = (float) list_0_components["so2"]
+      // owmAirQuality.pm2_5 = (float) list_0_components["pm2_5"]
+      // owmAirQuality.pm10 = (float) list_0_components["pm10"]
+      // owmAirQuality.nh3 = (float) list_0_components["nh3"]
+      debugMessage(String("Open Weather Map returned: ") + owmAirQuality.aqi + " AQI");
+      return true;
     }
-  } else {
-    sensorData.extTemperature = 10000;
-    sensorData.extHumidity = 10000;
-    sensorData.extAQI = 10000;
-  }
-#else
-  sensorData.extTemperature = 10000;
-  sensorData.extHumidity = 10000;
-  sensorData.extAQI = 10000;
-#endif
-  debugMessage(String("Open Weather Map returned: ") + sensorData.extTemperature + "F, " + sensorData.extHumidity + "%, " + sensorData.extAQI + " AQI");
+  #endif
+  return false;
 }
 
 void alertScreen(String messageText)
@@ -514,22 +627,22 @@ void infoScreen(String messageText)
   }
 
   // outdoor info
-  if (sensorData.extTemperature!=10000)
+  if (owmCurrentData.temp!=10000)
   {
     display.setCursor(((display.width()/2)+5),((display.height()*3/8)-10));
-    display.print(String("TMP ") + sensorData.extTemperature + "F");
+    display.print(String("TMP ") + owmCurrentData.temp + "F");
   }
-  if (sensorData.extHumidity!=10000)
+  if (owmCurrentData.humidity!=10000)
   {
     display.setCursor(((display.width()/2)+5),((display.height()*5/8)-10));
-    display.print(String("HMD ") + sensorData.extHumidity + "%");
+    display.print(String("HMD ") + owmCurrentData.humidity + "%");
   }
   // air quality index (AQI)
-  if (sensorData.extAQI!=10000)
+  if (owmAirQuality.aqi!=10000)
   {
     display.setCursor(((display.width()/2)+5),((display.height()*7/8)-10));
     display.print("AQI ");
-    display.print(aqiLabels[(sensorData.extAQI-1)]);
+    display.print(aqiLabels[(owmAirQuality.aqi-1)]);
   }
 
   // message
@@ -581,66 +694,66 @@ void screenBatteryStatus()
 int initSensor() 
 {
   //SCD40
-  // uint16_t error;
-  // char errorMessage[256];
+  uint16_t error;
+  char errorMessage[256];
 
-  // Wire.begin();
-  // envSensor.begin(Wire);
-  // envSensor.wakeUp();
-  // envSensor.setSensorAltitude(SITE_ALTITUDE); // optimizes CO2 reading
+  Wire.begin();
+  envSensor.begin(Wire);
+  envSensor.wakeUp();
+  envSensor.setSensorAltitude(SITE_ALTITUDE); // optimizes CO2 reading
 
-  // error = envSensor.startPeriodicMeasurement();
-  // if (error) 
-  // {
-  //   // Failed to initialize SCD40
-  //   errorToString(error, errorMessage, 256);
-  //   debugMessage(String(errorMessage) + "executing SCD40 startPeriodicMeasurement()");
-  //   return error;
-  // } 
-  // else 
-  // {
-  //   delay(5000);  // Give SCD40 time to warm up
-  //   return 0;     // error = 0 in this case
-  // }
+  error = envSensor.startPeriodicMeasurement();
+  if (error) 
+  {
+    // Failed to initialize SCD40
+    errorToString(error, errorMessage, 256);
+    debugMessage(String(errorMessage) + "executing SCD40 startPeriodicMeasurement()");
+    return error;
+  } 
+  else 
+  {
+    delay(5000);  // Give SCD40 time to warm up
+    return 0;     // error = 0 in this case
+  }
 
   // ATHX0, BME280
-  if (envSensor.begin())
-  {
-    // ID of 0x56-0x58 or 0x60 is a BME 280, 0x61 is BME680, 0x77 is BME280 on ESP32S2 Feather
-    debugMessage(String("Environment sensor ready, ID is: ")+envSensor.sensorID());
-    return 0;
-  }
-  else
-  {
-    return 1;
-  }
+  // if (envSensor.begin())
+  // {
+  //   // ID of 0x56-0x58 or 0x60 is a BME 280, 0x61 is BME680, 0x77 is BME280 on ESP32S2 Feather
+  //   debugMessage(String("Environment sensor ready, ID is: ")+envSensor.sensorID());
+  //   return 0;
+  // }
+  // else
+  // {
+  //   return 1;
+  // }
 }
 
 uint16_t readSensor()
 // reads environment sensor and stores data to environment global
 {
   // AHTX0, BME280
-  sensors_event_t temp_event, humidity_event;
-  envSensor_temp->getEvent(&temp_event);
-  envSensor_humidity->getEvent(&humidity_event);
+  // sensors_event_t temp_event, humidity_event;
+  // envSensor_temp->getEvent(&temp_event);
+  // envSensor_humidity->getEvent(&humidity_event);
  
-  sensorData.internalTempF = (temp_event.temperature * 1.8) +32;
-  sensorData.internalHumidity = humidity_event.relative_humidity;
-  sensorData.internalCO2 = 10000;
+  // sensorData.internalTempF = (temp_event.temperature * 1.8) +32;
+  // sensorData.internalHumidity = humidity_event.relative_humidity;
+  // sensorData.internalCO2 = 10000;
 
   // SCD40
-  // uint16_t error;
-  // char errorMessage[256];
+  uint16_t error;
+  char errorMessage[256];
 
-  // error = envSensor.readMeasurement(sensorData.internalCO2, sensorData.internalTempF, sensorData.internalHumidity);
-  // if (error) 
-  // {
-  //   errorToString(error, errorMessage, 256);
-  //   debugMessage(String(errorMessage) + "executing SCD40 readMeasurement()");
-  //   return error;
-  // }
-  // convert C to F for temp
-  // sensorData.internalTempF = (sensorData.internalTempF * 1.8) + 32;
+  error = envSensor.readMeasurement(sensorData.internalCO2, sensorData.internalTempF, sensorData.internalHumidity);
+  if (error) 
+  {
+    errorToString(error, errorMessage, 256);
+    debugMessage(String(errorMessage) + "executing SCD40 readMeasurement()");
+    return error;
+  }
+  //convert C to F for temp
+  sensorData.internalTempF = (sensorData.internalTempF * 1.8) + 32;
 
   debugMessage(String("environment sensor values: ") + sensorData.internalTempF + "F, " + sensorData.internalHumidity + "%, " + sensorData.internalCO2 + " ppm");
   return 0;
@@ -678,4 +791,91 @@ int readNVStorage() {
   debugMessage(String("Intermediate values FROM nv storage: Temp:") + averageTempF + ", Humidity:" + averageHumidity + ", CO2:" + averageCO2);
   debugMessage(String("Sample count FROM nv storage is ") + storedCounter);
   return storedCounter;
+}
+
+String getMeteoconIcon(String icon)
+{
+  // clear sky
+  // 01d
+  if (icon == "01d")  {
+    return "B";
+  }
+  // 01n
+  if (icon == "01n")  {
+    return "C";
+  }
+  // few clouds
+  // 02d
+  if (icon == "02d")  {
+    return "H";
+  }
+  // 02n
+  if (icon == "02n")  {
+    return "4";
+  }
+  // scattered clouds
+  // 03d
+  if (icon == "03d")  {
+    return "N";
+  }
+  // 03n
+  if (icon == "03n")  {
+    return "5";
+  }
+  // broken clouds
+  // 04d
+  if (icon == "04d")  {
+    return "Y";
+  }
+  // 04n
+  if (icon == "04n")  {
+    return "%";
+  }
+  // shower rain
+  // 09d
+  if (icon == "09d")  {
+    return "R";
+  }
+  // 09n
+  if (icon == "09n")  {
+    return "8";
+  }
+  // rain
+  // 10d
+  if (icon == "10d")  {
+    return "Q";
+  }
+  // 10n
+  if (icon == "10n")  {
+    return "7";
+  }
+  // thunderstorm
+  // 11d
+  if (icon == "11d")  {
+    return "P";
+  }
+  // 11n
+  if (icon == "11n")  {
+    return "6";
+  }
+  // snow
+  // 13d
+  if (icon == "13d")  {
+    return "W";
+  }
+  // 13n
+  if (icon == "13n")  {
+    return "#";
+  }
+  // mist
+  // 50d
+  if (icon == "50d")  {
+    return "M";
+  }
+  // 50n
+  if (icon == "50n")  {
+    return "M";
+  }
+  // Nothing matched: N/A
+  return ")";
 }
