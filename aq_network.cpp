@@ -239,7 +239,7 @@ String AQ_Network::httpGETRequest(const char* serverName) {
     payload = http.getString();
   } else {
     debugMessage("HTTP GET error code: " + httpResponseCode);
-    payload = "no payload to return";
+    payload = "HTTP GET error";
   }
   // free resources
   http.end();

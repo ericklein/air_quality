@@ -400,6 +400,9 @@ bool getOWMWeather()
       String serverPath = String(OWM_SERVER) + OWM_WEATHER_PATH + OWM_LAT_LONG + "&units=imperial" + "&APPID=" + OWM_KEY;
 
       jsonBuffer = aq_network.httpGETRequest(serverPath.c_str());
+      if (jsonBuffer=="HTTP GET error"){
+        return false;
+      }
       debugMessage(jsonBuffer);
 
       DynamicJsonDocument doc(2000);
@@ -466,6 +469,9 @@ bool getOWMAQI()
       String serverPath = String(OWM_SERVER) + OWM_AQM_PATH + OWM_LAT_LONG + "&APPID=" + OWM_KEY;
 
       jsonBuffer = aq_network.httpGETRequest(serverPath.c_str());
+      if (jsonBuffer=="HTTP GET error"){
+        return false;
+      }
       debugMessage(jsonBuffer);
 
       DynamicJsonDocument doc(384);
