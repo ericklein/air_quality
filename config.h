@@ -1,5 +1,5 @@
 // conditional compile flags
-#define DEBUG 	// Output to serial port
+//#define DEBUG 	// Output to serial port
 //#define RJ45  	// use Ethernet
 #define WIFI    	// use WiFi
 //#define MQTTLOG 	// log sensor data to MQTT broker
@@ -43,10 +43,10 @@ const int timeZone = -7;  // USA PDT
 // based on a settings curve in the LC709203F datasheet
 // #define BATTERY_APA 0x08 // 100mAH
 // #define BATTERY_APA 0x0B // 200mAH
-// #define BATTERY_APA 0x10 // 500mAH
+#define BATTERY_APA 0x10 // 500mAH
 // #define BATTERY_APA 0x19 // 1000mAH
 // #define BATTERY_APA 0x1D // 1200mAH
-#define BATTERY_APA 0x2D // 2000mAH
+// #define BATTERY_APA 0x2D // 2000mAH
 // #define BATTERY_APA 0x32 // 2500mAH
 // #define BATTERY_APA 0x36 // 3000mAH
 

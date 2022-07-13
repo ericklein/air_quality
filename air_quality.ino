@@ -50,7 +50,6 @@ typedef struct
   String description;
   // "icon": "09d"
   String icon;
-  String iconMeteoCon;
   // "temp": 290.56
   float temp;
   // "pressure": 1013
