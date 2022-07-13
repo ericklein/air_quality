@@ -42,20 +42,20 @@ bool batteryAvailable = false;
 bool internetAvailable = false;
 
 // initialize environment sensors
-// SCD40; temp, humidity, CO2
-// #include <SensirionI2CScd4x.h>
-// SensirionI2CScd4x envSensor;
 
-// unified Adafruit sensor setup
+// SCD40; temp, humidity, CO2
+#include <SensirionI2CScd4x.h>
+SensirionI2CScd4x envSensor;
+
 // AHTX0; temp, humidity
 //#include <Adafruit_AHTX0.h>
 //Adafruit_AHTX0 envSensor;
 
 // BME280; temp, humidity
-#include <Adafruit_BME280.h>
-Adafruit_BME280 envSensor; // i2c interface
-Adafruit_Sensor *envSensor_temp = envSensor.getTemperatureSensor();
-Adafruit_Sensor *envSensor_humidity = envSensor.getHumiditySensor();
+// #include <Adafruit_BME280.h>
+// Adafruit_BME280 envSensor; // i2c interface
+// Adafruit_Sensor *envSensor_temp = envSensor.getTemperatureSensor();
+// Adafruit_Sensor *envSensor_humidity = envSensor.getHumiditySensor();
 
 // Battery voltage sensor
 #include <Adafruit_LC709203F.h>
@@ -68,18 +68,18 @@ Adafruit_LC709203F lc;
   #include <Fonts/FreeSans9pt7b.h>
   #include <Fonts/FreeSans12pt7b.h>
   // MagTag board definition
-  // // #define EPD_RESET   6   // can set to -1 and share with chip Reset (can't deep sleep)
-  // // #define EPD_DC      7   // can be any pin, but required!
-  // // #define EPD_CS      8   // can be any pin, but required!
-  // #define SRAM_CS     -1  // can set to -1 to not use a pin (uses a lot of RAM!)
-  // #define EPD_BUSY    5   // can set to -1 to not use a pin (will wait a fixed delay)
+  // #define EPD_RESET   6   // can set to -1 and share with chip Reset (can't deep sleep)
+  // #define EPD_DC      7   // can be any pin, but required!
+  // #define EPD_CS      8   // can be any pin, but required!
+  #define SRAM_CS     -1  // can set to -1 to not use a pin (uses a lot of RAM!)
+  #define EPD_BUSY    5   // can set to -1 to not use a pin (will wait a fixed delay)
 
   // ESP32S2 w/BME280 board definition
-  #define EPD_RESET   -1   // can set to -1 and share with chip Reset (can't deep sleep)
-  #define EPD_DC      10   // can be any pin, but required!
-  #define EPD_CS      9   // can be any pin, but required!
-  #define SRAM_CS     6  // can set to -1 to not use a pin (uses a lot of RAM!)
-  #define EPD_BUSY    -1   // can set to -1 to not use a pin (will wait a fixed delay)
+  // #define EPD_RESET   -1   // can set to -1 and share with chip Reset (can't deep sleep)
+  // #define EPD_DC      10   // can be any pin, but required!
+  // #define EPD_CS      9   // can be any pin, but required!
+  // #define SRAM_CS     6  // can set to -1 to not use a pin (uses a lot of RAM!)
+  // #define EPD_BUSY    -1   // can set to -1 to not use a pin (will wait a fixed delay)
 
   ThinkInk_290_Grayscale4_T5 display(EPD_DC, EPD_RESET, EPD_CS, SRAM_CS, EPD_BUSY);
   // colors are EPD_WHITE, EPD_BLACK, EPD_RED, EPD_GRAY, EPD_LIGHT, EPD_DARK
@@ -117,8 +117,7 @@ void setup()
 
   #ifdef SCREEN
     // there is no way to query screen for status
-    //display.begin(THINKINK_GRAYSCALE4);
-    display.begin(THINKINK_MONO);
+    display.begin(THINKINK_MONO); // changed from THINKINK_GRAYSCALE4 to eliminate black screen border
     debugMessage("Display ready");
   #endif
 
@@ -280,8 +279,8 @@ void deepSleep()
 #endif
   aq_network.networkStop();
   // SCD40 only
-  // envSensor.stopPeriodicMeasurement();
-  // envSensor.powerDown();
+  envSensor.stopPeriodicMeasurement();
+  envSensor.powerDown();
 
 #if defined(ARDUINO_ADAFRUIT_FEATHER_ESP32S2)
   // Rev B board is LOW to enable
@@ -580,67 +579,67 @@ void screenBatteryStatus()
 
 int initSensor() 
 {
-  //SCD40
-  // uint16_t error;
-  // char errorMessage[256];
+  // SCD40
+  uint16_t error;
+  char errorMessage[256];
 
-  // Wire.begin();
-  // envSensor.begin(Wire);
-  // envSensor.wakeUp();
-  // envSensor.setSensorAltitude(SITE_ALTITUDE); // optimizes CO2 reading
+  Wire.begin();
+  envSensor.begin(Wire);
+  envSensor.wakeUp();
+  envSensor.setSensorAltitude(SITE_ALTITUDE); // optimizes CO2 reading
 
-  // error = envSensor.startPeriodicMeasurement();
-  // if (error) 
-  // {
-  //   // Failed to initialize SCD40
-  //   errorToString(error, errorMessage, 256);
-  //   debugMessage(String(errorMessage) + "executing SCD40 startPeriodicMeasurement()");
-  //   return error;
-  // } 
-  // else 
-  // {
-  //   delay(5000);  // Give SCD40 time to warm up
-  //   return 0;     // error = 0 in this case
-  // }
+  error = envSensor.startPeriodicMeasurement();
+  if (error) 
+  {
+    // Failed to initialize SCD40
+    errorToString(error, errorMessage, 256);
+    debugMessage(String(errorMessage) + "executing SCD40 startPeriodicMeasurement()");
+    return error;
+  } 
+  else 
+  {
+    delay(5000);  // Give SCD40 time to warm up
+    return 0;     // error = 0 in this case
+  }
 
   // ATHX0, BME280
-  if (envSensor.begin())
-  {
-    // ID of 0x56-0x58 or 0x60 is a BME 280, 0x61 is BME680, 0x77 is BME280 on ESP32S2 Feather
-    debugMessage(String("Environment sensor ready, ID is: ")+envSensor.sensorID());
-    return 0;
-  }
-  else
-  {
-    return 1;
-  }
+  // if (envSensor.begin())
+  // {
+  //   // ID of 0x56-0x58 or 0x60 is a BME 280, 0x61 is BME680, 0x77 is BME280 on ESP32S2 Feather
+  //   debugMessage(String("Environment sensor ready, ID is: ")+envSensor.sensorID());
+  //   return 0;
+  // }
+  // else
+  // {
+  //   return 1;
+  // }
 }
 
 uint16_t readSensor()
 // reads environment sensor and stores data to environment global
 {
   // AHTX0, BME280
-  sensors_event_t temp_event, humidity_event;
-  envSensor_temp->getEvent(&temp_event);
-  envSensor_humidity->getEvent(&humidity_event);
+  // sensors_event_t temp_event, humidity_event;
+  // envSensor_temp->getEvent(&temp_event);
+  // envSensor_humidity->getEvent(&humidity_event);
  
-  sensorData.internalTempF = (temp_event.temperature * 1.8) +32;
-  sensorData.internalHumidity = humidity_event.relative_humidity;
-  sensorData.internalCO2 = 10000;
+  // sensorData.internalTempF = (temp_event.temperature * 1.8) +32;
+  // sensorData.internalHumidity = humidity_event.relative_humidity;
+  // sensorData.internalCO2 = 10000;
 
   // SCD40
-  // uint16_t error;
-  // char errorMessage[256];
+  uint16_t error;
+  char errorMessage[256];
 
-  // error = envSensor.readMeasurement(sensorData.internalCO2, sensorData.internalTempF, sensorData.internalHumidity);
-  // if (error) 
-  // {
-  //   errorToString(error, errorMessage, 256);
-  //   debugMessage(String(errorMessage) + "executing SCD40 readMeasurement()");
-  //   return error;
-  // }
+  error = envSensor.readMeasurement(sensorData.internalCO2, sensorData.internalTempF, sensorData.internalHumidity);
+  if (error) 
+  {
+    errorToString(error, errorMessage, 256);
+    debugMessage(String(errorMessage) + "executing SCD40 readMeasurement()");
+    return error;
+  }
   // convert C to F for temp
-  // sensorData.internalTempF = (sensorData.internalTempF * 1.8) + 32;
+  sensorData.internalTempF = (sensorData.internalTempF * 1.8) + 32;
 
   debugMessage(String("environment sensor values: ") + sensorData.internalTempF + "F, " + sensorData.internalHumidity + "%, " + sensorData.internalCO2 + " ppm");
   return 0;
