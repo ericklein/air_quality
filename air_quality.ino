@@ -117,6 +117,7 @@ bool batteryAvailable = false;
 bool internetAvailable = false;
 
 // initialize environment sensors
+
 #ifdef SCD40
   // SCD40; temp, humidity, CO2
   #include <SensirionI2CScd4x.h>
@@ -201,8 +202,7 @@ void setup()
 
   #ifdef SCREEN
     // there is no way to query screen for status
-    //display.begin(THINKINK_GRAYSCALE4);
-    display.begin(THINKINK_MONO);
+    display.begin(THINKINK_MONO); // changed from THINKINK_GRAYSCALE4 to eliminate black screen border
     debugMessage("Display ready");
   #endif
 
@@ -372,6 +372,7 @@ void deepSleep()
     digitalWrite(EPD_RESET, LOW);  // hardware power down mode
   #endif
   aq_network.networkStop();
+
   #ifdef SCD40
     envSensor.stopPeriodicMeasurement();
     envSensor.powerDown();
@@ -701,6 +702,7 @@ void screenBatteryStatus()
 
 int initSensor() 
 {
+
   #ifdef SCD40
     uint16_t error;
     char errorMessage[256];
@@ -741,6 +743,7 @@ int initSensor()
 uint16_t readSensor()
 // reads environment sensor and stores data to environment global
 {
+
   #ifdef SCD40
     uint16_t error;
     char errorMessage[256];
