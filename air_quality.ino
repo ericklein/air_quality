@@ -117,20 +117,22 @@ bool batteryAvailable = false;
 bool internetAvailable = false;
 
 // initialize environment sensors
-// SCD40; temp, humidity, CO2
-#include <SensirionI2CScd4x.h>
-SensirionI2CScd4x envSensor;
+#ifdef SCD40
+  // SCD40; temp, humidity, CO2
+  #include <SensirionI2CScd4x.h>
+  SensirionI2CScd4x envSensor;
+#else
+  // unified Adafruit sensor setup
+  // AHTX0; temp, humidity
+  //#include <Adafruit_AHTX0.h>
+  //Adafruit_AHTX0 envSensor;
 
-// unified Adafruit sensor setup
-// AHTX0; temp, humidity
-//#include <Adafruit_AHTX0.h>
-//Adafruit_AHTX0 envSensor;
-
-// BME280; temp, humidity
-// #include <Adafruit_BME280.h>
-// Adafruit_BME280 envSensor; // i2c interface
-// Adafruit_Sensor *envSensor_temp = envSensor.getTemperatureSensor();
-// Adafruit_Sensor *envSensor_humidity = envSensor.getHumiditySensor();
+  // BME280; temp, humidity
+  #include <Adafruit_BME280.h>
+  Adafruit_BME280 envSensor; // i2c interface
+  Adafruit_Sensor *envSensor_temp = envSensor.getTemperatureSensor();
+  Adafruit_Sensor *envSensor_humidity = envSensor.getHumiditySensor();
+#endif
 
 // Battery voltage sensor
 #include <Adafruit_LC709203F.h>
@@ -365,20 +367,21 @@ void deepSleep()
 // Powers down hardware in preparation for board deep sleep
 {
   debugMessage(String("Going to sleep for ") + SAMPLE_INTERVAL + " minute(s)");
-#ifdef SCREEN
-  display.powerDown();
-  digitalWrite(EPD_RESET, LOW);  // hardware power down mode
-#endif
+  #ifdef SCREEN
+    display.powerDown();
+    digitalWrite(EPD_RESET, LOW);  // hardware power down mode
+  #endif
   aq_network.networkStop();
-  // SCD40 only
-  envSensor.stopPeriodicMeasurement();
-  envSensor.powerDown();
+  #ifdef SCD40
+    envSensor.stopPeriodicMeasurement();
+    envSensor.powerDown();
+  #endif
 
-#if defined(ARDUINO_ADAFRUIT_FEATHER_ESP32S2)
-  // Rev B board is LOW to enable
-  // Rev C board is HIGH to enable
-  digitalWrite(PIN_I2C_POWER, HIGH);
-#endif
+  #if defined(ARDUINO_ADAFRUIT_FEATHER_ESP32S2)
+    // Rev B board is LOW to enable
+    // Rev C board is HIGH to enable
+    digitalWrite(PIN_I2C_POWER, HIGH);
+  #endif
 
   nvStorage.end();
   esp_sleep_enable_timer_wakeup(SAMPLE_INTERVAL * SAMPLE_INTERVAL_ESP_MODIFIER);
@@ -698,70 +701,72 @@ void screenBatteryStatus()
 
 int initSensor() 
 {
-  //SCD40
-  uint16_t error;
-  char errorMessage[256];
+  #ifdef SCD40
+    uint16_t error;
+    char errorMessage[256];
 
-  Wire.begin();
-  envSensor.begin(Wire);
-  envSensor.wakeUp();
-  envSensor.setSensorAltitude(SITE_ALTITUDE); // optimizes CO2 reading
+    Wire.begin();
+    envSensor.begin(Wire);
+    envSensor.wakeUp();
+    envSensor.setSensorAltitude(SITE_ALTITUDE); // optimizes CO2 reading
 
-  error = envSensor.startPeriodicMeasurement();
-  if (error) 
-  {
-    // Failed to initialize SCD40
-    errorToString(error, errorMessage, 256);
-    debugMessage(String(errorMessage) + "executing SCD40 startPeriodicMeasurement()");
-    return error;
-  } 
-  else 
-  {
-    delay(5000);  // Give SCD40 time to warm up
-    return 0;     // error = 0 in this case
-  }
-
-  // ATHX0, BME280
-  // if (envSensor.begin())
-  // {
-  //   // ID of 0x56-0x58 or 0x60 is a BME 280, 0x61 is BME680, 0x77 is BME280 on ESP32S2 Feather
-  //   debugMessage(String("Environment sensor ready, ID is: ")+envSensor.sensorID());
-  //   return 0;
-  // }
-  // else
-  // {
-  //   return 1;
-  // }
+    error = envSensor.startPeriodicMeasurement();
+    if (error) 
+    {
+      // Failed to initialize SCD40
+      errorToString(error, errorMessage, 256);
+      debugMessage(String(errorMessage) + "executing SCD40 startPeriodicMeasurement()");
+      return error;
+    }
+    else 
+    {
+      delay(5000);  // Give SCD40 time to warm up
+      return 0;     // error = 0 in this case
+    }
+  #else
+    // ATHX0, BME280
+    if (envSensor.begin())
+    {
+      // ID of 0x56-0x58 or 0x60 is a BME 280, 0x61 is BME680, 0x77 is BME280 on ESP32S2 Feather
+      debugMessage(String("Environment sensor ready, ID is: ")+envSensor.sensorID());
+      return 0;
+    }
+    else
+    {
+      return 1;
+    }
+  #endif
 }
 
 uint16_t readSensor()
 // reads environment sensor and stores data to environment global
 {
-  // AHTX0, BME280
-  // sensors_event_t temp_event, humidity_event;
-  // envSensor_temp->getEvent(&temp_event);
-  // envSensor_humidity->getEvent(&humidity_event);
- 
-  // sensorData.internalTempF = (temp_event.temperature * 1.8) +32;
-  // sensorData.internalHumidity = humidity_event.relative_humidity;
-  // sensorData.internalCO2 = 10000;
+  #ifdef SCD40
+    uint16_t error;
+    char errorMessage[256];
 
-  // SCD40
-  uint16_t error;
-  char errorMessage[256];
+    error = envSensor.readMeasurement(sensorData.internalCO2, sensorData.internalTempF, sensorData.internalHumidity);
+    if (error) 
+    {
+      errorToString(error, errorMessage, 256);
+      debugMessage(String(errorMessage) + "executing SCD40 readMeasurement()");
+      return error;
+    }
+    //convert C to F for temp
+    sensorData.internalTempF = (sensorData.internalTempF * 1.8) + 32;
 
-  error = envSensor.readMeasurement(sensorData.internalCO2, sensorData.internalTempF, sensorData.internalHumidity);
-  if (error) 
-  {
-    errorToString(error, errorMessage, 256);
-    debugMessage(String(errorMessage) + "executing SCD40 readMeasurement()");
-    return error;
-  }
-  //convert C to F for temp
-  sensorData.internalTempF = (sensorData.internalTempF * 1.8) + 32;
-
-  debugMessage(String("environment sensor values: ") + sensorData.internalTempF + "F, " + sensorData.internalHumidity + "%, " + sensorData.internalCO2 + " ppm");
-  return 0;
+    debugMessage(String("environment sensor values: ") + sensorData.internalTempF + "F, " + sensorData.internalHumidity + "%, " + sensorData.internalCO2 + " ppm");
+    return 0;
+  #else
+    // AHTX0, BME280
+    sensors_event_t temp_event, humidity_event;
+    envSensor_temp->getEvent(&temp_event);
+    envSensor_humidity->getEvent(&humidity_event);
+   
+    sensorData.internalTempF = (temp_event.temperature * 1.8) +32;
+    sensorData.internalHumidity = humidity_event.relative_humidity;
+    sensorData.internalCO2 = 10000;
+  #endif
 }
 
 int readNVStorage() {

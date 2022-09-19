@@ -6,6 +6,7 @@
 //#define DWEET     // Post sensor readings to dweet.io
 #define INFLUX  	// Log data to remote InfluxDB server
 #define	SCREEN		// use screen as output
+#define SCD40			// use SCD40 to read temp, humidity, and CO2
 
 // sample timing in minutes
 #ifdef DEBUG
