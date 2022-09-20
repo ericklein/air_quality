@@ -91,7 +91,7 @@ typedef struct
   // "lat": 47.37
   float lat;
   // "aqi": 2
-  uint16_t aqi;
+  int aqi;
   // "co": 453.95
   float co;
   // "no": 0.47
@@ -143,14 +143,14 @@ Adafruit_LC709203F lc;
 #ifdef SCREEN
   #include <Adafruit_ThinkInk.h>
 
-  #include "Fonts/meteocons48pt7b.h"
-  #include "Fonts/meteocons24pt7b.h"
   #include "Fonts/meteocons20pt7b.h"
   #include "Fonts/meteocons16pt7b.h"
+  #include "Fonts/meteocons12pt7b.h"
 
   #include <Fonts/FreeSans9pt7b.h>
   #include <Fonts/FreeSans12pt7b.h>
   #include <Fonts/FreeSans18pt7b.h>
+  #include <Fonts/FreeSans24pt7b.h>
 
   // MagTag board definition
   // #define EPD_RESET   6   // can set to -1 and share with chip Reset (can't deep sleep)
@@ -228,7 +228,7 @@ void setup()
   if (initSensor()) 
   {
     debugMessage("Environment sensor failed to initialize, going to sleep");
-    alertScreen("Env sensor not detected");
+    screenAlert("Env sensor not detected");
     deepSleep();
   }
 
@@ -237,7 +237,7 @@ void setup()
   if(readSensor())
   {
     debugMessage("Environment sensor failed to read, going to sleep");
-    alertScreen("Env sensor no data");
+    screenAlert("Env sensor no data");
     deepSleep();
   }
   sampleCounter = readNVStorage();
@@ -253,7 +253,7 @@ void setup()
     if (sensorData.internalCO2 != 10000) {
       nvStorage.putUInt("co2", (sensorData.internalCO2 + averageCO2));
     }
-    debugMessage(String("Intermediate values TO nv storage: Temp:") + (sensorData.internalTempF + averageTempF) + " Humidity:" + (sensorData.internalHumidity + averageHumidity) + ", CO2:" + (sensorData.internalCO2 + averageCO2));
+    debugMessage(String("Intermediate values TO nv storage: Temp:") + (sensorData.internalTempF + averageTempF) + ", Humidity:" + (sensorData.internalHumidity + averageHumidity) + ", CO2:" + (sensorData.internalCO2 + averageCO2));
     deepSleep();
   } 
   else
@@ -345,9 +345,9 @@ void setup()
   // Update the screen if available
   if (upd_flags == "") {
     // None of the services succeeded (gasp!)
-    infoScreen(aq_network.dateTimeString());
+    screenInfo(aq_network.dateTimeString());
   } else {
-    infoScreen("[+" + upd_flags + "] " + aq_network.dateTimeString());
+    screenInfo("[+" + upd_flags + "] " + aq_network.dateTimeString());
   }
   deepSleep();
 }
@@ -399,31 +399,31 @@ bool getOWMWeather()
     {
       String jsonBuffer;
 
-      // Get local temp and humidity
+      // Get local weather conditions
       String serverPath = String(OWM_SERVER) + OWM_WEATHER_PATH + OWM_LAT_LONG + "&units=imperial" + "&APPID=" + OWM_KEY;
 
       jsonBuffer = aq_network.httpGETRequest(serverPath.c_str());
-      if (jsonBuffer=="HTTP GET error"){
+      debugMessage("Raw JSON from OWM Current Weather feed");
+      debugMessage(jsonBuffer);      
+      if (jsonBuffer=="HTTP GET error")
+      {
         return false;
       }
-      debugMessage(jsonBuffer);
 
-      DynamicJsonDocument doc(2000);
-      //StaticJsonDocument<2000> doc;
+      DynamicJsonDocument doc(2048);
 
       DeserializationError error = deserializeJson(doc, jsonBuffer);
 
       if (error)
       {
-        debugMessage("deserializeJson failed: ");
-        debugMessage(String(error.c_str()));
+        debugMessage(String("deserializeJson failed with error message: ") + error.c_str());
         return false;
       }
       
       int code = (int) doc["cod"];
       if(code != 200)
       {
-        debugMessage(String("OpenWeatherMap error: ") + (const char *)doc["message"]);
+        debugMessage(String("OWM error: ") + (const char *)doc["message"]);
         return false;
       }
 
@@ -451,7 +451,7 @@ bool getOWMWeather()
 
       owmCurrentData.windSpeed = (float) doc["wind"]["speed"];
       owmCurrentData.windDeg = (float) doc["wind"]["deg"];
-      debugMessage(String("Open Weather Map returned: ") + owmCurrentData.temp + "F, " + owmCurrentData.humidity + "%");
+      debugMessage(String("OWM Current Weather set: ") + owmCurrentData.temp + "F, " + owmCurrentData.humidity + "%");
       return true;
     }
   #endif
@@ -472,61 +472,50 @@ bool getOWMAQI()
       String serverPath = String(OWM_SERVER) + OWM_AQM_PATH + OWM_LAT_LONG + "&APPID=" + OWM_KEY;
 
       jsonBuffer = aq_network.httpGETRequest(serverPath.c_str());
-      if (jsonBuffer=="HTTP GET error"){
+      debugMessage("Raw JSON from OWM AQI feed");
+      debugMessage(jsonBuffer);      
+      if (jsonBuffer=="HTTP GET error")
+      {
         return false;
       }
-      debugMessage(jsonBuffer);
 
       DynamicJsonDocument doc(384);
-      //StaticJsonDocument<384> doc;
 
       DeserializationError error = deserializeJson(doc, jsonBuffer);
-
       if (error)
       {
-        debugMessage("deserializeJson failed: ");
-        debugMessage(String(error.c_str()));
-        return false;
-      }
-    
-      int code = (int) doc["cod"];
-      if(code != 200)
-      {
-        debugMessage(String("OpenWeatherMap error: ") + (const char *)doc["message"]);
+        debugMessage(String("deserializeJson failed with error message: ") + error.c_str());
         return false;
       }
 
-      // owmAirQuality.lon = (float) doc1["coord"]["lon"];
-      // owmAirQuality.lat = (float) doc1["coord"]["lat"];
-
+      owmAirQuality.lon = (float) doc["coord"]["lon"];
+      owmAirQuality.lat = (float) doc["coord"]["lat"];
       JsonObject list_0 = doc["list"][0];
-
       owmAirQuality.aqi = list_0["main"]["aqi"];
-
-      // JsonObject list_0_components = list_0["components"];
-      // owmAirQuality.co = (float) list_0_components["co"]
-      // owmAirQuality.no = (float) list_0_components["no"]
-      // owmAirQuality.no2 = (float) list_0_components["no2"]
-      // owmAirQuality.o3 = (float) list_0_components["o3"]
-      // owmAirQuality.so2 = (float) list_0_components["so2"]
-      // owmAirQuality.pm2_5 = (float) list_0_components["pm2_5"]
-      // owmAirQuality.pm10 = (float) list_0_components["pm10"]
-      // owmAirQuality.nh3 = (float) list_0_components["nh3"]
-      debugMessage(String("Open Weather Map returned: ") + owmAirQuality.aqi + " AQI");
+      JsonObject list_0_components = list_0["components"];
+      owmAirQuality.co = (float) list_0_components["co"];
+      owmAirQuality.no = (float) list_0_components["no"];
+      owmAirQuality.no2 = (float) list_0_components["no2"];
+      owmAirQuality.o3 = (float) list_0_components["o3"];
+      owmAirQuality.so2 = (float) list_0_components["so2"];
+      owmAirQuality.pm2_5 = (float) list_0_components["pm2_5"];
+      owmAirQuality.pm10 = (float) list_0_components["pm10"];
+      owmAirQuality.nh3 = (float) list_0_components["nh3"];
+      debugMessage(String("OWM AQI set: ") + owmAirQuality.aqi + " AQI");
       return true;
     }
   #endif
   return false;
 }
 
-void alertScreen(String messageText)
+void screenAlert(String messageText)
 // Display critical error message on screen
 {
 #ifdef SCREEN
   display.clearBuffer();
   display.setTextColor(EPD_BLACK);
   display.setFont(&FreeSans12pt7b);
-  display.setCursor(20, (display.height() / 2 + 6));
+  display.setCursor(40,(display.height()/2+6));
   display.print(messageText);
 
   //update display
@@ -534,7 +523,7 @@ void alertScreen(String messageText)
 #endif
 }
 
-void infoScreen(String messageText)
+void screenInfo(String messageText)
 // Display environmental information on screen
 {
 #ifdef SCREEN
@@ -545,118 +534,154 @@ void infoScreen(String messageText)
   display.clearBuffer();
   display.setTextColor(EPD_BLACK);
 
+  // screen size cheats
+
+  int x_indoor_left_margin = (display.width()/20);
+  int x_mid_point = (display.width()/2);
+  int x_outdoor_left_margin = (display.width()*11/20);
+
   // borders
   // ThinkInk 2.9" epd is 296x128 pixels
   // label border
-  display.drawLine(0,(display.height()/8),display.width(),(display.height()/8),EPD_GRAY);
-  // horizontal temp/humidity border
-  // display.drawLine(0,(display.height()*3/8),display.width(),(display.height()*3/8),EPD_GRAY);
-  // horizontal humidity/AQ border
-  // display.drawLine(0,(display.height()*5/8),display.width(),(display.height()*5/8),EPD_GRAY);
-  // horizontal AQ/message text border
   display.drawLine(0,(display.height()*7/8),display.width(),(display.height()*7/8),EPD_GRAY);
   // splitting sensor vs. outside values
-  display.drawLine((display.width()/2),0,(display.width()/2),(display.height()*7/8),EPD_GRAY);
+  display.drawLine(x_mid_point,0,x_mid_point,(display.height()*7/8),EPD_GRAY);
+  
   // battery status
   screenBatteryStatus();
 
-  // indoor and outdoor labels
-  display.setFont();
-  display.setCursor(((display.width()/4)-10),((display.height()*1/8)-11));
-  display.print("Here");
-  display.setCursor(((display.width()*3/4-12)),((display.height()*1/8)-11));
-  display.print("Outside");
+  // wifi status
+  screenWiFiStatus();
 
-  display.setFont(&FreeSans9pt7b);
-
-  // indoor info
+  // Indoor
   int temperatureDelta = ((int)(sensorData.internalTempF +0.5)) - ((int) (averageTempF + 0.5));
   int humidityDelta = ((int)(sensorData.internalHumidity +0.5)) - ((int) (averageHumidity + 0.5));
 
-  display.setCursor(5,((display.height()*3/8)-10));
-  display.print(String("TMP ") + (int)(sensorData.internalTempF+0.5) + "F");
+  // Indoor temp
+  display.setFont(&FreeSans24pt7b);
+  display.setCursor(x_indoor_left_margin,(display.height()/3));
+  display.print(String((int)(sensorData.internalTempF+0.5)));
+  // move the cursor to raise the F indicator
+  //display.setCursor(x,y);
+  display.setFont(&meteocons16pt7b);
+  display.print("+");
+
+  // Indoor temp delta
   if (temperatureDelta!=0)
   {
+    display.setFont();
     if(temperatureDelta>0)
     {
       // upward triangle (left pt, right pt, bottom pt)
-      display.fillTriangle(90,((display.height()*3/8)-10),110,((display.height()*3/8)-10),100,(((display.height()*3/8)-10)-9), EPD_BLACK);
+      display.fillTriangle(110,((display.height()*3/8)-10),130,((display.height()*3/8)-10),120,(((display.height()*3/8)-10)-9), EPD_BLACK);
     }
     else
     {
-      // (left pt, right pt, bottom pt)
-      display.fillTriangle(90,(((display.height()*3/8)-10)-9),110,(((display.height()*3/8)-10)-9),100,((display.height()*3/8)-10), EPD_BLACK);
+      // downward triangle (left pt, right pt, bottom pt)
+      display.fillTriangle(110,(((display.height()*3/8)-10)-9),130,(((display.height()*3/8)-10)-9),120,((display.height()*3/8)-10), EPD_BLACK);
     }
-    display.setCursor(112,((display.height()*3/8)-10));
+    display.setCursor(130,((display.height()*3/8)-10));
     display.print(abs(temperatureDelta));
   }
 
-  display.setCursor(5,((display.height()*5/8)-10));
-  display.print(String("HMD ") + (int)(sensorData.internalHumidity+0.5) + "%");
+  // Indoor humidity
+  display.setFont(&FreeSans12pt7b);
+  display.setCursor(x_indoor_left_margin,((display.height()*9/16)));
+  display.print(String((int)(sensorData.internalHumidity+0.5)) + "%");
+  // Indoor humidity delta
   if (humidityDelta!=0)
   {
+    display.setFont();
     if(humidityDelta>0)
     {
       // upward triangle (left pt, right pt, bottom pt)
-      display.fillTriangle(90,((display.height()*5/8)-10),110,((display.height()*5/8)-10),100,(((display.height()*5/8)-10)-9), EPD_BLACK);
+      display.fillTriangle(110,((display.height()*5/8)-10),130,((display.height()*5/8)-10),120,(((display.height()*5/8)-10)-9), EPD_BLACK);
     }
     else
     {
       // (left pt, right pt, bottom pt)
-      display.fillTriangle(90,(((display.height()*5/8)-10)-9),110,(((display.height()*5/8)-10)-9),100,((display.height()*5/8)-10), EPD_BLACK);
+      display.fillTriangle(110,(((display.height()*5/8)-10)-9),130,(((display.height()*5/8)-10)-9),120,((display.height()*5/8)-10), EPD_BLACK);
     }
-    display.setCursor(112,((display.height()*5/8)-10));
+    display.setCursor(130,((display.height()*5/8)-10));
     display.print(abs(humidityDelta));
   }
 
+  // Indoor CO2 level
   if (sensorData.internalCO2!=10000)
   {
-    co2range = 2;
     if (sensorData.internalCO2<1001)
-    {co2range = 0;}
-    else if ((sensorData.internalCO2>1000)&&(sensorData.internalCO2<2001))
-    {co2range = 1;}
-    display.setCursor(5,((display.height()*7/8)-10));
-    display.print(String("C02 ") + co2Labels[co2range]);
+      {co2range = 0;}
+    else 
+    {
+      if ((sensorData.internalCO2>1000)&&(sensorData.internalCO2<2001))
+        {co2range = 1;}
+      else
+        {co2range = 2;}
+    }
+    display.setFont(&FreeSans12pt7b);
+    display.setCursor(x_indoor_left_margin,(display.height()*13/16));
+    display.setFont(&FreeSans9pt7b); 
+    display.print(String(co2Labels[co2range])+ " CO2");
     if ((sensorData.internalCO2-averageCO2)!=0)
     {
+      display.setFont();
       if(sensorData.internalCO2-averageCO2>0)
       {
-          // upward triangle (left pt, right pt, bottom pt)
-          display.fillTriangle(90,((display.height()*7/8)-10),110,((display.height()*7/8)-10),100,(((display.height()*7/8)-10)-9), EPD_BLACK);
+      // upward triangle (left pt, right pt, bottom pt)
+      display.fillTriangle(110,((display.height()*7/8)-10),130,((display.height()*7/8)-10),120,(((display.height()*7/8)-10)-9), EPD_BLACK);
       }
-        else
+      else
       {
-          // (left pt, right pt, bottom pt)
-          display.fillTriangle(90,(((display.height()*7/8)-10)-9),110,(((display.height()*7/8)-10)-9),100,((display.height()*7/8)-10), EPD_BLACK);
+        // (left pt, right pt, bottom pt)
+        display.fillTriangle(110,(((display.height()*7/8)-10)-9),130,(((display.height()*7/8)-10)-9),120,((display.height()*7/8)-10), EPD_BLACK);
       }
-      display.setCursor(112,((display.height()*7/8)-10));
+      display.setCursor(130,((display.height()*7/8)-10));
       display.print(abs(sensorData.internalCO2 - averageCO2));
     }
   }
 
-  // outdoor info
+  // Outside
+  // location label
+  display.setFont();
+  display.setCursor((display.width()*5/8),((display.height()*1/8)-11));
+  display.print(owmCurrentData.cityName);
+
+  // Outside temp
+  display.setFont(&FreeSans12pt7b);
   if (owmCurrentData.temp!=10000)
   {
-    display.setCursor(((display.width()/2)+5),((display.height()*3/8)-10));
-    display.print(String("TMP ") + owmCurrentData.temp + "F");
-  }
-  if (owmCurrentData.humidity!=10000)
-  {
-    display.setCursor(((display.width()/2)+5),((display.height()*5/8)-10));
-    display.print(String("HMD ") + owmCurrentData.humidity + "%");
-  }
-  // air quality index (AQI)
-  if (owmAirQuality.aqi!=10000)
-  {
-    display.setCursor(((display.width()/2)+5),((display.height()*7/8)-10));
-    display.print("AQI ");
-    display.print(aqiLabels[(owmAirQuality.aqi-1)]);
+    display.setCursor(x_outdoor_left_margin,(display.height()/4));
+    display.print(String((int)(owmCurrentData.temp+0.5)));
+    display.setFont(&meteocons12pt7b);
+    display.print("+");
   }
 
-  // message
+  // weather icon
+  display.setFont(&meteocons20pt7b);
+  display.setCursor((display.width()*4/5),(display.height()/2));
+  String weatherIcon = getMeteoconIcon(owmCurrentData.icon);
+  display.print(weatherIcon);
+
+  // Outside humidity
+  display.setFont(&FreeSans12pt7b);
+  if (owmCurrentData.humidity!=10000)
+  {
+    display.setCursor(x_outdoor_left_margin,(display.height()*9/16));
+    display.print(String(owmCurrentData.humidity) + "%");
+  }
+
+  // Outside air quality index (AQI)
+  display.setFont(&FreeSans9pt7b);
+  if (owmAirQuality.aqi!=10000)
+  {
+    display.setCursor((x_outdoor_left_margin),(display.height()*13/16));
+    display.print(aqiLabels[(owmAirQuality.aqi-1)]);
+    display.print(" AQI");
+  }
+
+  // status message
   display.setFont();  // resets to system default monospace font
-  display.setCursor(5,(display.height()-10));
+  display.setCursor(5,(display.height()-9));
   display.print(messageText);
 
   //update display
@@ -692,12 +717,31 @@ void screenBatteryStatus()
     debugMessage("Battery is at " + String(percent) + " percent capacity");
     debugMessage("Battery voltage: " + String(lc.cellVoltage()) + " v");
 
+    // battery nub (3pix wide, 6pix high)
+    display.drawRect((display.width()-5-3),((display.height()*7/8)+7),3,6,EPD_BLACK);
+
     //calculate fill
-    display.fillRect((display.width() - 33), ((display.height() * 7 / 8) + 4), (int((percent / 100) * barWidth)), barHeight, EPD_GRAY);
+    display.fillRect((display.width()-barWidth-5-3),((display.height()*7/8)+5),(int((percent/100)*barWidth)),barHeight,EPD_GRAY);
     // border
-    display.drawRect((display.width() - 33), ((display.height() * 7 / 8) + 4), barWidth, barHeight, EPD_BLACK);
+    display.drawRect((display.width()-barWidth-5-3),((display.height()*7/8)+5),barWidth,barHeight,EPD_BLACK);
   }
 #endif
+}
+
+void screenWiFiStatus()
+{
+  #if defined(WIFI) || defined(RJ45)
+  // if there is a network interface (so it will compile)
+    if (internetAvailable)
+    // and internet is verified
+    {
+      int barWidth = 28;
+
+      display.setCursor((display.width()-(barWidth-5-3)-50),(display.height()-9));
+      display.setFont();
+      display.print("WiFi");
+    }
+  #endif
 }
 
 int initSensor() 
