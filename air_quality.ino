@@ -19,6 +19,7 @@ AQ_Network aq_network;
 Preferences nvStorage;
 
 // Global variables
+
 // accumulating sensor readings
 float averageTempF;
 float averageHumidity;
@@ -34,6 +35,17 @@ typedef struct
 
 // global for air characteristics
 envData sensorData;
+
+// hardware status data
+typedef struct
+{
+  float batteryPercent;
+  float batteryVoltage;
+  int rssi;
+} hdweData;
+
+// global for hardware status
+hdweData hardwareData;
 
 // Open Weather Map Current data
 typedef struct
@@ -182,7 +194,8 @@ Adafruit_LC709203F lc;
 
 #ifdef MQTTLOG
   extern void mqttConnect();
-  extern int mqttDeviceInfoUpdate(float cellPercent, float cellVoltage, int rssi);
+  extern int mqttDeviceWiFiUpdate(int rssi);
+  extern int mqttDeviceBatteryUpdate(float cellPercent, float cellVoltage);
   extern int mqttSensorUpdate(uint16_t co2, float tempF, float humidity);
 #endif
 
@@ -213,7 +226,6 @@ void setup()
 
     // Confirm key site configuration parameters
     debugMessage("Air Quality started");
-    // debugMessage("---------------------------------");
     // debugMessage(String(SAMPLE_INTERVAL) + " minute sample interval");
     // debugMessage(String(SAMPLE_SIZE) + " samples before logging");
     // debugMessage("Site lat/long: " + String(OWM_LAT_LONG));
@@ -225,7 +237,7 @@ void setup()
   #endif
 
   // Initialize environmental sensor.  Returns non-zero if initialization fails
-  if (initSensor()) 
+  if (!initSensor()) 
   {
     debugMessage("Environment sensor failed to initialize, going to sleep");
     screenAlert("Env sensor not detected");
@@ -234,7 +246,7 @@ void setup()
 
   // Environmental sensor available, so fetch values
   int sampleCounter;
-  if(readSensor())
+  if(!readSensor())
   {
     debugMessage("Environment sensor failed to read, going to sleep");
     screenAlert("Env sensor no data");
@@ -275,17 +287,10 @@ void setup()
   }
 
   initBattery();
+  readBattery();
 
-  // Setup whatever network connection is specified in config.h
+  // Setup network connection specified in config.h
   internetAvailable = aq_network.networkBegin();
-
-  // Implement a variety of internet services, if networking hardware is present and the
-  // network is connected.  Services supported include:
-  //
-  //  NTP to get date and time information (via Network subsystem)
-  //  Open Weather Map (OWM) to get local weather and AQI info
-  //  MQTT to publish data to an MQTT broker on specified topics
-  //  DWEET to publish data to the DWEET service
 
   // Get local weather and air quality info from Open Weather Map
   if (!getOWMWeather())
@@ -302,29 +307,11 @@ void setup()
   String upd_flags = "";  // To indicate whether services succeeded
   if (internetAvailable)
   {
-    float battpct, battv;
-    int rssi;
-
-    rssi = aq_network.getWiFiRSSI();
-
-    if (batteryAvailable)
-    {
-      battpct = lc.cellPercent(); // buffered to prevent issues associated with repeated calls within short time
-      battv = lc.cellVoltage();
-    }
-    else
-    {
-      // Error values
-      battpct = 10000;
-      battv = 10000;
-    }
+    hardwareData.rssi = aq_network.getWiFiRSSI();
 
     #ifdef MQTTLOG
-      int sensor_pub = 0;
-      int device_pub = 0;
-      sensor_pub = mqttSensorUpdate(averageCO2, averageTempF, averageHumidity);
-      device_pub = mqttDeviceInfoUpdate(battpct, battv, rssi);
-      if (sensor_pub && device_pub) {
+      if ((mqttSensorUpdate(sensorData.internalCO2, sensorData.internalTempF,sensorData.internalHumidity)) && (mqttDeviceWiFiUpdate(hardwareData.rssi)) && (mqttDeviceBatteryUpdate(hardwareData.batteryPercent, hardwareData.batteryVoltage)))
+      {
         upd_flags += "M";
       }
     #endif
@@ -344,8 +331,8 @@ void setup()
 
   // Update the screen if available
   if (upd_flags == "") {
-    // None of the services succeeded (gasp!)
-    screenInfo(aq_network.dateTimeString());
+    // None of the services succeeded
+    screenInfo("");
   } else {
     screenInfo("[+" + upd_flags + "] " + aq_network.dateTimeString());
   }
@@ -657,10 +644,15 @@ void screenInfo(String messageText)
   }
 
   // weather icon
-  display.setFont(&meteocons20pt7b);
-  display.setCursor((display.width()*4/5),(display.height()/2));
   String weatherIcon = getMeteoconIcon(owmCurrentData.icon);
-  display.print(weatherIcon);
+  // if getMeteoIcon doesn't have a matching symbol, skip display
+  if (weatherIcon!=")")
+  {
+    // display icon
+    display.setFont(&meteocons20pt7b);
+    display.setCursor((display.width()*4/5),(display.height()/2));
+    display.print(weatherIcon);
+  }
 
   // Outside humidity
   display.setFont(&FreeSans12pt7b);
@@ -702,27 +694,32 @@ void initBattery() {
   }
 }
 
+void readBattery()
+{
+  if (batteryAvailable)
+  {
+    hardwareData.batteryPercent = lc.cellPercent();
+    hardwareData.batteryVoltage = lc.cellVoltage();
+    debugMessage("Battery is at " + String(hardwareData.batteryPercent) + " percent capacity");
+    debugMessage("Battery voltage: " + String(hardwareData.batteryVoltage) + " v");
+  }
+}
+
 void screenBatteryStatus()
 // Displays remaining battery % as graphic in lower right of screen
 // used in XXXScreen() routines
 {
 #ifdef SCREEN
-  if (batteryAvailable) {
-    // render battery percentage to screen
-
+  if (batteryAvailable) 
+  {
     int barHeight = 10;
     int barWidth = 28;
-    // stored so we don't call the function twice in the routine
-    float percent = lc.cellPercent();
-    debugMessage("Battery is at " + String(percent) + " percent capacity");
-    debugMessage("Battery voltage: " + String(lc.cellVoltage()) + " v");
 
     // battery nub (3pix wide, 6pix high)
     display.drawRect((display.width()-5-3),((display.height()*7/8)+7),3,6,EPD_BLACK);
-
-    //calculate fill
-    display.fillRect((display.width()-barWidth-5-3),((display.height()*7/8)+5),(int((percent/100)*barWidth)),barHeight,EPD_GRAY);
-    // border
+    //battery percentage as rectangle fill
+    display.fillRect((display.width()-barWidth-5-3),((display.height()*7/8)+5),(int((hardwareData.batteryPercent/100)*barWidth)),barHeight,EPD_GRAY);
+    // battery border
     display.drawRect((display.width()-barWidth-5-3),((display.height()*7/8)+5),barWidth,barHeight,EPD_BLACK);
   }
 #endif
@@ -730,18 +727,15 @@ void screenBatteryStatus()
 
 void screenWiFiStatus()
 {
-  #if defined(WIFI) || defined(RJ45)
-  // if there is a network interface (so it will compile)
-    if (internetAvailable)
-    // and internet is verified
-    {
-      int barWidth = 28;
+  if (internetAvailable)
+  // and internet is verified
+  {
+    int barWidth = 28;
 
-      display.setCursor((display.width()-(barWidth-5-3)-50),(display.height()-9));
-      display.setFont();
-      display.print("WiFi");
-    }
-  #endif
+    display.setCursor((display.width()-(barWidth-5-3)-50),(display.height()-9));
+    display.setFont();
+    display.print("WiFi");
+  }
 }
 
 int initSensor() 
@@ -761,13 +755,13 @@ int initSensor()
     {
       // Failed to initialize SCD40
       errorToString(error, errorMessage, 256);
-      debugMessage(String(errorMessage) + "executing SCD40 startPeriodicMeasurement()");
-      return error;
+      debugMessage(String(errorMessage) + " executing SCD40 startPeriodicMeasurement()");
+      return 0;
     }
     else 
     {
       delay(5000);  // Give SCD40 time to warm up
-      return 0;     // error = 0 in this case
+      return 1; // success
     }
   #else
     // ATHX0, BME280
@@ -775,11 +769,11 @@ int initSensor()
     {
       // ID of 0x56-0x58 or 0x60 is a BME 280, 0x61 is BME680, 0x77 is BME280 on ESP32S2 Feather
       debugMessage(String("Environment sensor ready, ID is: ")+envSensor.sensorID());
-      return 0;
+      return 1;
     }
     else
     {
-      return 1;
+      return 0;
     }
   #endif
 }
@@ -797,13 +791,13 @@ uint16_t readSensor()
     {
       errorToString(error, errorMessage, 256);
       debugMessage(String(errorMessage) + "executing SCD40 readMeasurement()");
-      return error;
+      return 0;
     }
     //convert C to F for temp
     sensorData.internalTempF = (sensorData.internalTempF * 1.8) + 32;
 
     debugMessage(String("environment sensor values: ") + sensorData.internalTempF + "F, " + sensorData.internalHumidity + "%, " + sensorData.internalCO2 + " ppm");
-    return 0;
+    return 1;
   #else
     // AHTX0, BME280
     sensors_event_t temp_event, humidity_event;
@@ -813,6 +807,7 @@ uint16_t readSensor()
     sensorData.internalTempF = (temp_event.temperature * 1.8) +32;
     sensorData.internalHumidity = humidity_event.relative_humidity;
     sensorData.internalCO2 = 10000;
+    return 1;
   #endif
 }
 

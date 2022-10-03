@@ -1,5 +1,5 @@
 // conditional compile flags
-#define DEBUG 	// Output to serial port
+//#define DEBUG 	// Output to serial port
 //#define RJ45  	// use Ethernet
 #define WIFI    	// use WiFi
 //#define MQTTLOG 	// log sensor data to MQTT broker
@@ -35,9 +35,10 @@
 
 // select time zone, used by NTPClient
 //const int timeZone = 0;  	// UTC
+const int timeZone = 1; // Ireland
 //const int timeZone = -5;  // USA EST
 //const int timeZone = -4;  // USA EDT
-const int timeZone = -7;  // USA PDT
+//const int timeZone = -7;  // USA PDT
 //const int timeZone = -8;  // USA PST
 
 // Battery parameters
