@@ -18,8 +18,6 @@ AQ_Network aq_network;
 #include <Preferences.h>
 Preferences nvStorage;
 
-// Global variables
-
 // accumulating sensor readings
 float averageTempF;
 float averageHumidity;
@@ -32,8 +30,6 @@ typedef struct
   float internalHumidity;
   uint16_t internalCO2;
 } envData;
-
-// global for air characteristics
 envData sensorData;
 
 // hardware status data
@@ -43,8 +39,6 @@ typedef struct
   float batteryVoltage;
   int rssi;
 } hdweData;
-
-// global for hardware status
 hdweData hardwareData;
 
 // Open Weather Map Current data
@@ -92,8 +86,6 @@ typedef struct
   String cityName;
   time_t timezone;
 } OpenWeatherMapCurrentData;
-
-// global for OWM current data
 OpenWeatherMapCurrentData owmCurrentData;
 
 typedef struct
@@ -121,11 +113,9 @@ typedef struct
   // "nh3": 0.86
   float nh3;
 } OpenWeatherMapAirQuality;
-
-// global for OWM current data
 OpenWeatherMapAirQuality owmAirQuality;
 
-bool batteryAvailable = false;
+bool batteryVoltageAvailable = false;
 bool internetAvailable = false;
 
 // initialize environment sensors
@@ -164,20 +154,6 @@ Adafruit_LC709203F lc;
   #include <Fonts/FreeSans18pt7b.h>
   #include <Fonts/FreeSans24pt7b.h>
 
-  // MagTag board definition
-  // #define EPD_RESET   6   // can set to -1 and share with chip Reset (can't deep sleep)
-  // #define EPD_DC      7   // can be any pin, but required!
-  // #define EPD_CS      8   // can be any pin, but required!
-  #define SRAM_CS     -1  // can set to -1 to not use a pin (uses a lot of RAM!)
-  #define EPD_BUSY    5   // can set to -1 to not use a pin (will wait a fixed delay)
-
-  // ESP32S2 w/BME280 board definition
-  // #define EPD_RESET   -1   // can set to -1 and share with chip Reset (can't deep sleep)
-  // #define EPD_DC      10   // can be any pin, but required!
-  // #define EPD_CS      9   // can be any pin, but required!
-  // #define SRAM_CS     6  // can set to -1 to not use a pin (uses a lot of RAM!)
-  // #define EPD_BUSY    -1   // can set to -1 to not use a pin (will wait a fixed delay)
-
   ThinkInk_290_Grayscale4_T5 display(EPD_DC, EPD_RESET, EPD_CS, SRAM_CS, EPD_BUSY);
   // colors are EPD_WHITE, EPD_BLACK, EPD_RED, EPD_GRAY, EPD_LIGHT, EPD_DARK
 #endif
@@ -185,7 +161,7 @@ Adafruit_LC709203F lc;
 #include "ArduinoJson.h"  // Needed by getWeather()
 
 #ifdef INFLUX
-  extern boolean post_influx(uint16_t co2, float tempF, float humidity, float battery_p, float battery_v, int rssi);
+  extern boolean post_influx(uint16_t co2, float tempF, float humidity, float battery_v, int rssi);
 #endif
 
 #ifdef DWEET
@@ -195,30 +171,14 @@ Adafruit_LC709203F lc;
 #ifdef MQTTLOG
   extern void mqttConnect();
   extern int mqttDeviceWiFiUpdate(int rssi);
-  extern int mqttDeviceBatteryUpdate(float cellPercent, float cellVoltage);
+  extern int mqttDeviceBatteryUpdate(float cellVoltage);
   extern int mqttSensorUpdate(uint16_t co2, float tempF, float humidity);
 #endif
 
 void setup()
 // One time run of code, then deep sleep
 {
-  #if defined(ARDUINO_ADAFRUIT_FEATHER_ESP32S2)
-    // turn on the I2C power by setting pin to opposite of 'rest state'
-    // Rev B board is LOW to enable
-    // Rev C board is HIGH to enable
-    pinMode(PIN_I2C_POWER, INPUT);
-    delay(1);
-    bool polarity = digitalRead(PIN_I2C_POWER);
-    pinMode(PIN_I2C_POWER, OUTPUT);
-    digitalWrite(PIN_I2C_POWER, !polarity);
-  #endif
-
-  #ifdef SCREEN
-    // there is no way to query screen for status
-    display.begin(THINKINK_MONO); // changed from THINKINK_GRAYSCALE4 to eliminate black screen border
-    debugMessage("Display ready");
-  #endif
-
+  // handle Serial first so debugMessage() works
   #ifdef DEBUG
     Serial.begin(115200);
     // wait for serial port connection
@@ -236,12 +196,22 @@ void setup()
     #endif
   #endif
 
+  enableInternalPower();
+
+  #ifdef SCREEN
+    // there is no way to query screen for status
+    display.begin(THINKINK_MONO); // changed from THINKINK_GRAYSCALE4 to eliminate black screen border
+    debugMessage("Display ready");
+  #endif
+
   // Initialize environmental sensor.  Returns non-zero if initialization fails
   if (!initSensor()) 
   {
     debugMessage("Environment sensor failed to initialize, going to sleep");
     screenAlert("Env sensor not detected");
-    deepSleep();
+    // This error often occurs right after a firmware flash and reset.
+    // Hardware deep sleep typically resolves it, so quickly cycle the hardware
+    disableInternalPower(HARDWARE_ERROR_INTERVAL*SAMPLE_INTERVAL_ESP_MODIFIER);
   }
 
   // Environmental sensor available, so fetch values
@@ -250,7 +220,7 @@ void setup()
   {
     debugMessage("Environment sensor failed to read, going to sleep");
     screenAlert("Env sensor no data");
-    deepSleep();
+    disableInternalPower(HARDWARE_ERROR_INTERVAL*SAMPLE_INTERVAL_ESP_MODIFIER);
   }
   sampleCounter = readNVStorage();
   sampleCounter++;
@@ -266,7 +236,7 @@ void setup()
       nvStorage.putUInt("co2", (sensorData.internalCO2 + averageCO2));
     }
     debugMessage(String("Intermediate values TO nv storage: Temp:") + (sensorData.internalTempF + averageTempF) + ", Humidity:" + (sensorData.internalHumidity + averageHumidity) + ", CO2:" + (sensorData.internalCO2 + averageCO2));
-    deepSleep();
+    disableInternalPower(SAMPLE_INTERVAL_ESP_MODIFIER*SAMPLE_INTERVAL);
   } 
   else
   {
@@ -286,8 +256,7 @@ void setup()
     debugMessage("Intermediate values in nv storage reset to zero");
   }
 
-  initBattery();
-  readBattery();
+  batteryReadVoltage();
 
   // Setup network connection specified in config.h
   internetAvailable = aq_network.networkBegin();
@@ -307,36 +276,44 @@ void setup()
   String upd_flags = "";  // To indicate whether services succeeded
   if (internetAvailable)
   {
-    hardwareData.rssi = aq_network.getWiFiRSSI();
+    hardwareData.rssi = abs(aq_network.getWiFiRSSI());
 
     #ifdef MQTTLOG
-      if ((mqttSensorUpdate(sensorData.internalCO2, sensorData.internalTempF,sensorData.internalHumidity)) && (mqttDeviceWiFiUpdate(hardwareData.rssi)) && (mqttDeviceBatteryUpdate(hardwareData.batteryPercent, hardwareData.batteryVoltage)))
+      if ((mqttSensorUpdate(sensorData.internalCO2, sensorData.internalTempF,sensorData.internalHumidity)) && (mqttDeviceWiFiUpdate(hardwareData.rssi)) && (mqttDeviceBatteryUpdate(hardwareData.batteryVoltage)))
       {
         upd_flags += "M";
       }
     #endif
 
     #ifdef DWEET
-      post_dweet(averageCO2, averageTempF, averageHumidity, battpct, battv, rssi);
+      post_dweet(averageCO2, averageTempF, averageHumidity, hardwareData.batteryPercent, hardwareData.batteryVoltage, hardwareData.rssi);
       upd_flags += "D";
     #endif
 
     #ifdef INFLUX
       // Returns true if successful
-      if (post_influx(averageCO2, averageTempF, averageHumidity, battpct, battv, rssi)) {
+      if (post_influx(averageCO2, averageTempF, averageHumidity, hardwareData.batteryVoltage, hardwareData.rssi)) {
         upd_flags += "I";
       }
     #endif
+  
+    if (upd_flags == "") 
+    {
+      // External data services not updated but we have network time
+      screenInfo(aq_network.dateTimeString());
+    } 
+    else 
+    {
+      // External data services not updated and we have network time
+      screenInfo("[+" + upd_flags + "] " + aq_network.dateTimeString());
+    }
   }
-
-  // Update the screen if available
-  if (upd_flags == "") {
-    // None of the services succeeded
+  else
+  {
+    // no internet connection, update screen with sensor data only
     screenInfo("");
-  } else {
-    screenInfo("[+" + upd_flags + "] " + aq_network.dateTimeString());
   }
-  deepSleep();
+  disableInternalPower(SAMPLE_INTERVAL*SAMPLE_INTERVAL_ESP_MODIFIER);
 }
 
 void loop() {}
@@ -348,32 +325,6 @@ void debugMessage(String messageText)
   Serial.println(messageText);
   Serial.flush();  // Make sure the message gets output (before any sleeping...)
 #endif
-}
-
-void deepSleep()
-// Powers down hardware in preparation for board deep sleep
-{
-  debugMessage(String("Going to sleep for ") + SAMPLE_INTERVAL + " minute(s)");
-  #ifdef SCREEN
-    display.powerDown();
-    digitalWrite(EPD_RESET, LOW);  // hardware power down mode
-  #endif
-  aq_network.networkStop();
-
-  #ifdef SCD40
-    envSensor.stopPeriodicMeasurement();
-    envSensor.powerDown();
-  #endif
-
-  #if defined(ARDUINO_ADAFRUIT_FEATHER_ESP32S2)
-    // Rev B board is LOW to enable
-    // Rev C board is HIGH to enable
-    digitalWrite(PIN_I2C_POWER, HIGH);
-  #endif
-
-  nvStorage.end();
-  esp_sleep_enable_timer_wakeup(SAMPLE_INTERVAL * SAMPLE_INTERVAL_ESP_MODIFIER);
-  esp_deep_sleep_start();
 }
 
 bool getOWMWeather()
@@ -514,8 +465,6 @@ void screenInfo(String messageText)
 // Display environmental information on screen
 {
 #ifdef SCREEN
-  String aqiLabels[5] = { "Good", "Fair", "Moderate", "Poor", "Very Poor" };
-  String co2Labels[3]={"Good","Poor","Bad"};
   int co2range;
   
   display.clearBuffer();
@@ -596,15 +545,8 @@ void screenInfo(String messageText)
   // Indoor CO2 level
   if (sensorData.internalCO2!=10000)
   {
-    if (sensorData.internalCO2<1001)
-      {co2range = 0;}
-    else 
-    {
-      if ((sensorData.internalCO2>1000)&&(sensorData.internalCO2<2001))
-        {co2range = 1;}
-      else
-        {co2range = 2;}
-    }
+    // calculate CO2 value range in 400ppm bands
+    int co2range = ((sensorData.internalCO2 - 400) / 400);
     display.setFont(&FreeSans12pt7b);
     display.setCursor(x_indoor_left_margin,(display.height()*13/16));
     display.setFont(&FreeSans9pt7b); 
@@ -682,26 +624,36 @@ void screenInfo(String messageText)
 #endif
 }
 
-void initBattery() {
-  if (lc.begin())
-  // Check battery monitoring status
-  {
-    debugMessage("Battery monitor ready");
-    lc.setPackAPA(BATTERY_APA);
-    batteryAvailable = true;
-  } else {
-    debugMessage("Battery monitor not detected");
-  }
-}
-
-void readBattery()
+void screenWiFiStatus() 
 {
-  if (batteryAvailable)
+  if (internetAvailable) 
   {
-    hardwareData.batteryPercent = lc.cellPercent();
-    hardwareData.batteryVoltage = lc.cellVoltage();
-    debugMessage("Battery is at " + String(hardwareData.batteryPercent) + " percent capacity");
-    debugMessage("Battery voltage: " + String(hardwareData.batteryVoltage) + " v");
+    const int barWidth = 3;
+    const int barHeightMultiplier = 3;
+    const int barSpacingMultipler = 5;
+    const int barStartingXModifier = 70;
+    int barCount;
+
+    // Convert RSSI values to a 5 bar visual indicator
+    // >90 means no signal
+    barCount = (6-((hardwareData.rssi/10)-3));
+    if (barCount>5) barCount = 5;
+    if (barCount>0)
+    {
+      // <50 rssi value = 5 bars, each +10 rssi value range = one less bar
+      // draw bars to represent WiFi strength
+      for (int b = 1; b <= barCount; b++)
+      {
+        // display.fillRect(((display.width() - 70) + (b * 5)), ((display.height()) - (b * 5)), barWidth, b * 5, EPD_BLACK);
+        display.fillRect(((display.width() - barStartingXModifier) + (b * barSpacingMultipler)), ((display.height()) - (b * barHeightMultiplier)), barWidth, b * barHeightMultiplier, EPD_BLACK);
+      }
+      debugMessage(String("WiFi signal strength on screen as ") + barCount +" bars");
+    }
+    else
+    {
+      // you could do a visual representation of no WiFi strength here
+      debugMessage("RSSI too low, no display");
+    }
   }
 }
 
@@ -710,7 +662,7 @@ void screenBatteryStatus()
 // used in XXXScreen() routines
 {
 #ifdef SCREEN
-  if (batteryAvailable) 
+  if (batteryVoltageAvailable) 
   {
     int barHeight = 10;
     int barWidth = 28;
@@ -725,16 +677,87 @@ void screenBatteryStatus()
 #endif
 }
 
-void screenWiFiStatus()
+void batteryReadVoltage() 
 {
-  if (internetAvailable)
-  // and internet is verified
+  // check to see if i2C monitor is available
+  if (lc.begin())
+  // Check battery monitoring status
   {
-    int barWidth = 28;
+    debugMessage("Reading battery voltage from LC709203F");
+    lc.setPackAPA(BATTERY_APA);
+    hardwareData.batteryPercent = lc.cellPercent();
+    hardwareData.batteryVoltage = lc.cellVoltage();
+    batteryVoltageAvailable = true;
+  } 
+  else
+  {
+  // use supported boards to read voltage
+    #if defined (ARDUINO_ADAFRUIT_FEATHER_ESP32_V2)
+      pinMode(VBATPIN,INPUT);
+      #define BATTV_MAX           4.2     // maximum voltage of battery
+      #define BATTV_MIN           3.2     // what we regard as an empty battery
 
-    display.setCursor((display.width()-(barWidth-5-3)-50),(display.height()-9));
-    display.setFont();
-    display.print("WiFi");
+      // assumes default ESP32 analogReadResolution (4095)
+      // the 1.05 is a fudge factor original author used to align reading with multimeter
+      hardwareData.batteryVoltage = ((float)analogRead(VBATPIN) / 4095) * 3.3 * 2 * 1.05;
+      hardwareData.batteryPercent = (uint8_t)(((hardwareData.batteryVoltage - BATTV_MIN) / (BATTV_MAX - BATTV_MIN)) * 100);
+
+      // Adafruit ESP32 V2 power management guide code form https://learn.adafruit.com/adafruit-esp32-feather-v2/power-management-2, which does not work? [logged issue]
+      // hardwareData.batteryVoltage = analogReadMilliVolts(VBATPIN);
+      // hardwareData.batteryVoltage *= 2;    // we divided by 2, so multiply back
+      // hardwareData.batteryVoltage /= 1000; // convert to volts!
+
+      // manual percentage decay map from https://blog.ampow.com/lipo-voltage-chart/
+      // hardwareData.batteryPercent = 100;
+      // if ((hardwareData.batteryVoltage < 4.2) && (hardwareData.batteryVoltage > 4.15))
+      //   hardwareData.batteryPercent = 95;
+      // if ((hardwareData.batteryVoltage < 4.16) && (hardwareData.batteryVoltage > 4.10))
+      //   hardwareData.batteryPercent = 90;
+      // if ((hardwareData.batteryVoltage < 4.11) && (hardwareData.batteryVoltage > 4.07))
+      //   hardwareData.batteryPercent = 85;
+      // if ((hardwareData.batteryVoltage < 4.08) && (hardwareData.batteryVoltage > 4.01))
+      //   hardwareData.batteryPercent = 80;
+      // if ((hardwareData.batteryVoltage < 4.02) && (hardwareData.batteryVoltage > 3.97))
+      //   hardwareData.batteryPercent = 75;
+      // if ((hardwareData.batteryVoltage < 3.98) && (hardwareData.batteryVoltage > 3.94))
+      //   hardwareData.batteryPercent = 70;
+       // if ((hardwareData.batteryVoltage < 3.95) && (hardwareData.batteryVoltage > 3.90))
+      // hardwareData.batteryPercent = 65;
+      //  if ((hardwareData.batteryVoltage < 3.91) && (hardwareData.batteryVoltage > 3.87))
+      //    hardwareData.batteryPercent = 60;
+      //  if ((hardwareData.batteryVoltage < 3.87) && (hardwareData.batteryVoltage > 3.84))
+      //    hardwareData.batteryPercent = 55;
+      //  if (hardwareData.batteryVoltage = 3.84)
+      //    hardwareData.batteryPercent = 50;
+      //  if ((hardwareData.batteryVoltage < 3.84) && (hardwareData.batteryVoltage > 3.81))
+      //    hardwareData.batteryPercent = 45;
+      //  if ((hardwareData.batteryVoltage < 3.82) && (hardwareData.batteryVoltage > 3.79))
+      //    hardwareData.batteryPercent = 40;
+      //  if (hardwareData.batteryVoltage = 3.79)
+      //    hardwareData.batteryPercent = 35;
+      //  if ((hardwareData.batteryVoltage < 3.79) && (hardwareData.batteryVoltage > 3.76))
+      //    hardwareData.batteryPercent = 30;
+      //  if ((hardwareData.batteryVoltage < 3.77) && (hardwareData.batteryVoltage > 3.74))
+      //    hardwareData.batteryPercent = 25;
+      //  if ((hardwareData.batteryVoltage < 3.75) && (hardwareData.batteryVoltage > 3.72))
+      //    hardwareData.batteryPercent = 20;      
+      //  if ((hardwareData.batteryVoltage < 3.73) && (hardwareData.batteryVoltage > 3.70))
+      //    hardwareData.batteryPercent = 15;
+      //  if ((hardwareData.batteryVoltage < 3.73) && (hardwareData.batteryVoltage > 3.70))
+      //    hardwareData.batteryPercent = 15;
+      //  if ((hardwareData.batteryVoltage < 3.71) && (hardwareData.batteryVoltage > 3.68))
+      //    hardwareData.batteryPercent = 10;
+      //  if ((hardwareData.batteryVoltage < 3.69) && (hardwareData.batteryVoltage > 3.60))
+      //    hardwareData.batteryPercent = 5;
+      //  if (hardwareData.batteryVoltage < 3.61)
+      //    hardwareData.batteryPercent = 0;
+      batteryVoltageAvailable = true;
+    #endif
+  }
+  if (batteryVoltageAvailable) 
+  {
+    debugMessage("Battery voltage: " + String(hardwareData.batteryVoltage) + " v");
+    debugMessage("Battery percentage: " + String(hardwareData.batteryPercent) + " %");
   }
 }
 
@@ -760,6 +783,7 @@ int initSensor()
     }
     else 
     {
+      debugMessage("SCD40 initialized, waiting 5 sec for first measurement");
       delay(5000);  // Give SCD40 time to warm up
       return 1; // success
     }
@@ -843,6 +867,96 @@ int readNVStorage() {
   debugMessage(String("Intermediate values FROM nv storage: Temp:") + averageTempF + ", Humidity:" + averageHumidity + ", CO2:" + averageCO2);
   debugMessage(String("Sample count FROM nv storage is ") + storedCounter);
   return storedCounter;
+}
+
+void enableInternalPower()
+{
+  // Handle two ESP32 I2C ports
+  #if defined(ARDUINO_ADAFRUIT_QTPY_ESP32S2) || defined(ARDUINO_ADAFRUIT_QTPY_ESP32S3_NOPSRAM) || defined(ARDUINO_ADAFRUIT_QTPY_ESP32S3) || defined(ARDUINO_ADAFRUIT_QTPY_ESP32_PICO)
+    // ESP32 is kinda odd in that secondary ports must be manually
+    // assigned their pins with setPins()!
+    Wire1.setPins(SDA1, SCL1);
+    debugMessage("enabled ESP32 hardware with two I2C ports");
+  #endif
+
+  // Adafruit ESP32 I2C power management
+  #if defined(ARDUINO_ADAFRUIT_FEATHER_ESP32S2)
+    // turn on the I2C power by setting pin to opposite of 'rest state'
+    // Rev B board is LOW to enable
+    // Rev C board is HIGH to enable
+    pinMode(PIN_I2C_POWER, INPUT);
+    delay(1);
+    bool polarity = digitalRead(PIN_I2C_POWER);
+    pinMode(PIN_I2C_POWER, OUTPUT);
+    digitalWrite(PIN_I2C_POWER, !polarity);
+
+    // if you need to turn the neopixel on
+    // pinMode(NEOPIXEL_POWER, OUTPUT);
+    // digitalWrite(NEOPIXEL_POWER, HIGH);
+    debugMessage("enabled Adafruit Feather ESP32S2 I2C power");
+  #endif
+
+  #if defined(ARDUINO_ADAFRUIT_FEATHER_ESP32S2_TFT)
+    pinMode(TFT_I2C_POWER, OUTPUT);
+    digitalWrite(TFT_I2C_POWER, HIGH);
+  #endif
+
+  #if defined(ARDUINO_ADAFRUIT_FEATHER_ESP32_V2)
+    // Turn on the I2C power
+    pinMode(NEOPIXEL_I2C_POWER, OUTPUT);
+    digitalWrite(NEOPIXEL_I2C_POWER, HIGH);
+
+    // Turn on neopixel
+    // pinMode(NEOPIXEL_POWER, OUTPUT);
+    // digitalWrite(NEOPIXEL_POWER, HIGH);
+    debugMessage("enabled Adafruit Feather ESP32 V2 I2C power");
+  #endif
+}
+
+void disableInternalPower(float deepSleepTime)
+// Powers down hardware then board deep sleep
+{
+  display.powerDown();
+  digitalWrite(EPD_RESET, LOW);  // hardware power down mode
+  aq_network.networkStop();
+
+  uint16_t error;
+  char errorMessage[256];
+
+  // stop potentially previously started measurement
+  error = envSensor.stopPeriodicMeasurement();
+  if (error) {
+    Serial.print("Error trying to execute stopPeriodicMeasurement(): ");
+    errorToString(error, errorMessage, 256);
+    debugMessage(errorMessage);
+  }
+  envSensor.powerDown();
+
+  #if defined(ARDUINO_ADAFRUIT_FEATHER_ESP32_V2)
+    // Turn off the I2C power
+    pinMode(NEOPIXEL_I2C_POWER, OUTPUT);
+    digitalWrite(NEOPIXEL_I2C_POWER, LOW);
+
+    // if you need to turn the neopixel off
+    // pinMode(NEOPIXEL_POWER, OUTPUT);
+    // digitalWrite(NEOPIXEL_POWER, LOW);
+    debugMessage("disabled Adafruit Feather ESP32 V2 I2C power");
+  #endif
+
+  #if defined(ARDUINO_ADAFRUIT_FEATHER_ESP32S2)
+    // Rev B board is LOW to enable
+    // Rev C board is HIGH to enable
+    digitalWrite(PIN_I2C_POWER, LOW);
+
+    // if you need to turn the neopixel off
+    // pinMode(NEOPIXEL_POWER, OUTPUT);
+    // digitalWrite(NEOPIXEL_POWER, LOW);
+    debugMessage("disabled Adafruit Feather ESP32S2 I2C power");
+  #endif
+
+  debugMessage(String("Going to sleep for ") + (deepSleepTime/SAMPLE_INTERVAL_ESP_MODIFIER) + " minutes");
+  esp_sleep_enable_timer_wakeup(deepSleepTime);
+  esp_deep_sleep_start();
 }
 
 String getMeteoconIcon(String icon)

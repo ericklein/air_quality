@@ -8,7 +8,6 @@
 
 // Shared helper function we call here too...
 extern void debugMessage(String messageText);
-extern bool batteryAvailable;
 
 // Includes and defines specific to WiFi network connectivity
 #ifdef WIFI
@@ -71,15 +70,14 @@ String AQ_Network::dateTimeString() {
   String dateTime;
 
 #if defined(WIFI) || defined(RJ45)
-  String weekDays[7] = { "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday" };
-
   if (timeClient.update()) {
-    // NTPClient doesn't include date information, get it from time structure
-    time_t epochTime = timeClient.getEpochTime();
-    struct tm* ptm = gmtime((time_t*)&epochTime);
-    int day = ptm->tm_mday;
-    int month = ptm->tm_mon + 1;
-    int year = ptm->tm_year + 1900;
+
+    // NTPClient doesn't include date information, get it from time structure if needed
+    // time_t epochTime = timeClient.getEpochTime();
+    // struct tm* ptm = gmtime((time_t*)&epochTime);
+    // int day = ptm->tm_mday;
+    // int month = ptm->tm_mon + 1;
+    // int year = ptm->tm_year + 1900;
 
     dateTime = weekDays[timeClient.getDay()];
     dateTime += " at ";
@@ -151,76 +149,74 @@ String AQ_Network::dateTimeString() {
 bool AQ_Network::networkBegin() {
   bool networkAvailable = false;
 
-#ifdef WIFI
-  uint8_t tries;
+  #ifdef WIFI
+    uint8_t tries;
 
-  // set hostname has to come before WiFi.begin
-  WiFi.hostname(CLIENT_ID);
-  // WiFi.setHostname(CLIENT_ID); //for WiFiNINA
+    // set hostname has to come before WiFi.begin
+    WiFi.hostname(CLIENT_ID);
+    // WiFi.setHostname(CLIENT_ID); //for WiFiNINA
 
-  // Connect to WiFi.  Prepared to wait a reasonable interval for the connection to
-  // succeed, but not forever.  Will check status and, if not connected, delay an
-  // increasing amount of time up to a maximum of WIFI_ATTEMPT_LIMIT delay intervals.
-  WiFi.begin(WIFI_SSID, WIFI_PASS);
+    // Connect to WiFi.  Prepared to wait a reasonable interval for the connection to
+    // succeed, but not forever.  Will check status and, if not connected, delay an
+    // increasing amount of time up to a maximum of WIFI_ATTEMPT_LIMIT delay intervals.
+    WiFi.begin(WIFI_SSID, WIFI_PASS);
 
-  for (tries = 1; tries <= WIFI_ATTEMPT_LIMIT; tries++) {
-    debugMessage(String("Connection attempt ") + tries + " of " + WIFI_ATTEMPT_LIMIT + " to " + WIFI_SSID + " in " + (tries * 10) + " seconds");
-    if (WiFi.status() == WL_CONNECTED) {
-      // Successful connection!
-      networkAvailable = true;
-      break;
+    for (tries = 1; tries <= WIFI_ATTEMPT_LIMIT; tries++) {
+      debugMessage(String("Connection attempt ") + tries + " of " + WIFI_ATTEMPT_LIMIT + " to " + WIFI_SSID + " in " + (tries * 10) + " seconds");
+      if (WiFi.status() == WL_CONNECTED) {
+        // Successful connection!
+        networkAvailable = true;
+        break;
+      }
+      // use of delay OK as this is initialization code
+      delay(tries * 10000);  // Waiting longer each time we check for status
     }
-    // use of delay OK as this is initialization code
-    delay(tries * 10000);  // Waiting longer each time we check for status
-  }
-  if (networkAvailable) {
-    debugMessage("WiFi IP address is: " + WiFi.localIP().toString());
-    debugMessage("RSSI is: " + String(getWiFiRSSI()) + " dBm");
-  } else {
-    // Couldn't connect, alas
-    debugMessage(String("Can not connect to WFii after ") + WIFI_ATTEMPT_LIMIT + " attempts");
-  }
-#endif
-
-#ifdef RJ45
-  // Configure Ethernet CS pin, not needed if using default D10
-  //Ethernet.init(10);  // Most Arduino shields
-  //Ethernet.init(5);   // MKR ETH shield
-  //Ethernet.init(0);   // Teensy 2.0
-  //Ethernet.init(20);  // Teensy++ 2.0
-  //Ethernet.init(15);  // ESP8266 with Adafruit Featherwing Ethernet
-  //Ethernet.init(33);  // ESP32 with Adafruit Featherwing Ethernet
-
-  // Initialize Ethernet and UDP
-  if (Ethernet.begin(mac) == 0) {
-    // identified errors
-    if (Ethernet.hardwareStatus() == EthernetNoHardware) {
-      debugMessage("Ethernet hardware not found");
-    } else if (Ethernet.linkStatus() == LinkOFF) {
-      debugMessage("Ethernet cable not connected");
+    if (networkAvailable) {
+      debugMessage("WiFi IP address is: " + WiFi.localIP().toString());
+      debugMessage("RSSI is: " + String(getWiFiRSSI()) + " dBm");
     } else {
-      // generic error
-      debugMessage("Failed to configure Ethernet");
+      // Couldn't connect, alas
+      debugMessage(String("Can not connect to WFii after ") + WIFI_ATTEMPT_LIMIT + " attempts");
     }
-  } else {
-    debugMessage(String("Ethernet IP address is: ") + Ethernet.localIP().toString());
-    networkAvailable = true;
-  }
-#endif
+  #endif
 
-#if defined(WIFI) || defined(RJ45)
-  if (networkAvailable) {
-    // Get time from NTP
-    timeClient.begin();
-    // Set offset time in seconds to adjust for your timezone
-    timeClient.setTimeOffset(timeZone * 60 * 60);
-    debugMessage("NTP time: " + dateTimeString());
-  }
-#endif
+  #ifdef RJ45
+    // Configure Ethernet CS pin, not needed if using default D10
+    //Ethernet.init(10);  // Most Arduino shields
+    //Ethernet.init(5);   // MKR ETH shield
+    //Ethernet.init(0);   // Teensy 2.0
+    //Ethernet.init(20);  // Teensy++ 2.0
+    //Ethernet.init(15);  // ESP8266 with Adafruit Featherwing Ethernet
+    //Ethernet.init(33);  // ESP32 with Adafruit Featherwing Ethernet
 
+    // Initialize Ethernet and UDP
+    if (Ethernet.begin(mac) == 0) {
+      // identified errors
+      if (Ethernet.hardwareStatus() == EthernetNoHardware) {
+        debugMessage("Ethernet hardware not found");
+      } else if (Ethernet.linkStatus() == LinkOFF) {
+        debugMessage("Ethernet cable not connected");
+      } else {
+        // generic error
+        debugMessage("Failed to configure Ethernet");
+      }
+    } else {
+      debugMessage(String("Ethernet IP address is: ") + Ethernet.localIP().toString());
+      networkAvailable = true;
+    }
+  #endif
+
+  #if defined(WIFI) || defined(RJ45)
+    if (networkAvailable) {
+      // Get time from NTP
+      timeClient.begin();
+      // Set offset time in seconds to adjust for your timezone
+      timeClient.setTimeOffset(timeZone * 60 * 60);
+      debugMessage("NTP time: " + dateTimeString());
+    }
+  #endif
   return (networkAvailable);
 }
-
 
 String AQ_Network::httpGETRequest(const char* serverName) {
   String payload = "{}";
