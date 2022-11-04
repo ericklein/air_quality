@@ -42,7 +42,7 @@ WiFiUDP ntpUDP;
   EthernetUDP ntpUDP;
 #endif
 
-// Network services independent of physiccal connection
+// Network services independent of physical connection
 #if defined(WIFI) || defined(RJ45)
   // NTP setup
   #include <NTPClient.h>
@@ -206,16 +206,17 @@ bool AQ_Network::networkBegin() {
     }
   #endif
 
-  #if defined(WIFI) || defined(RJ45)
-    if (networkAvailable) {
-      // Get time from NTP
-      timeClient.begin();
-      // Set offset time in seconds to adjust for your timezone
-      timeClient.setTimeOffset(timeZone * 60 * 60);
-      debugMessage("NTP time: " + dateTimeString());
-    }
-  #endif
   return (networkAvailable);
+}
+
+void AQ_Network::setTime(long timeZoneOffset) {
+  #if defined(WIFI) || defined(RJ45)
+    // Get time from NTP
+    timeClient.begin();
+    // Set offset time in seconds to adjust for your timezone
+    timeClient.setTimeOffset(timeZoneOffset);
+    debugMessage("Time zone adjusted local time : " + dateTimeString());
+  #endif
 }
 
 String AQ_Network::httpGETRequest(const char* serverName) {

@@ -266,7 +266,11 @@ void setup()
   {
     owmCurrentData.temp = 10000;
     owmCurrentData.humidity = 10000;
+    // SECONDARY: Set UTC time offset based on config.h time zone
+    aq_network.setTime(backupTimeZone * 60 * 60);
   }
+  // PRIMARY: Set UTC time offset based on OWM local time zone
+  aq_network.setTime(owmCurrentData.timezone);
 
   if (!getOWMAQI())
   {
@@ -464,9 +468,7 @@ void screenAlert(String messageText)
 void screenInfo(String messageText)
 // Display environmental information on screen
 {
-#ifdef SCREEN
-  int co2range;
-  
+#ifdef SCREEN  
   display.clearBuffer();
   display.setTextColor(EPD_BLACK);
 
