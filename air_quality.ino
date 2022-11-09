@@ -168,7 +168,7 @@ Adafruit_LC709203F lc;
   extern void post_dweet(uint16_t co2, float tempF, float humidity, float battpct, float battv, int rssi);
 #endif
 
-#ifdef MQTTLOG
+#ifdef MQTT
   extern void mqttConnect();
   extern int mqttDeviceWiFiUpdate(int rssi);
   extern int mqttDeviceBatteryUpdate(float cellVoltage);
@@ -183,17 +183,16 @@ void setup()
     Serial.begin(115200);
     // wait for serial port connection
     while (!Serial);
-
-    // Confirm key site configuration parameters
-    debugMessage("Air Quality started");
-    // debugMessage(String(SAMPLE_INTERVAL) + " minute sample interval");
-    // debugMessage(String(SAMPLE_SIZE) + " samples before logging");
-    // debugMessage("Site lat/long: " + String(OWM_LAT_LONG));
-    // debugMessage("Site altitude: " + String(SITE_ALTITUDE));
-    // debugMessage("Client ID: " + String(CLIENT_ID));
-    #ifdef DWEET
-      debugMessage("Dweet device: " + String(DWEET_DEVICE));
-    #endif
+  #endif
+  // Confirm key site configuration parameters
+  debugMessage("Air Quality started");
+  // debugMessage(String(SAMPLE_INTERVAL) + " minute sample interval");
+  // debugMessage(String(SAMPLE_SIZE) + " samples before logging");
+  // debugMessage("Site lat/long: " + String(OWM_LAT_LONG));
+  // debugMessage("Site altitude: " + String(SITE_ALTITUDE));
+  // debugMessage("Client ID: " + String(CLIENT_ID));
+  #ifdef DWEET
+    debugMessage("Dweet device: " + String(DWEET_DEVICE));
   #endif
 
   enableInternalPower();
@@ -282,7 +281,7 @@ void setup()
   {
     hardwareData.rssi = abs(aq_network.getWiFiRSSI());
 
-    #ifdef MQTTLOG
+    #ifdef MQTT
       if ((mqttSensorUpdate(sensorData.internalCO2, sensorData.internalTempF,sensorData.internalHumidity)) && (mqttDeviceWiFiUpdate(hardwareData.rssi)) && (mqttDeviceBatteryUpdate(hardwareData.batteryVoltage)))
       {
         upd_flags += "M";
@@ -549,6 +548,7 @@ void screenInfo(String messageText)
   {
     // calculate CO2 value range in 400ppm bands
     int co2range = ((sensorData.internalCO2 - 400) / 400);
+    co2range = constrain(co2range,0,4); // filter CO2 levels above 2400
     display.setFont(&FreeSans12pt7b);
     display.setCursor(x_indoor_left_margin,(display.height()*13/16));
     display.setFont(&FreeSans9pt7b); 
