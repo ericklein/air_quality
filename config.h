@@ -69,23 +69,22 @@ const String aqiLabels[5] = { "Good", "Fair", "Moderate", "Poor", "Very Poor" };
 // used in aq_network.cpp
 const String weekDays[7] = { "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday" };
 
-// millisecond modifier to minutes for sampling interval (ARM)
-// #define SAMPLE_INTERVAL_ARM_MODIFIER 60000
-// microsecond modifier to minutes for sampling interval (ESP)
-#define SAMPLE_INTERVAL_ESP_MODIFIER 60000000
-
 // Open Weather Map parameters
 #define OWM_SERVER			"http://api.openweathermap.org/data/2.5/"
 #define OWM_WEATHER_PATH	"weather?"
 #define OWM_AQM_PATH		"air_pollution?"
 
-// select time zone, used by NTPClient
-// const int backupTimeZone = 0;  	// UTC
-// const int backupTimeZone = 1; // Ireland
-// const int backupTimeZone = -5;  // USA EST
-// const int backupTimeZone = -4;  // USA EDT
-// const int backupTimeZone = -7;  // USA PDT
-const int backupTimeZone = -8;  // USA PST
+// NTP time configuration
+
+//https://cplusplus.com/reference/ctime/tm/
+
+#define ntpServer "pool.ntp.org"
+// gmtOffset_sec is a backup used if OWM data not available
+// const long  gmtOffset_sec = 0; // UTC
+// const long  gmtOffset_sec = 3600; // Ireland
+const long  gmtOffset_sec = -28800; // PST
+const int   daylightOffset_sec = 0;
+// const int   daylightOffset_sec = 3600; // US DT
 
 // set client ID; used by mqtt and wifi
 // #define CLIENT_ID "AQ-demo"

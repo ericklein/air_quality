@@ -210,7 +210,7 @@ void setup()
     screenAlert("Env sensor not detected");
     // This error often occurs right after a firmware flash and reset.
     // Hardware deep sleep typically resolves it, so quickly cycle the hardware
-    disableInternalPower(HARDWARE_ERROR_INTERVAL*SAMPLE_INTERVAL_ESP_MODIFIER);
+    disableInternalPower(HARDWARE_ERROR_INTERVAL);
   }
 
   // Environmental sensor available, so fetch values
@@ -219,7 +219,7 @@ void setup()
   {
     debugMessage("Environment sensor failed to read, going to sleep");
     screenAlert("Env sensor no data");
-    disableInternalPower(HARDWARE_ERROR_INTERVAL*SAMPLE_INTERVAL_ESP_MODIFIER);
+    disableInternalPower(HARDWARE_ERROR_INTERVAL);
   }
   sampleCounter = readNVStorage();
   sampleCounter++;
@@ -235,7 +235,7 @@ void setup()
       nvStorage.putUInt("co2", (sensorData.internalCO2 + averageCO2));
     }
     debugMessage(String("Intermediate values TO nv storage: Temp:") + (sensorData.internalTempF + averageTempF) + ", Humidity:" + (sensorData.internalHumidity + averageHumidity) + ", CO2:" + (sensorData.internalCO2 + averageCO2));
-    disableInternalPower(SAMPLE_INTERVAL_ESP_MODIFIER*SAMPLE_INTERVAL);
+    disableInternalPower(SAMPLE_INTERVAL);
   } 
   else
   {
@@ -266,7 +266,7 @@ void setup()
     owmCurrentData.temp = 10000;
     owmCurrentData.humidity = 10000;
     // SECONDARY: Set UTC time offset based on config.h time zone
-    aq_network.setTime(backupTimeZone * 60 * 60);
+    aq_network.setTime(gmtOffset_sec);
   }
   // PRIMARY: Set UTC time offset based on OWM local time zone
   aq_network.setTime(owmCurrentData.timezone);
@@ -316,7 +316,7 @@ void setup()
     // no internet connection, update screen with sensor data only
     screenInfo("");
   }
-  disableInternalPower(SAMPLE_INTERVAL*SAMPLE_INTERVAL_ESP_MODIFIER);
+  disableInternalPower(SAMPLE_INTERVAL);
 }
 
 void loop() {}
@@ -915,7 +915,7 @@ void enableInternalPower()
   #endif
 }
 
-void disableInternalPower(float deepSleepTime)
+void disableInternalPower(int deepSleepTime)
 // Powers down hardware then board deep sleep
 {
   display.powerDown();
@@ -956,8 +956,8 @@ void disableInternalPower(float deepSleepTime)
     debugMessage("disabled Adafruit Feather ESP32S2 I2C power");
   #endif
 
-  debugMessage(String("Going to sleep for ") + (deepSleepTime/SAMPLE_INTERVAL_ESP_MODIFIER) + " minutes");
-  esp_sleep_enable_timer_wakeup(deepSleepTime);
+  debugMessage(String("Going to sleep for ") + (deepSleepTime) + " minutes");
+  esp_sleep_enable_timer_wakeup(deepSleepTime*1000000); // ESP microsecond modifier
   esp_deep_sleep_start();
 }
 
