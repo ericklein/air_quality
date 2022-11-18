@@ -61,7 +61,8 @@
   #define SAMPLE_SIZE 6
 #endif
 
-#define WIFI_ATTEMPT_LIMIT	5 // max connection attempts to WiFi AP
+#define CONNECT_ATTEMPT_LIMIT	3 // max connection attempts to internet services
+#define CONNECT_ATTEMPT_INTERVAL 10 // seconds between internet service connect attempts
 
 const String co2Labels[5]={"Good", "OK", "So-So", "Poor", "Bad"};
 // used and defined by OWM
@@ -95,9 +96,6 @@ const int   daylightOffset_sec = 0;
 //#define CLIENT_ID "AQ-master-bedroom"
 
 #ifdef MQTT
-	// set MQTT parameters
-	#define MQTT_ATTEMPT_LIMIT 	3 	// max connection attempts to MQTT broker
-
 	// Adafruit I/O
 	// structure: username/feeds/groupname.feedname or username/feeds/feedname
 	// e.g. #define MQTT_PUB_TOPIC1		"sircoolio/feeds/pocket-office.temperature"
@@ -127,8 +125,6 @@ const int   daylightOffset_sec = 0;
 
 	#define DEVICE_SITE "indoor"
 	#define DEVICE_TYPE "air quality"
-
-	#define INFLUX_ATTEMPT_LIMIT 	3 	// max connection attempts to Influxdb
 #endif
 
 // Post data to the internet via dweet.io.  Set DWEET_DEVICE to be a

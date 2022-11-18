@@ -25,7 +25,7 @@ extern bool internetAvailable;
   // Connects and reconnects to MQTT broker, call as needed to maintain connection
   {
     int8_t mqttErr;
-    int8_t tries = 1;
+    int tries = 1;
   
     // exit if already connected
     if (aq_mqtt.connected())
@@ -49,17 +49,17 @@ extern bool internetAvailable;
       //   case 6: debugMessage("Adafruit MQTT: Failed to subscribe"); break;
       //   default: debugMessage("Adafruit MQTT: GENERIC - Connection failed"); break;
       // }
-      debugMessage(String(MQTT_BROKER) + " connect attempt " + tries + " of " + MQTT_ATTEMPT_LIMIT + " happens in " + (tries*10) + " seconds");
+      debugMessage(String(MQTT_BROKER) + " connect attempt " + tries + " of " + CONNECT_ATTEMPT_LIMIT + " happens in " + (CONNECT_ATTEMPT_INTERVAL) + " seconds");
       aq_mqtt.disconnect();
-      delay(tries*10000);
+      delay(CONNECT_ATTEMPT_INTERVAL*1000);
       tries++;
   
-      if (tries == MQTT_ATTEMPT_LIMIT)
+      if (tries == CONNECT_ATTEMPT_LIMIT)
       {
         debugMessage(String("Connection failed to MQTT broker: ") + MQTT_BROKER);
       }
     }
-    if (tries < MQTT_ATTEMPT_LIMIT)
+    if (tries < CONNECT_ATTEMPT_LIMIT)
     {
       debugMessage(String("Connected to MQTT broker ") + MQTT_BROKER);
     }
