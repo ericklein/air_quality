@@ -169,7 +169,7 @@ Adafruit_LC709203F lc;
 #endif
 
 #ifdef MQTT
-  extern void mqttConnect();
+  //extern void mqttConnect();
   extern int mqttDeviceWiFiUpdate(int rssi);
   extern int mqttDeviceBatteryUpdate(float cellVoltage);
   extern int mqttSensorUpdate(uint16_t co2, float tempF, float humidity);
@@ -217,8 +217,8 @@ void setup()
   int sampleCounter;
   if(!readSensor())
   {
-    debugMessage("Environment sensor failed to read, going to sleep");
-    screenAlert("Env sensor no data");
+    debugMessage("SCD40 returned no/bad data, going to sleep");
+    screenAlert("SCD40 no/bad data");
     disableInternalPower(HARDWARE_ERROR_INTERVAL);
   }
   sampleCounter = readNVStorage();
@@ -817,6 +817,11 @@ uint16_t readSensor()
     {
       errorToString(error, errorMessage, 256);
       debugMessage(String(errorMessage) + "executing SCD40 readMeasurement()");
+      return 0;
+    }
+    if (sensorData.internalCO2<440 || sensorData.internalCO2>6000)
+    {
+      debugMessage("SCD40 CO2 reading out of range");
       return 0;
     }
     //convert C to F for temp

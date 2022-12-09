@@ -35,13 +35,16 @@
 // #define EPD_RESET   6   // can set to -1 and share with chip Reset (can't deep sleep)
 #define EPD_BUSY    5   // can set to -1 to not use a pin (will wait a fixed delay)
 
-// ESP32S2 w/BME280
+// ESP32-S2 with Adafruit 2.9" E-Ink Featherwing (PID 4777)
 #if defined (ARDUINO_ADAFRUIT_FEATHER_ESP32S2)
 	#define EPD_CS      9
 	#define EPD_DC      10     
 	#define SRAM_CS     6  // can set to -1 to not use a pin (uses a lot of RAM!)
-	#define EPD_RESET   -1   // can set to -1 and share with chip Reset (can't deep sleep)
-	#define EPD_BUSY    -1   // can set to -1 to not use a pin (will wait a fixed delay)
+	// on Featherwing EPD_RESET and EPD_BUSY must be set to -1 as these lines are not connected
+	#define EPD_RESET   -1
+	#define EPD_BUSY    -1
+	// #define EPD_RESET   8 // can set to -1 and share with microcontroller Reset!
+	// #define EPD_BUSY    7 // can set to -1 to not use a pin (will wait a fixed delay)
 #endif
 
 // Interval between enviroment sensor samples in minutes

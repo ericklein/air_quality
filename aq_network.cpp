@@ -64,7 +64,7 @@ bool AQ_Network::networkBegin() {
   bool networkAvailable = false;
 
   #ifdef WIFI
-    uint8_t tries;
+    int8_t tries;
 
     // set hostname has to come before WiFi.begin
     WiFi.hostname(CLIENT_ID);
@@ -76,20 +76,19 @@ bool AQ_Network::networkBegin() {
 
     for (tries = 1; tries <= CONNECT_ATTEMPT_LIMIT; tries++) {
       debugMessage(String("Connection attempt ") + tries + " of " + CONNECT_ATTEMPT_LIMIT + " to " + WIFI_SSID + " in " + (CONNECT_ATTEMPT_INTERVAL) + " seconds");
-      if (WiFi.status() == WL_CONNECTED) {
-        // Successful connection!
+      if (WiFi.status() == WL_CONNECTED)
+      {
+        debugMessage("WiFi IP address is: " + WiFi.localIP().toString());
+        debugMessage("RSSI is: " + String(getWiFiRSSI()) + " dBm");
         networkAvailable = true;
         break;
       }
       // use of delay OK as this is initialization code
       delay(CONNECT_ATTEMPT_INTERVAL * 1000);
     }
-    if (networkAvailable) {
-      debugMessage("WiFi IP address is: " + WiFi.localIP().toString());
-      debugMessage("RSSI is: " + String(getWiFiRSSI()) + " dBm");
-    } else {
+    if (!networkAvailable) {
       // Couldn't connect, alas
-      debugMessage(String("Can not connect to WFii after ") + CONNECT_ATTEMPT_LIMIT + " attempts");
+      debugMessage(String("Can not connect to WiFi after ") + CONNECT_ATTEMPT_LIMIT + " attempts");
     }
   #endif
 
