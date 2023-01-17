@@ -41,7 +41,7 @@ typedef struct
 } hdweData;
 hdweData hardwareData;
 
-// Open Weather Map Current data
+// OpenWeatherMap Current data
 typedef struct
 {
   // "lon": 8.54
@@ -88,6 +88,7 @@ typedef struct
 } OpenWeatherMapCurrentData;
 OpenWeatherMapCurrentData owmCurrentData;
 
+// OpenWeatherMap Air Quality data
 typedef struct
 {
   // "lon": 8.54
@@ -158,7 +159,7 @@ Adafruit_LC709203F lc;
   // colors are EPD_WHITE, EPD_BLACK, EPD_RED, EPD_GRAY, EPD_LIGHT, EPD_DARK
 #endif
 
-#include "ArduinoJson.h"  // Needed by getWeather()
+#include "ArduinoJson.h"  // Needed by OWM retrieval routines
 
 #ifdef INFLUX
   extern boolean post_influx(uint16_t co2, float tempF, float humidity, float battery_v, int rssi);
@@ -812,22 +813,28 @@ uint16_t readSensor()
     uint16_t error;
     char errorMessage[256];
 
-    error = envSensor.readMeasurement(sensorData.internalCO2, sensorData.internalTempF, sensorData.internalHumidity);
-    if (error) 
+    screenAlert("CO2 check");
+    for (int loop=0; loop<READ_PER_SAMPLE; loop++)
     {
-      errorToString(error, errorMessage, 256);
-      debugMessage(String(errorMessage) + "executing SCD40 readMeasurement()");
-      return 0;
+      // minimum time between SCD40 reads
+      delay(5000);
+      // read and store data if successful
+      error = envSensor.readMeasurement(sensorData.internalCO2, sensorData.internalTempF, sensorData.internalHumidity);
+      // handle SCD40 errors
+      if (error) {
+        errorToString(error, errorMessage, 256);
+        debugMessage(String(errorMessage) + "executing SCD40 readMeasurement()");
+        return 0;
+      }
+      if (sensorData.internalCO2<440 || sensorData.internalCO2>6000)
+      {
+        debugMessage("SCD40 CO2 reading out of range");
+        return 0;
+      }
+      //convert C to F for temp
+      sensorData.internalTempF = (sensorData.internalTempF * 1.8) + 32;
+      debugMessage(String("SCD40 read ") + loop + "of 5: " + sensorData.internalTempF + "F, " + sensorData.internalHumidity + "%, " + sensorData.internalCO2 + " ppm");
     }
-    if (sensorData.internalCO2<440 || sensorData.internalCO2>6000)
-    {
-      debugMessage("SCD40 CO2 reading out of range");
-      return 0;
-    }
-    //convert C to F for temp
-    sensorData.internalTempF = (sensorData.internalTempF * 1.8) + 32;
-
-    debugMessage(String("environment sensor values: ") + sensorData.internalTempF + "F, " + sensorData.internalHumidity + "%, " + sensorData.internalCO2 + " ppm");
     return 1;
   #else
     // AHTX0, BME280
@@ -961,7 +968,7 @@ void disableInternalPower(int deepSleepTime)
     debugMessage("disabled Adafruit Feather ESP32S2 I2C power");
   #endif
 
-  debugMessage(String("Going to sleep for ") + (deepSleepTime) + " minutes");
+  debugMessage(String("Going to sleep for ") + deepSleepTime + " minutes");
   esp_sleep_enable_timer_wakeup(deepSleepTime*1000000); // ESP microsecond modifier
   esp_deep_sleep_start();
 }

@@ -117,7 +117,6 @@ bool AQ_Network::networkBegin() {
       networkAvailable = true;
     }
   #endif
-
   return (networkAvailable);
 }
 

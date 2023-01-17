@@ -6,7 +6,7 @@
 */
 
 // Step 1: Set conditional compile flags
-// #define DEBUG 	// Output to serial port
+#define DEBUG 	// Output to serial port
 //#define RJ45  	// use Ethernet
 #define WIFI    	// use WiFi
 #define MQTT 	// log sensor data to MQTT broker
@@ -28,12 +28,12 @@
 
 // Pin config for e-paper display
 
-// Adafruit MagTag, some values come from board definition package
-#define EPD_CS      8   
-#define EPD_DC      7   
-#define SRAM_CS     -1  // can set to -1 to not use a pin (uses a lot of RAM!)
-// #define EPD_RESET   6   // can set to -1 and share with chip Reset (can't deep sleep)
-#define EPD_BUSY    5   // can set to -1 to not use a pin (will wait a fixed delay)
+// // Adafruit MagTag, some values come from board definition package
+// #define EPD_CS      8   
+// #define EPD_DC      7   
+// #define SRAM_CS     -1  // can set to -1 to not use a pin (uses a lot of RAM!)
+// // #define EPD_RESET   6   // can set to -1 and share with chip Reset (can't deep sleep)
+// #define EPD_BUSY    5   // can set to -1 to not use a pin (will wait a fixed delay)
 
 // ESP32-S2 with Adafruit 2.9" E-Ink Featherwing (PID 4777)
 #if defined (ARDUINO_ADAFRUIT_FEATHER_ESP32S2)
@@ -47,22 +47,22 @@
 	// #define EPD_BUSY    7 // can set to -1 to not use a pin (will wait a fixed delay)
 #endif
 
-// Interval between enviroment sensor samples in minutes
+// environment sensor sample timing
 #ifdef DEBUG
-	#define SAMPLE_INTERVAL 1
+	// number of times SCD40 is read, last read is the sample value
+	#define READS_PER_SAMPLE	1
+	// time between samples in seconds
+	#define SAMPLE_INTERVAL		60
+	// number of samples to average
+  #define SAMPLE_SIZE				2
 #else
-	#define SAMPLE_INTERVAL 10
+	#define READS_PER_SAMPLE	5
+	#define SAMPLE_INTERVAL 	180
+  #define SAMPLE_SIZE 			6
 #endif
 
 // Sleep time if hardware error occurs in seconds
-#define HARDWARE_ERROR_INTERVAL 1
-
-// number of samples captured before logging
-#ifdef DEBUG
-  #define SAMPLE_SIZE 2
-#else
-  #define SAMPLE_SIZE 6
-#endif
+#define HARDWARE_ERROR_INTERVAL 10
 
 #define CONNECT_ATTEMPT_LIMIT	3 // max connection attempts to internet services
 #define CONNECT_ATTEMPT_INTERVAL 10 // seconds between internet service connect attempts
@@ -91,9 +91,9 @@ const int   daylightOffset_sec = 0;
 // const int   daylightOffset_sec = 3600; // US DT
 
 // set client ID; used by mqtt and wifi
-// #define CLIENT_ID "AQ-demo"
+#define CLIENT_ID "AQ-demo"
 //#define CLIENT_ID "AQ-test"
-#define CLIENT_ID "AQ-lab-office"
+// #define CLIENT_ID "AQ-lab-office"
 // #define CLIENT_ID "AQ-kitchen"
 //#define CLIENT_ID "AQ-cellar"
 //#define CLIENT_ID "AQ-master-bedroom"
@@ -104,11 +104,17 @@ const int   daylightOffset_sec = 0;
 	// e.g. #define MQTT_PUB_TOPIC1		"sircoolio/feeds/pocket-office.temperature"
 	
 	// structure: site/room/device/data	
-	#define MQTT_PUB_TOPIC1		"7828/lab-office/aq/temperature"
-	#define MQTT_PUB_TOPIC2		"7828/lab-office/aq/humidity"
-	#define MQTT_PUB_TOPIC3		"7828/lab-office/aq/co2"
-	#define MQTT_PUB_TOPIC5		"7828/lab-office/aq/battery-voltage"
-	#define MQTT_PUB_TOPIC6		"7828/lab-office/aq/rssi"
+	// #define MQTT_PUB_TOPIC1		"7828/lab-office/aq/temperature"
+	// #define MQTT_PUB_TOPIC2		"7828/lab-office/aq/humidity"
+	// #define MQTT_PUB_TOPIC3		"7828/lab-office/aq/co2"
+	// #define MQTT_PUB_TOPIC5		"7828/lab-office/aq/battery-voltage"
+	// #define MQTT_PUB_TOPIC6		"7828/lab-office/aq/rssi"
+
+	#define MQTT_PUB_TOPIC1		"7828/demo/aq/temperature"
+	#define MQTT_PUB_TOPIC2		"7828/demo/aq/humidity"
+	#define MQTT_PUB_TOPIC3		"7828/demo/aq/co2"
+	#define MQTT_PUB_TOPIC5		"7828/demo/aq/battery-voltage"
+	#define MQTT_PUB_TOPIC6		"7828/demo/aq/rssi"
 #endif
 
 #ifdef INFLUX  
@@ -119,11 +125,11 @@ const int   daylightOffset_sec = 0;
 	// Standard set of tag values used for each sensor data point stored to InfluxDB.  Reuses
   // CLIENT_ID as defined anove here in config.h as well as device location (e.g., room in 
   // the house) and site (indoors vs. outdoors, typically).
-	// #define DEVICE_LOCATION "AQ-demo"
+	#define DEVICE_LOCATION "AQ-demo"
   //#define DEVICE_LOCATION "test"
 	// #define DEVICE_LOCATION "kitchen"
 	// #define DEVICE_LOCATION "cellar"
-	#define DEVICE_LOCATION "lab-office"
+	// #define DEVICE_LOCATION "lab-office"
 	//#define DEVICE_LOCATION "master bedroom"
 
 	#define DEVICE_SITE "indoor"
