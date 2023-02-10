@@ -120,10 +120,10 @@ bool AQ_Network::networkBegin() {
   return (networkAvailable);
 }
 
-void AQ_Network::setTime(long timeZoneOffset) {
+void AQ_Network::setTime(long timeZoneOffset, long daylightOffset) {
   #if defined(WIFI) || defined(RJ45)
     // Get time from NTP
-    configTime(timeZoneOffset, daylightOffset_sec, ntpServer);
+    configTime(timeZoneOffset, daylightOffset, ntpServer);
     debugMessage("Time zone adjusted local time : " + dateTimeString());
   #endif
 }

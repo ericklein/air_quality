@@ -86,9 +86,9 @@ const String weekDays[7] = { "Sunday", "Monday", "Tuesday", "Wednesday", "Thursd
 // gmtOffset_sec is a backup used if OWM data not available
 // const long  gmtOffset_sec = 0; // UTC
 // const long  gmtOffset_sec = 3600; // Ireland
-const long  gmtOffset_sec = -28800; // PST
+const long  gmtOffset_sec = -28800; // PST [- 8]
 const int   daylightOffset_sec = 0;
-// const int   daylightOffset_sec = 3600; // US DT
+// const int   daylightOffset_sec = 3600; // PST [+ 1]
 
 // set client ID; used by mqtt and wifi
 #define CLIENT_ID "AQ-demo"

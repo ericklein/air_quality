@@ -1,3 +1,10 @@
+/*
+  Project Name:   air_quality
+  Description:    Regularly sample and log temperature, humidity, and if available, co2 levels
+
+  See README.md for target information and revision history
+*/
+
 #include "Arduino.h"
 
 // hardware and internet configuration parameters
