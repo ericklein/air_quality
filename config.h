@@ -29,11 +29,11 @@
 // Pin config for e-paper display
 
 // // Adafruit MagTag, some values come from board definition package
-// #define EPD_CS      8   
-// #define EPD_DC      7   
-// #define SRAM_CS     -1  // can set to -1 to not use a pin (uses a lot of RAM!)
-// // #define EPD_RESET   6   // can set to -1 and share with chip Reset (can't deep sleep)
-// #define EPD_BUSY    5   // can set to -1 to not use a pin (will wait a fixed delay)
+#define EPD_CS      8   
+#define EPD_DC      7   
+#define SRAM_CS     -1  // can set to -1 to not use a pin (uses a lot of RAM!)
+// #define EPD_RESET   6   // can set to -1 and share with chip Reset (can't deep sleep)
+#define EPD_BUSY    5   // can set to -1 to not use a pin (will wait a fixed delay)
 
 // ESP32-S2 with Adafruit 2.9" E-Ink Featherwing (PID 4777)
 #if defined (ARDUINO_ADAFRUIT_FEATHER_ESP32S2)
@@ -65,7 +65,7 @@
 #define HARDWARE_ERROR_INTERVAL 10
 
 #define CONNECT_ATTEMPT_LIMIT	3 // max connection attempts to internet services
-#define CONNECT_ATTEMPT_INTERVAL 10 // seconds between internet service connect attempts
+#define CONNECT_ATTEMPT_INTERVAL 5 // seconds between internet service connect attempts
 
 const String co2Labels[5]={"Good", "OK", "So-So", "Poor", "Bad"};
 // used and defined by OWM
@@ -101,20 +101,20 @@ const int   daylightOffset_sec = 0;
 #ifdef MQTT
 	// Adafruit I/O
 	// structure: username/feeds/groupname.feedname or username/feeds/feedname
-	// e.g. #define MQTT_PUB_TOPIC1		"sircoolio/feeds/pocket-office.temperature"
+	// e.g. #define MQTT_PUB_TEMPF		"sircoolio/feeds/pocket-office.temperature"
 	
 	// structure: site/room/device/data	
-	// #define MQTT_PUB_TOPIC1		"7828/lab-office/aq/temperature"
-	// #define MQTT_PUB_TOPIC2		"7828/lab-office/aq/humidity"
-	// #define MQTT_PUB_TOPIC3		"7828/lab-office/aq/co2"
-	// #define MQTT_PUB_TOPIC5		"7828/lab-office/aq/battery-voltage"
-	// #define MQTT_PUB_TOPIC6		"7828/lab-office/aq/rssi"
+	// #define MQTT_PUB_TEMPF			"7828/lab-office/aq/temperature"
+	// #define MQTT_PUB_HUMIDITY		"7828/lab-office/aq/humidity"
+	// #define MQTT_PUB_CO2				"7828/lab-office/aq/co2"
+	// #define MQTT_PUB_BATTVOLT		"7828/lab-office/aq/battery-voltage"
+	// #define MQTT_PUB_RSSI				"7828/lab-office/aq/rssi"
 
-	#define MQTT_PUB_TOPIC1		"7828/demo/aq/temperature"
-	#define MQTT_PUB_TOPIC2		"7828/demo/aq/humidity"
-	#define MQTT_PUB_TOPIC3		"7828/demo/aq/co2"
-	#define MQTT_PUB_TOPIC5		"7828/demo/aq/battery-voltage"
-	#define MQTT_PUB_TOPIC6		"7828/demo/aq/rssi"
+	#define MQTT_PUB_TEMPF			"7828/demo/aq/temperature"
+	#define MQTT_PUB_HUMIDITY	"7828/demo/aq/humidity"
+	#define MQTT_PUB_CO2				"7828/demo/aq/co2"
+	#define MQTT_PUB_BATTVOLT	"7828/demo/aq/battery-voltage"
+	#define MQTT_PUB_RSSI			"7828/demo/aq/rssi"
 #endif
 
 #ifdef INFLUX  
@@ -143,35 +143,3 @@ const int   daylightOffset_sec = 0;
 	#define DWEET_HOST "dweet.io"   // Typically dweet.io
 	#define DWEET_DEVICE "makerhour-airquality"  // Must be unique across all of dweet.io
 #endif
-
-// The following parameters are defined in secrets.h.
-// 	WiFi credentials (if WiFi enabled)
-// 	#define WIFI_SSID
-// 	#define WIFI_PASS       
-
-// 	Open Weather Map
-// 	#define OWM_KEY
-//	#define OWM_LAT_LONG  // example "lat=47.9001&lon=-122.4001"
-
-//	#define SITE_ELEVATION // in meters
-
-// If MQTT enabled
-// 	#define MQTT_PORT
-// 	#define MQTT_USER
-// 	#define MQTT_BROKER
-// 	#define MQTT_PASS
-
-// If InfluxDB data storage enabled
-// For an InfluxDB v1.X server:
-// #define INFLUX_V1
-// #define INFLUXDB_URL 
-// #define INFLUXDB_DB_NAME
-// #define INFLUXDB_USER
-// #define INFLUXDB_PASSWORD
-//
-// For an InfluxDB v2.X server:
-// #define INFLUX_V2
-// #define INFLUXDB_URL 
-// #define INFLUXDB_TOKEN
-// #define INFLUXDB_ORG
-// #define INFLUXDB_BUCKET

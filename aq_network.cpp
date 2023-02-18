@@ -61,34 +61,26 @@ extern void debugMessage(String messageText);
 // connected and available.  Depends on configuration #defines in config.h to determine
 // what network hardware is attached, and key network settings there as well (e.g. SSID).
 bool AQ_Network::networkBegin() {
-  bool networkAvailable = false;
+  bool result = false;
 
   #ifdef WIFI
-    int8_t tries;
-
     // set hostname has to come before WiFi.begin
     WiFi.hostname(CLIENT_ID);
-    // WiFi.setHostname(CLIENT_ID); //for WiFiNINA
 
-    // Connect to WiFi. Attempts connection and if unsuccessful, re-attempts after
-    // CONNECT_ATTEMPT_INTERVAL second delay for CONNECT_ATTEMPT_LIMIT delay intervals.
     WiFi.begin(WIFI_SSID, WIFI_PASS);
 
-    for (tries = 1; tries <= CONNECT_ATTEMPT_LIMIT; tries++) {
-      debugMessage(String("Connection attempt ") + tries + " of " + CONNECT_ATTEMPT_LIMIT + " to " + WIFI_SSID + " in " + (CONNECT_ATTEMPT_INTERVAL) + " seconds");
+    for (int tries = 1; tries <= CONNECT_ATTEMPT_LIMIT; tries++) {
+      // Attempts WiFi connection, and if unsuccessful, re-attempts after CONNECT_ATTEMPT_INTERVAL second delay for CONNECT_ATTEMPT_LIMIT times
       if (WiFi.status() == WL_CONNECTED)
       {
         debugMessage("WiFi IP address is: " + WiFi.localIP().toString());
         debugMessage("RSSI is: " + String(getWiFiRSSI()) + " dBm");
-        networkAvailable = true;
+        result = true;
         break;
       }
-      // use of delay OK as this is initialization code
-      delay(CONNECT_ATTEMPT_INTERVAL * 1000);
-    }
-    if (!networkAvailable) {
-      // Couldn't connect, alas
-      debugMessage(String("Can not connect to WiFi after ") + CONNECT_ATTEMPT_LIMIT + " attempts");
+      debugMessage(String("Connection attempt ") + tries + " of " + CONNECT_ATTEMPT_LIMIT + " to " + WIFI_SSID + " failed");
+      // use of delay() OK as this is initialization code
+      delay(CONNECT_ATTEMPT_INTERVAL * 1000); // convered into milliseconds
     }
   #endif
 
@@ -114,10 +106,10 @@ bool AQ_Network::networkBegin() {
       }
     } else {
       debugMessage(String("Ethernet IP address is: ") + Ethernet.localIP().toString());
-      networkAvailable = true;
+      result = true;
     }
   #endif
-  return (networkAvailable);
+  return (result);
 }
 
 void AQ_Network::setTime(long timeZoneOffset, long daylightOffset) {

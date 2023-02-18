@@ -813,8 +813,7 @@ uint16_t readSensor()
     uint16_t error;
     char errorMessage[256];
 
-    screenAlert("CO2 check");
-    for (int loop=0; loop<READ_PER_SAMPLE; loop++)
+    for (int loop=1; loop<=READS_PER_SAMPLE; loop++)
     {
       // minimum time between SCD40 reads
       delay(5000);
@@ -833,7 +832,7 @@ uint16_t readSensor()
       }
       //convert C to F for temp
       sensorData.ambientTempF = (sensorData.ambientTempF * 1.8) + 32;
-      debugMessage(String("SCD40 read ") + loop + "of 5: " + sensorData.ambientTempF + "F, " + sensorData.ambientHumidity + "%, " + sensorData.ambientCO2 + " ppm");
+      debugMessage(String("SCD40 read ") + loop + " of 5: " + sensorData.ambientTempF + "F, " + sensorData.ambientHumidity + "%, " + sensorData.ambientCO2 + " ppm");
     }
     return 1;
   #else
@@ -968,7 +967,7 @@ void disableInternalPower(int deepSleepTime)
     debugMessage("disabled Adafruit Feather ESP32S2 I2C power");
   #endif
 
-  debugMessage(String("Going to sleep for ") + deepSleepTime + " minutes");
+  debugMessage(String("Going to sleep for ") + deepSleepTime + " seconds");
   esp_sleep_enable_timer_wakeup(deepSleepTime*1000000); // ESP microsecond modifier
   esp_deep_sleep_start();
 }
