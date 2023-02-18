@@ -1,46 +1,21 @@
-// conditional compile flags
+/*
+  Project Name:   air_quality
+  Description:    Regularly sample and log temperature, humidity, and if available, co2 levels
+
+  See README.md for target information and revision history
+*/
+
+// Step 1: Set conditional compile flags
 #define DEBUG 	// Output to serial port
 //#define RJ45  	// use Ethernet
 #define WIFI    	// use WiFi
-//#define MQTTLOG 	// log sensor data to MQTT broker
+#define MQTT 	// log sensor data to MQTT broker
 //#define DWEET     // Post sensor readings to dweet.io
-//#define INFLUX  	// Log data to remote InfluxDB server
+#define INFLUX  	// Log data to remote InfluxDB server
 #define	SCREEN		// use screen as output
 #define SCD40			// use SCD40 to read temp, humidity, and CO2
 
-// sample timing in minutes
-#ifdef DEBUG
-	#define SAMPLE_INTERVAL 1
-#else
-	#define SAMPLE_INTERVAL 10
-#endif
-// number of samples captured before logging
-#ifdef DEBUG
-  #define SAMPLE_SIZE 2
-#else
-  #define SAMPLE_SIZE 6
-#endif
-
-#define WIFI_ATTEMPT_LIMIT	5 // max connection attempts to WiFi AP
-
-// millisecond modifier to minutes for sampling interval (ARM)
-// #define SAMPLE_INTERVAL_ARM_MODIFIER 60000
-// microsecond modifier to minutes for sampling interval (ESP)
-#define SAMPLE_INTERVAL_ESP_MODIFIER 60000000
-
-// Open Weather Map parameters
-#define OWM_SERVER			"http://api.openweathermap.org/data/2.5/"
-#define OWM_WEATHER_PATH	"weather?"
-#define OWM_AQM_PATH		"air_pollution?"
-
-// select time zone, used by NTPClient
-//const int timeZone = 0;  	// UTC
-//const int timeZone = -5;  // USA EST
-//const int timeZone = -4;  // USA EDT
-const int timeZone = -7;  // USA PDT
-//const int timeZone = -8;  // USA PST
-
-// Battery parameters
+// Step 2: Set battery size if applicable
 // based on a settings curve in the LC709203F datasheet
 // #define BATTERY_APA 0x08 // 100mAH
 // #define BATTERY_APA 0x0B // 200mAH
@@ -51,66 +26,95 @@ const int timeZone = -7;  // USA PDT
 // #define BATTERY_APA 0x32 // 2500mAH
 // #define BATTERY_APA 0x36 // 3000mAH
 
+// Pin config for e-paper display
+
+// // Adafruit MagTag, some values come from board definition package
+#define EPD_CS      8   
+#define EPD_DC      7   
+#define SRAM_CS     -1  // can set to -1 to not use a pin (uses a lot of RAM!)
+// #define EPD_RESET   6   // can set to -1 and share with chip Reset (can't deep sleep)
+#define EPD_BUSY    5   // can set to -1 to not use a pin (will wait a fixed delay)
+
+// ESP32-S2 with Adafruit 2.9" E-Ink Featherwing (PID 4777)
+#if defined (ARDUINO_ADAFRUIT_FEATHER_ESP32S2)
+	#define EPD_CS      9
+	#define EPD_DC      10     
+	#define SRAM_CS     6  // can set to -1 to not use a pin (uses a lot of RAM!)
+	// on Featherwing EPD_RESET and EPD_BUSY must be set to -1 as these lines are not connected
+	#define EPD_RESET   -1
+	#define EPD_BUSY    -1
+	// #define EPD_RESET   8 // can set to -1 and share with microcontroller Reset!
+	// #define EPD_BUSY    7 // can set to -1 to not use a pin (will wait a fixed delay)
+#endif
+
+// environment sensor sample timing
+#ifdef DEBUG
+	// number of times SCD40 is read, last read is the sample value
+	#define READS_PER_SAMPLE	1
+	// time between samples in seconds
+	#define SAMPLE_INTERVAL		60
+	// number of samples to average
+  #define SAMPLE_SIZE				2
+#else
+	#define READS_PER_SAMPLE	5
+	#define SAMPLE_INTERVAL 	180
+  #define SAMPLE_SIZE 			6
+#endif
+
+// Sleep time if hardware error occurs in seconds
+#define HARDWARE_ERROR_INTERVAL 10
+
+#define CONNECT_ATTEMPT_LIMIT	3 // max connection attempts to internet services
+#define CONNECT_ATTEMPT_INTERVAL 5 // seconds between internet service connect attempts
+
+const String co2Labels[5]={"Good", "OK", "So-So", "Poor", "Bad"};
+// used and defined by OWM
+const String aqiLabels[5] = { "Good", "Fair", "Moderate", "Poor", "Very Poor" };
+// used in aq_network.cpp
+const String weekDays[7] = { "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday" };
+
+// Open Weather Map parameters
+#define OWM_SERVER			"http://api.openweathermap.org/data/2.5/"
+#define OWM_WEATHER_PATH	"weather?"
+#define OWM_AQM_PATH		"air_pollution?"
+
+// NTP time configuration
+
+//https://cplusplus.com/reference/ctime/tm/
+
+#define ntpServer "pool.ntp.org"
+// gmtOffset_sec is a backup used if OWM data not available
+// const long  gmtOffset_sec = 0; // UTC
+// const long  gmtOffset_sec = 3600; // Ireland
+const long  gmtOffset_sec = -28800; // PST [- 8]
+const int   daylightOffset_sec = 0;
+// const int   daylightOffset_sec = 3600; // PST [+ 1]
+
 // set client ID; used by mqtt and wifi
-#define CLIENT_ID "AQ-test-room"
-//#define CLIENT_ID "AQ-lab-office"
-//#define CLIENT_ID "AQ-kitchen"
+#define CLIENT_ID "AQ-demo"
+//#define CLIENT_ID "AQ-test"
+// #define CLIENT_ID "AQ-lab-office"
+// #define CLIENT_ID "AQ-kitchen"
 //#define CLIENT_ID "AQ-cellar"
 //#define CLIENT_ID "AQ-master-bedroom"
 
-#ifdef MQTTLOG
-	// set MQTT parameters
-	#define MQTT_ATTEMPT_LIMIT 	3 	// max connection attempts to MQTT broker
+#ifdef MQTT
+	// Adafruit I/O
+	// structure: username/feeds/groupname.feedname or username/feeds/feedname
+	// e.g. #define MQTT_PUB_TEMPF		"sircoolio/feeds/pocket-office.temperature"
+	
+	// structure: site/room/device/data	
+	// #define MQTT_PUB_TEMPF			"7828/lab-office/aq/temperature"
+	// #define MQTT_PUB_HUMIDITY		"7828/lab-office/aq/humidity"
+	// #define MQTT_PUB_CO2				"7828/lab-office/aq/co2"
+	// #define MQTT_PUB_BATTVOLT		"7828/lab-office/aq/battery-voltage"
+	// #define MQTT_PUB_RSSI				"7828/lab-office/aq/rssi"
 
-	// #define MQTT_PUB_TOPIC1		"sircoolio/feeds/pocket-office.temperature"
-	// #define MQTT_PUB_TOPIC2		"sircoolio/feeds/pocket-office.humidity"
-	// #define MQTT_PUB_TOPIC3		"sircoolio/feeds/pocket-office.co2"
-	// #define MQTT_PUB_TOPIC4		"sircoolio/feeds/pocket-office.battery-level"
-	// #define MQTT_PUB_TOPIC5		"sircoolio/feeds/pocket-office.battery-voltage"
-	// #define MQTT_PUB_TOPIC6		"sircoolio/feeds/pocket-office.rssi"
-
-	// #define MQTT_PUB_TOPIC1		"sircoolio/feeds/master-bedroom.temperature"
-	// #define MQTT_PUB_TOPIC2		"sircoolio/feeds/master-bedroom.humidity"
-	// #define MQTT_PUB_TOPIC3		"sircoolio/feeds/master-bedroom.co2"
-	// #define MQTT_PUB_TOPIC4		"sircoolio/feeds/master-bedroom.battery-level"
-	// #define MQTT_PUB_TOPIC5		"sircoolio/feeds/master-bedroom.battery-voltage"
-	// #define MQTT_PUB_TOPIC6		"sircoolio/feeds/master-bedroom.rssi"
-
-	// #define MQTT_PUB_TOPIC1		"sircoolio/feeds/lab-office.temperature"
-	// #define MQTT_PUB_TOPIC2		"sircoolio/feeds/lab-office.humidity"
-	// #define MQTT_PUB_TOPIC3		"sircoolio/feeds/lab-office.co2"
-	// #define MQTT_PUB_TOPIC4		"sircoolio/feeds/lab-office.battery-level"
-	// #define MQTT_PUB_TOPIC5		"sircoolio/feeds/lab-office.battery-voltage"
-	// #define MQTT_PUB_TOPIC6		"sircoolio/feeds/lab-office.rssi"
-
-	// #define MQTT_PUB_TOPIC1		"sircoolio/feeds/kitchen.temperature"
-	// #define MQTT_PUB_TOPIC2		"sircoolio/feeds/kitchen.humidity"
-	// #define MQTT_PUB_TOPIC3		"sircoolio/feeds/kitchen.co2"
-	// #define MQTT_PUB_TOPIC4		"sircoolio/feeds/kitchen.battery-level"
-	// #define MQTT_PUB_TOPIC5		"sircoolio/feeds/kitchen.battery-voltage"
-	// #define MQTT_PUB_TOPIC6		"sircoolio/feeds/kitchen.rssi"
-
-	// #define MQTT_PUB_TOPIC1		"sircoolio/feeds/cellar.temperature"
-	// #define MQTT_PUB_TOPIC2		"sircoolio/feeds/cellar.humidity"
-	// #define MQTT_PUB_TOPIC3		"sircoolio/feeds/cellar.co2"
-	// #define MQTT_PUB_TOPIC4		"sircoolio/feeds/cellar.battery-level"
-	// #define MQTT_PUB_TOPIC5		"sircoolio/feeds/cellar.battery-voltage"
-	// #define MQTT_PUB_TOPIC6		"sircoolio/feeds/cellar.rssi"
-
-	#define MQTT_PUB_TOPIC1		"sircoolio/feeds/test-room.temperature"
-	#define MQTT_PUB_TOPIC2		"sircoolio/feeds/test-room.humidity"
-	#define MQTT_PUB_TOPIC3		"sircoolio/feeds/test-room.co2"
-	#define MQTT_PUB_TOPIC4		"sircoolio/feeds/test-room.battery-level"
-	#define MQTT_PUB_TOPIC5		"sircoolio/feeds/test-room.battery-voltage"
-	#define MQTT_PUB_TOPIC6		"sircoolio/feeds/test-room.rssi"
-
-	// #define MQTT_PUB_TOPIC1		"sircoolio/feeds/test-headless.temperature"
-	// #define MQTT_PUB_TOPIC2		"sircoolio/feeds/test-headless.humidity"
-	// #define MQTT_PUB_TOPIC3		"sircoolio/feeds/test-headless.co2"
-	// #define MQTT_PUB_TOPIC4		"sircoolio/feeds/test-headless.battery-level"
-	// #define MQTT_PUB_TOPIC5		"sircoolio/feeds/test-headless.battery-voltage"
-	// #define MQTT_PUB_TOPIC6		"sircoolio/feeds/test-headless.rssi"
-
+	#define MQTT_PUB_TEMPF			"7828/demo/aq/temperature"
+	#define MQTT_PUB_HUMIDITY	"7828/demo/aq/humidity"
+	#define MQTT_PUB_CO2				"7828/demo/aq/co2"
+	#define MQTT_PUB_BATTVOLT	"7828/demo/aq/battery-voltage"
+	#define MQTT_PUB_RSSI			"7828/demo/aq/rssi"
 #endif
 
 #ifdef INFLUX  
@@ -121,16 +125,15 @@ const int timeZone = -7;  // USA PDT
 	// Standard set of tag values used for each sensor data point stored to InfluxDB.  Reuses
   // CLIENT_ID as defined anove here in config.h as well as device location (e.g., room in 
   // the house) and site (indoors vs. outdoors, typically).
-	#define DEVICE_LOCATION "test room"
-	//#define DEVICE_LOCATION "kitchen"
+	#define DEVICE_LOCATION "AQ-demo"
+  //#define DEVICE_LOCATION "test"
+	// #define DEVICE_LOCATION "kitchen"
 	// #define DEVICE_LOCATION "cellar"
-	//#define DEVICE_LOCATION "lab-office"
+	// #define DEVICE_LOCATION "lab-office"
 	//#define DEVICE_LOCATION "master bedroom"
 
 	#define DEVICE_SITE "indoor"
 	#define DEVICE_TYPE "air quality"
-
-	#define INFLUX_ATTEMPT_LIMIT 	5 	// max connection attempts to Influxdb
 #endif
 
 // Post data to the internet via dweet.io.  Set DWEET_DEVICE to be a
@@ -140,35 +143,3 @@ const int timeZone = -7;  // USA PDT
 	#define DWEET_HOST "dweet.io"   // Typically dweet.io
 	#define DWEET_DEVICE "makerhour-airquality"  // Must be unique across all of dweet.io
 #endif
-
-// The following parameters are defined in secrets.h.
-// 	WiFi credentials (if WiFi enabled)
-// 	#define WIFI_SSID
-// 	#define WIFI_PASS       
-
-// 	Open Weather Map
-// 	#define OWM_KEY
-//	#define OWM_LAT_LONG  // example "lat=47.9001&lon=-122.4001"
-
-//	#define SITE_ELEVATION // in meters
-
-// If MQTT enabled
-// 	#define MQTT_PORT
-// 	#define MQTT_USER
-// 	#define MQTT_BROKER
-// 	#define MQTT_PASS
-
-// If InfluxDB data storage enabled
-// For an InfluxDB v1.X server:
-// #define INFLUX_V1
-// #define INFLUXDB_URL 
-// #define INFLUXDB_DB_NAME
-// #define INFLUXDB_USER
-// #define INFLUXDB_PASSWORD
-//
-// For an InfluxDB v2.X server:
-// #define INFLUX_V2
-// #define INFLUXDB_URL 
-// #define INFLUXDB_TOKEN
-// #define INFLUXDB_ORG
-// #define INFLUXDB_BUCKET
