@@ -30,7 +30,7 @@ typedef struct
   float ambientHumidity;
   uint16_t ambientCO2;
 } envData;
-envData sensorData;
+envData sensorData; // global variable for environment sensor data
 
 // hardware status data
 typedef struct
@@ -39,82 +39,51 @@ typedef struct
   float batteryVoltage;
   int rssi;
 } hdweData;
-hdweData hardwareData;
+hdweData hardwareData;  // global variable for hardware characteristics
 
 // OpenWeatherMap Current data
 typedef struct
 {
-  // "lon": 8.54
-  float lon;
-  // "lat": 47.37
-  float lat;
-  // "id": 521
-  uint16_t weatherId;
-  // "main": "Rain"
-  String main;
-  // "description": "shower rain"
-  String description;
-  // "icon": "09d"
-  String icon;
-  // "temp": 290.56
-  float temp;
-  // "pressure": 1013
-  uint16_t pressure;
-  // "humidity": 87
-  uint16_t humidity;
-  // "temp_min": 289.15
-  float tempMin;
-  // "temp_max": 292.15
-  float tempMax;
-  // visibility: 10000
-  uint16_t visibility;
-  // "wind": {"speed": 1.5}
-  float windSpeed;
-  // "wind": {deg: 226.505}
-  float windDeg;
-  // "clouds": {"all": 90}
-  uint8_t clouds;
-  // "dt": 1527015000
-  time_t observationTime;
-  // "country": "CH"
-  String country;
-  // "sunrise": 1526960448
-  time_t sunrise;
-  // "sunset": 1527015901
-  time_t sunset;
-  // "name": "Zurich"
-  String cityName;
-  time_t timezone;
+  float lon;              // "lon": 8.54
+  float lat;              // "lat": 47.37
+  uint16_t weatherId;     // "id": 521
+  String main;            // "main": "Rain"
+  String description;     // "description": "shower rain"
+  String icon;            // "icon": "09d"
+  float temp;             // "temp": 90.56
+  uint16_t pressure;      // "pressure": 1013, in hPa
+  uint16_t humidity;      // "humidity": 87, as %
+  float tempMin;          // "temp_min": 89.15
+  float tempMax;          // "temp_max": 92.15
+  uint16_t visibility;    // visibility: 10000, in meters
+  float windSpeed;        // "wind": {"speed": 1.5}, in meters/s
+  float windDeg;          // "wind": {deg: 226.505}
+  uint8_t clouds;         // "clouds": {"all": 90}, in %
+  time_t observationTime; // "dt": 1527015000, in UTC
+  String country;         // "country": "CH"
+  time_t sunrise;         // "sunrise": 1526960448, in UTC
+  time_t sunset;          // "sunset": 1527015901, in UTC
+  String cityName;        // "name": "Zurich"
+  time_t timezone;        // shift in seconds from UTC
 } OpenWeatherMapCurrentData;
-OpenWeatherMapCurrentData owmCurrentData;
+OpenWeatherMapCurrentData owmCurrentData; // global variable for OWM current data
 
 // OpenWeatherMap Air Quality data
 typedef struct
 {
-  // "lon": 8.54
-  float lon;
-  // "lat": 47.37
-  float lat;
-  // "aqi": 2
-  int aqi;
-  // "co": 453.95
-  float co;
-  // "no": 0.47
-  float no;
-  // "no2": 52.09
-  float no2;
-  // "o3": 17.17
-  float o3;
-  // "so2": 7.51
-  float so2;
-  // "pm2.5": 8.04
-  float pm2_5;
-  // "pm10": 9.96
-  float pm10;
-  // "nh3": 0.86
-  float nh3;
+  float lon;    // "lon": 8.54
+  float lat;    // "lat": 47.37
+  int aqi;      // "aqi": 2  [European standards body value]
+  float co;     // "co": 453.95, in μg/m3
+  float no;     // "no": 0.47, in μg/m3
+  float no2;    // "no2": 52.09, in μg/m3
+  float o3;     // "o3": 17.17, in μg/m3
+  float so2;    // "so2": 7.51, in μg/m3
+  float pm25;   // "pm2.5": 8.04, in μg/m3
+  float pm10;   // "pm10": 9.96, in μg/m3
+  float nh3;    // "nh3": 0.86, in μg/m3
 } OpenWeatherMapAirQuality;
-OpenWeatherMapAirQuality owmAirQuality;
+OpenWeatherMapAirQuality owmAirQuality; // global variable for OWM current data
 
 bool batteryVoltageAvailable = false;
 bool internetAvailable = false;
@@ -187,11 +156,9 @@ void setup()
   #endif
   // Confirm key site configuration parameters
   debugMessage("Air Quality started");
-  // debugMessage(String(SAMPLE_INTERVAL) + " minute sample interval");
-  // debugMessage(String(SAMPLE_SIZE) + " samples before logging");
-  // debugMessage("Site lat/long: " + String(OWM_LAT_LONG));
-  // debugMessage("Site altitude: " + String(SITE_ALTITUDE));
-  // debugMessage("Client ID: " + String(CLIENT_ID));
+    debugMessage(String("Sample interval is ") + SAMPLE_INTERVAL + " seconds");
+    debugMessage(String("Number of samples before reporting is ") + SAMPLE_SIZE);
+    debugMessage(String("Internet service reconnect delay is ") + CONNECT_ATTEMPT_INTERVAL + " seconds");
   #ifdef DWEET
     debugMessage("Dweet device: " + String(DWEET_DEVICE));
   #endif
@@ -262,7 +229,7 @@ void setup()
   internetAvailable = aq_network.networkBegin();
 
   // Get local weather and air quality info from Open Weather Map
-  if (!getOWMWeather())
+  if (!getOWMCurrentWeatherData())
   {
     owmCurrentData.temp = 10000;
     owmCurrentData.humidity = 10000;
@@ -272,7 +239,7 @@ void setup()
   // PRIMARY: Set UTC time offset based on OWM local time zone
   aq_network.setTime(owmCurrentData.timezone, 0);
 
-  if (!getOWMAQI())
+  if (!getOWMAirPollution())
   {
     owmAirQuality.aqi = 10000;
   }
@@ -331,8 +298,8 @@ void debugMessage(String messageText)
 #endif
 }
 
-bool getOWMWeather()
-// retrieves weather from Open Weather Map APIs and stores data to environment global
+bool getOWMCurrentWeatherData()
+// stores local current weather info from Open Weather Map in environment global
 {
   #if defined(WIFI) || defined(RJ45)
     // if there is a network interface (so it will compile)
@@ -400,9 +367,9 @@ bool getOWMWeather()
   return false;
 }
 
-bool getOWMAQI()
+bool getOWMAirPollution()
+// stores local air pollution info from Open Weather Map in environment global
 {
-  // retrieves weather from Open Weather Map APIs and stores data to environment global
   #if defined(WIFI) || defined(RJ45)
     // if there is a network interface (so it will compile)
     if (internetAvailable)
@@ -440,10 +407,10 @@ bool getOWMAQI()
       owmAirQuality.no2 = (float) list_0_components["no2"];
       owmAirQuality.o3 = (float) list_0_components["o3"];
       owmAirQuality.so2 = (float) list_0_components["so2"];
-      owmAirQuality.pm2_5 = (float) list_0_components["pm2_5"];
+      owmAirQuality.pm25 = (float) list_0_components["pm2_5"];
+      debugMessage(String("OWM current PM2.5 is ") + owmAirQuality.pm25 + " in μg/m3");      
       owmAirQuality.pm10 = (float) list_0_components["pm10"];
       owmAirQuality.nh3 = (float) list_0_components["nh3"];
-      debugMessage(String("OWM AQI set: ") + owmAirQuality.aqi + " AQI");
       return true;
     }
   #endif
@@ -612,7 +579,10 @@ void screenInfo(String messageText)
   if (owmAirQuality.aqi!=10000)
   {
     display.setCursor((x_outdoor_left_margin),(display.height()*13/16));
-    display.print(aqiLabels[(owmAirQuality.aqi-1)]);
+    // European standards-body value
+    //display.print(aqiLabels[(owmAirQuality.aqi-1)]);
+    // US standards-body value
+    display.print(aqiLabels[int((pm25toAQI(owmAirQuality.pm25)-1))]);
     display.print(" AQI");
   }
 
@@ -627,7 +597,8 @@ void screenInfo(String messageText)
 #endif
 }
 
-void screenWiFiStatus() 
+void screenWiFiStatus()
+// helper function for XXXScreen() routines that draws WiFi signal strength
 {
   if (internetAvailable) 
   {
@@ -661,8 +632,7 @@ void screenWiFiStatus()
 }
 
 void screenBatteryStatus()
-// Displays remaining battery % as graphic in lower right of screen
-// used in XXXScreen() routines
+// helper function for XXXScreen() routines that draws remaining battery %
 {
 #ifdef SCREEN
   if (batteryVoltageAvailable) 
@@ -680,7 +650,8 @@ void screenBatteryStatus()
 #endif
 }
 
-void batteryReadVoltage() 
+void batteryReadVoltage()
+// stores battery voltage if available in hardware characteristics global 
 {
   // check to see if i2C monitor is available
   if (lc.begin())
@@ -696,6 +667,7 @@ void batteryReadVoltage()
   {
   // use supported boards to read voltage
     #if defined (ARDUINO_ADAFRUIT_FEATHER_ESP32_V2)
+      // see project supporting material for other ways to quantify battery %
       pinMode(VBATPIN,INPUT);
       #define BATTV_MAX           4.2     // maximum voltage of battery
       #define BATTV_MIN           3.2     // what we regard as an empty battery
@@ -705,55 +677,6 @@ void batteryReadVoltage()
       hardwareData.batteryVoltage = ((float)analogRead(VBATPIN) / 4095) * 3.3 * 2 * 1.05;
       hardwareData.batteryPercent = (uint8_t)(((hardwareData.batteryVoltage - BATTV_MIN) / (BATTV_MAX - BATTV_MIN)) * 100);
 
-      // Adafruit ESP32 V2 power management guide code form https://learn.adafruit.com/adafruit-esp32-feather-v2/power-management-2, which does not work? [logged issue]
-      // hardwareData.batteryVoltage = analogReadMilliVolts(VBATPIN);
-      // hardwareData.batteryVoltage *= 2;    // we divided by 2, so multiply back
-      // hardwareData.batteryVoltage /= 1000; // convert to volts!
-
-      // manual percentage decay map from https://blog.ampow.com/lipo-voltage-chart/
-      // hardwareData.batteryPercent = 100;
-      // if ((hardwareData.batteryVoltage < 4.2) && (hardwareData.batteryVoltage > 4.15))
-      //   hardwareData.batteryPercent = 95;
-      // if ((hardwareData.batteryVoltage < 4.16) && (hardwareData.batteryVoltage > 4.10))
-      //   hardwareData.batteryPercent = 90;
-      // if ((hardwareData.batteryVoltage < 4.11) && (hardwareData.batteryVoltage > 4.07))
-      //   hardwareData.batteryPercent = 85;
-      // if ((hardwareData.batteryVoltage < 4.08) && (hardwareData.batteryVoltage > 4.01))
-      //   hardwareData.batteryPercent = 80;
-      // if ((hardwareData.batteryVoltage < 4.02) && (hardwareData.batteryVoltage > 3.97))
-      //   hardwareData.batteryPercent = 75;
-      // if ((hardwareData.batteryVoltage < 3.98) && (hardwareData.batteryVoltage > 3.94))
-      //   hardwareData.batteryPercent = 70;
-       // if ((hardwareData.batteryVoltage < 3.95) && (hardwareData.batteryVoltage > 3.90))
-      // hardwareData.batteryPercent = 65;
-      //  if ((hardwareData.batteryVoltage < 3.91) && (hardwareData.batteryVoltage > 3.87))
-      //    hardwareData.batteryPercent = 60;
-      //  if ((hardwareData.batteryVoltage < 3.87) && (hardwareData.batteryVoltage > 3.84))
-      //    hardwareData.batteryPercent = 55;
-      //  if (hardwareData.batteryVoltage = 3.84)
-      //    hardwareData.batteryPercent = 50;
-      //  if ((hardwareData.batteryVoltage < 3.84) && (hardwareData.batteryVoltage > 3.81))
-      //    hardwareData.batteryPercent = 45;
-      //  if ((hardwareData.batteryVoltage < 3.82) && (hardwareData.batteryVoltage > 3.79))
-      //    hardwareData.batteryPercent = 40;
-      //  if (hardwareData.batteryVoltage = 3.79)
-      //    hardwareData.batteryPercent = 35;
-      //  if ((hardwareData.batteryVoltage < 3.79) && (hardwareData.batteryVoltage > 3.76))
-      //    hardwareData.batteryPercent = 30;
-      //  if ((hardwareData.batteryVoltage < 3.77) && (hardwareData.batteryVoltage > 3.74))
-      //    hardwareData.batteryPercent = 25;
-      //  if ((hardwareData.batteryVoltage < 3.75) && (hardwareData.batteryVoltage > 3.72))
-      //    hardwareData.batteryPercent = 20;      
-      //  if ((hardwareData.batteryVoltage < 3.73) && (hardwareData.batteryVoltage > 3.70))
-      //    hardwareData.batteryPercent = 15;
-      //  if ((hardwareData.batteryVoltage < 3.73) && (hardwareData.batteryVoltage > 3.70))
-      //    hardwareData.batteryPercent = 15;
-      //  if ((hardwareData.batteryVoltage < 3.71) && (hardwareData.batteryVoltage > 3.68))
-      //    hardwareData.batteryPercent = 10;
-      //  if ((hardwareData.batteryVoltage < 3.69) && (hardwareData.batteryVoltage > 3.60))
-      //    hardwareData.batteryPercent = 5;
-      //  if (hardwareData.batteryVoltage < 3.61)
-      //    hardwareData.batteryPercent = 0;
       batteryVoltageAvailable = true;
     #endif
   }
@@ -764,7 +687,8 @@ void batteryReadVoltage()
   }
 }
 
-int initSensor() 
+int initSensor()
+// initializes environment sensor if available. Supports SCD40, ATHX0, BME280 sensors
 {
 
   #ifdef SCD40
@@ -806,7 +730,7 @@ int initSensor()
 }
 
 uint16_t readSensor()
-// reads environment sensor and stores data to environment global
+// stores environment sensor to environment global
 {
 
   #ifdef SCD40
@@ -848,7 +772,9 @@ uint16_t readSensor()
   #endif
 }
 
-int readNVStorage() {
+int readNVStorage() 
+// reads data from non-volatile storage and stores in appropriate global variables
+{
   int storedCounter;
   float storedTempF;
   float storedHumidity;
@@ -883,6 +809,7 @@ int readNVStorage() {
 }
 
 void enableInternalPower()
+// enable appropriate hardware
 {
   // Handle two ESP32 I2C ports
   #if defined(ARDUINO_ADAFRUIT_QTPY_ESP32S2) || defined(ARDUINO_ADAFRUIT_QTPY_ESP32S3_NOPSRAM) || defined(ARDUINO_ADAFRUIT_QTPY_ESP32S3) || defined(ARDUINO_ADAFRUIT_QTPY_ESP32_PICO)
@@ -927,7 +854,7 @@ void enableInternalPower()
 }
 
 void disableInternalPower(int deepSleepTime)
-// Powers down hardware then board deep sleep
+// Powers down hardware activated via enableInternalPower() then deep sleep MCU
 {
   display.powerDown();
   digitalWrite(EPD_RESET, LOW);  // hardware power down mode
@@ -973,6 +900,7 @@ void disableInternalPower(int deepSleepTime)
 }
 
 String getMeteoconIcon(String icon)
+// Maps OWM icon data to the appopropriate Meteocon font character 
 {
   // clear sky
   // 01d
@@ -1057,4 +985,22 @@ String getMeteoconIcon(String icon)
   }
   // Nothing matched: N/A
   return ")";
+}
+
+float pm25toAQI(float pm25)
+// Converts pm25 reading to AQI using the AQI Equation
+// (https://forum.airnowtech.org/t/the-aqi-equation/169)
+{  
+  if(pm25 <= 12.0)       return(fmap(pm25,  0.0, 12.0,  0.0, 50.0));
+  else if(pm25 <= 35.4)  return(fmap(pm25, 12.1, 35.4, 51.0,100.0));
+  else if(pm25 <= 55.4)  return(fmap(pm25, 35.5, 55.4,101.0,150.0));
+  else if(pm25 <= 150.4) return(fmap(pm25, 55.5,150.4,151.0,200.0));
+  else if(pm25 <= 250.4) return(fmap(pm25,150.5,250.4,201.0,300.0));
+  else if(pm25 <= 500.4) return(fmap(pm25,250.5,500.4,301.0,500.0));
+  else return(505.0);  // AQI above 500 not recognized
+}
+
+float fmap(float x, float xmin, float xmax, float ymin, float ymax)
+{
+    return( ymin + ((x - xmin)*(ymax-ymin)/(xmax - xmin)));
 }

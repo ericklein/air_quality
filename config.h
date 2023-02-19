@@ -68,10 +68,14 @@
 #define CONNECT_ATTEMPT_INTERVAL 5 // seconds between internet service connect attempts
 
 const String co2Labels[5]={"Good", "OK", "So-So", "Poor", "Bad"};
-// used and defined by OWM
-const String aqiLabels[5] = { "Good", "Fair", "Moderate", "Poor", "Very Poor" };
+
+// if using OWM aqi value, these are the European standards-body conversions from numeric valeu
+// const String aqiLabels[5] = { "Good", "Fair", "Moderate", "Poor", "Very Poor" };
+// if using US standards-body conversions from numeric value
+const String aqiLabels[6] = {"Good", "Moderate", "Unhealthy (SG)", "Unhealthy", "Very Unhealthy", "Hazardous"};
+
 // used in aq_network.cpp
-const String weekDays[7] = { "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday" };
+const String weekDays[7] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
 
 // Open Weather Map parameters
 #define OWM_SERVER			"http://api.openweathermap.org/data/2.5/"
