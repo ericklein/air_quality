@@ -39,7 +39,7 @@ typedef struct
   float batteryVoltage;
   int rssi;
 } hdweData;
-hdweData hardwareData;  // global variable for hardware characteristics
+hdweData hardwareData;  // global variable for hardware characteristics          
 
 // OpenWeatherMap Current data
 typedef struct
@@ -85,9 +85,6 @@ typedef struct
 } OpenWeatherMapAirQuality;
 OpenWeatherMapAirQuality owmAirQuality; // global variable for OWM current data
 
-bool batteryVoltageAvailable = false;
-bool internetAvailable = false;
-
 // initialize environment sensors
 
 #ifdef SCD40
@@ -124,25 +121,45 @@ Adafruit_LC709203F lc;
   #include <Fonts/FreeSans18pt7b.h>
   #include <Fonts/FreeSans24pt7b.h>
 
+  // Special glyphs for the UI
+  #include "glyphs.h"
+
   ThinkInk_290_Grayscale4_T5 display(EPD_DC, EPD_RESET, EPD_CS, SRAM_CS, EPD_BUSY);
   // colors are EPD_WHITE, EPD_BLACK, EPD_RED, EPD_GRAY, EPD_LIGHT, EPD_DARK
+
+  // this eInk display is 296x128 pixels
+  // screen layout assists
+  const int xMargins = 5;
+  const int xOutdoorMargin = ((display.width()/2) + xMargins);
+  const int yMargins = 2;
+  // yCO2 not used
+  const int yCO2 = 50;
+  const int ySparkline = 45;
+  const int ytemp = 100;
+  // BUG, 7/8 = 112, WiFi status is 15 (5*3) pixels high
+  const int yStatus = (display.height()*7/8);
+  const int sparklineHeight = 40;
+  const int batteryBarWidth = 28;
+  const int batteryBarHeight = 10;
 #endif
 
 #include "ArduinoJson.h"  // Needed by OWM retrieval routines
 
 #ifdef INFLUX
-  extern boolean post_influx(uint16_t co2, float tempF, float humidity, float battery_v, int rssi);
+  extern boolean post_influx(uint16_t co2, float tempF, float humidity, float batteryVoltage, int rssi);
 #endif
 
 #ifdef DWEET
-  extern void post_dweet(uint16_t co2, float tempF, float humidity, float battpct, float battv, int rssi);
+  extern void post_dweet(uint16_t co2, float tempF, float humidity, float batteryVoltage, int rssi);
 #endif
 
 #ifdef MQTT
   //extern void mqttConnect();
   extern int mqttDeviceWiFiUpdate(int rssi);
-  extern int mqttDeviceBatteryUpdate(float cellVoltage);
-  extern int mqttSensorUpdate(uint16_t co2, float tempF, float humidity);
+  extern int mqttDeviceBatteryUpdate(float batteryVoltage);
+  extern int mqttSensorTempFUpdate(float tempF);
+  extern int mqttSensorHumidityUpdate(float humidity);
+  extern int mqttSensorCO2Update(uint16_t co2);
 #endif
 
 void setup()
@@ -162,6 +179,9 @@ void setup()
   #ifdef DWEET
     debugMessage("Dweet device: " + String(DWEET_DEVICE));
   #endif
+
+  hardwareData.batteryVoltage = 0;  // 0 = no battery attached
+  hardwareData.rssi = 0;            // 0 = no WiFi 
 
   enableInternalPower();
 
@@ -226,7 +246,8 @@ void setup()
   batteryReadVoltage();
 
   // Setup network connection specified in config.h
-  internetAvailable = aq_network.networkBegin();
+  if (aq_network.networkBegin())
+    hardwareData.rssi = abs(aq_network.getWiFiRSSI());    
 
   // Get local weather and air quality info from Open Weather Map
   if (!getOWMCurrentWeatherData())
@@ -245,19 +266,17 @@ void setup()
   }
 
   String upd_flags = "";  // To indicate whether services succeeded
-  if (internetAvailable)
+  if (hardwareData.rssi!=0)
   {
-    hardwareData.rssi = abs(aq_network.getWiFiRSSI());
-
     #ifdef MQTT
-      if ((mqttSensorUpdate(sensorData.ambientCO2, sensorData.ambientTempF,sensorData.ambientHumidity)) && (mqttDeviceWiFiUpdate(hardwareData.rssi)) && (mqttDeviceBatteryUpdate(hardwareData.batteryVoltage)))
+      if ((mqttSensorTempFUpdate(sensorData.ambientTempF)) && (mqttSensorHumidityUpdate(sensorData.ambientHumidity)) && (mqttSensorCO2Update(sensorData.ambientCO2)) && (mqttDeviceWiFiUpdate(hardwareData.rssi)) && (mqttDeviceBatteryUpdate(hardwareData.batteryVoltage)))
       {
         upd_flags += "M";
       }
     #endif
 
     #ifdef DWEET
-      post_dweet(averageCO2, averageTempF, averageHumidity, hardwareData.batteryPercent, hardwareData.batteryVoltage, hardwareData.rssi);
+      post_dweet(averageCO2, averageTempF, averageHumidity, hardwareData.batteryVoltage, hardwareData.rssi);
       upd_flags += "D";
     #endif
 
@@ -303,7 +322,7 @@ bool getOWMCurrentWeatherData()
 {
   #if defined(WIFI) || defined(RJ45)
     // if there is a network interface (so it will compile)
-    if (internetAvailable)
+    if (hardwareData.rssi!=0)
     // and internet is verified
     {
       String jsonBuffer;
@@ -372,7 +391,7 @@ bool getOWMAirPollution()
 {
   #if defined(WIFI) || defined(RJ45)
     // if there is a network interface (so it will compile)
-    if (internetAvailable)
+    if (hardwareData.rssi!=0)
     // and internet is verified
     {
       String jsonBuffer;
@@ -439,105 +458,138 @@ void screenInfo(String messageText)
   display.clearBuffer();
   display.setTextColor(EPD_BLACK);
 
-  // screen size cheats
-
-  int x_indoor_left_margin = (display.width()/20);
-  int x_mid_point = (display.width()/2);
-  int x_outdoor_left_margin = (display.width()*11/20);
-
   // borders
-  // ThinkInk 2.9" epd is 296x128 pixels
-  // label border
-  display.drawLine(0,(display.height()*7/8),display.width(),(display.height()*7/8),EPD_GRAY);
+  // label
+  display.drawLine(0,yStatus,display.width(),yStatus,EPD_GRAY);
   // splitting sensor vs. outside values
-  display.drawLine(x_mid_point,0,x_mid_point,(display.height()*7/8),EPD_GRAY);
+  display.drawLine((display.width()/2),0,(display.width()/2),yStatus,EPD_GRAY);
   
-  // battery status
-  screenBatteryStatus();
-
-  // wifi status
-  screenWiFiStatus();
+  // screen helper routines
+  // draws battery in the lower right corner. -3 in first parameter accounts for battery nub
+  screenHelperBatteryStatus((display.width()-xMargins-batteryBarWidth-3),(display.height()-yMargins-batteryBarHeight),batteryBarWidth,batteryBarHeight);
+  screenHelperWiFiStatus();
+  // draws any status message in the lower left corner. -8 in the first parameter accounts for fixed font height
+  screenHelperStatusMessage(xMargins,(display.height()-yMargins-8), messageText);
 
   // Indoor
-  int temperatureDelta = ((int)(sensorData.ambientTempF +0.5)) - ((int) (averageTempF + 0.5));
-  int humidityDelta = ((int)(sensorData.ambientHumidity +0.5)) - ((int) (averageHumidity + 0.5));
+  // CO2 level
+  // calculate CO2 value range in 400ppm bands
+  int co2range = ((sensorData.ambientCO2 - 400) / 400);
+  co2range = constrain(co2range,0,4); // filter CO2 levels above 2400
+
+  display.setFont(&FreeSans18pt7b);
+  display.setCursor(xMargins, yMargins);
+  display.print("CO");
+  display.setCursor(xMargins+65,yMargins);
+  display.print(": " + String(co2Labels[co2range]));
+  display.setFont(&FreeSans12pt7b);
+  display.setCursor(xMargins+50,yMargins+10);
+  display.print("2");
+  display.setCursor((xMargins+90),yMargins+25);
+  display.print("(" + String(sensorData.ambientCO2) + ")");
 
   // Indoor temp
-  display.setFont(&FreeSans24pt7b);
-  display.setCursor(x_indoor_left_margin,(display.height()/3));
-  display.print(String((int)(sensorData.ambientTempF+0.5)));
-  // move the cursor to raise the F indicator
-  //display.setCursor(x,y);
-  display.setFont(&meteocons16pt7b);
-  display.print("+");
-
-  // Indoor temp delta
-  if (temperatureDelta!=0)
-  {
-    display.setFont();
-    if(temperatureDelta>0)
-    {
-      // upward triangle (left pt, right pt, bottom pt)
-      display.fillTriangle(110,((display.height()*3/8)-10),130,((display.height()*3/8)-10),120,(((display.height()*3/8)-10)-9), EPD_BLACK);
-    }
-    else
-    {
-      // downward triangle (left pt, right pt, bottom pt)
-      display.fillTriangle(110,(((display.height()*3/8)-10)-9),130,(((display.height()*3/8)-10)-9),120,((display.height()*3/8)-10), EPD_BLACK);
-    }
-    display.setCursor(130,((display.height()*3/8)-10));
-    display.print(abs(temperatureDelta));
+  int tempF = sensorData.ambientTempF + 0.5;
+  display.setFont(&FreeSans18pt7b);
+  if(tempF < 100) {
+    display.setCursor(xMargins,ytemp);
+    display.print(String(tempF));
+    display.drawBitmap(xMargins+42,ytemp-21,epd_bitmap_temperatureF_icon_sm,20,28,EPD_BLACK);
+  }
+  else {
+    display.setCursor(xMargins,ytemp);
+    display.print(String(tempF));
+    display.setFont(&FreeSans12pt7b);
+    display.setCursor(xMargins+65,ytemp);
+    display.print("F"); 
   }
 
   // Indoor humidity
-  display.setFont(&FreeSans12pt7b);
-  display.setCursor(x_indoor_left_margin,((display.height()*9/16)));
-  display.print(String((int)(sensorData.ambientHumidity+0.5)) + "%");
-  // Indoor humidity delta
-  if (humidityDelta!=0)
-  {
-    display.setFont();
-    if(humidityDelta>0)
-    {
-      // upward triangle (left pt, right pt, bottom pt)
-      display.fillTriangle(110,((display.height()*5/8)-10),130,((display.height()*5/8)-10),120,(((display.height()*5/8)-10)-9), EPD_BLACK);
-    }
-    else
-    {
-      // (left pt, right pt, bottom pt)
-      display.fillTriangle(110,(((display.height()*5/8)-10)-9),130,(((display.height()*5/8)-10)-9),120,((display.height()*5/8)-10), EPD_BLACK);
-    }
-    display.setCursor(130,((display.height()*5/8)-10));
-    display.print(abs(humidityDelta));
-  }
+  display.setFont(&FreeSans18pt7b);
+  display.setCursor(display.width()/2, ytemp);
+  display.print(String((int)(sensorData.ambientHumidity + 0.5)));
+  display.drawBitmap(display.width()/2+42,ytemp-21,epd_bitmap_humidity_icon_sm4,20,28,EPD_BLACK);
 
-  // Indoor CO2 level
-  if (sensorData.ambientCO2!=10000)
-  {
-    // calculate CO2 value range in 400ppm bands
-    int co2range = ((sensorData.ambientCO2 - 400) / 400);
-    co2range = constrain(co2range,0,4); // filter CO2 levels above 2400
-    display.setFont(&FreeSans12pt7b);
-    display.setCursor(x_indoor_left_margin,(display.height()*13/16));
-    display.setFont(&FreeSans9pt7b); 
-    display.print(String(co2Labels[co2range])+ " CO2");
-    if ((sensorData.ambientCO2-averageCO2)!=0)
-    {
-      display.setFont();
-      if(sensorData.ambientCO2-averageCO2>0)
-      {
-      // upward triangle (left pt, right pt, bottom pt)
-      display.fillTriangle(110,((display.height()*7/8)-10),130,((display.height()*7/8)-10),120,(((display.height()*7/8)-10)-9), EPD_BLACK);
-      }
-      else
-      {
-        // (left pt, right pt, bottom pt)
-        display.fillTriangle(110,(((display.height()*7/8)-10)-9),130,(((display.height()*7/8)-10)-9),120,((display.height()*7/8)-10), EPD_BLACK);
-      }
-      display.setCursor(130,((display.height()*7/8)-10));
-      display.print(abs(sensorData.ambientCO2 - averageCO2));
-    }
-  }
+  // Indoor
+  // int temperatureDelta = ((int)(sensorData.ambientTempF +0.5)) - ((int) (averageTempF + 0.5));
+  // int humidityDelta = ((int)(sensorData.ambientHumidity +0.5)) - ((int) (averageHumidity + 0.5));
+
+  // // Indoor temp
+  // display.setFont(&FreeSans24pt7b);
+  // display.setCursor(xMargins,(display.height()/3));
+  // display.print(String((int)(sensorData.ambientTempF+0.5)));
+  // // move the cursor to raise the F indicator
+  // //display.setCursor(x,y);
+  // display.setFont(&meteocons16pt7b);
+  // display.print("+");
+
+  // // Indoor temp delta
+  // if (temperatureDelta!=0)
+  // {
+  //   display.setFont();
+  //   if(temperatureDelta>0)
+  //   {
+  //     // upward triangle (left pt, right pt, bottom pt)
+  //     display.fillTriangle(110,((display.height()*3/8)-10),130,((display.height()*3/8)-10),120,(((display.height()*3/8)-10)-9), EPD_BLACK);
+  //   }
+  //   else
+  //   {
+  //     // downward triangle (left pt, right pt, bottom pt)
+  //     display.fillTriangle(110,(((display.height()*3/8)-10)-9),130,(((display.height()*3/8)-10)-9),120,((display.height()*3/8)-10), EPD_BLACK);
+  //   }
+  //   display.setCursor(130,((display.height()*3/8)-10));
+  //   display.print(abs(temperatureDelta));
+  // }
+
+  // // Indoor humidity
+  // display.setFont(&FreeSans12pt7b);
+  // display.setCursor(xMargins,((display.height()*9/16)));
+  // display.print(String((int)(sensorData.ambientHumidity+0.5)) + "%");
+  // // Indoor humidity delta
+  // if (humidityDelta!=0)
+  // {
+  //   display.setFont();
+  //   if(humidityDelta>0)
+  //   {
+  //     // upward triangle (left pt, right pt, bottom pt)
+  //     display.fillTriangle(110,((display.height()*5/8)-10),130,((display.height()*5/8)-10),120,(((display.height()*5/8)-10)-9), EPD_BLACK);
+  //   }
+  //   else
+  //   {
+  //     // (left pt, right pt, bottom pt)
+  //     display.fillTriangle(110,(((display.height()*5/8)-10)-9),130,(((display.height()*5/8)-10)-9),120,((display.height()*5/8)-10), EPD_BLACK);
+  //   }
+  //   display.setCursor(130,((display.height()*5/8)-10));
+  //   display.print(abs(humidityDelta));
+  // }
+
+  // // Indoor CO2 level
+  // if (sensorData.ambientCO2!=10000)
+  // {
+  //   // calculate CO2 value range in 400ppm bands
+  //   int co2range = ((sensorData.ambientCO2 - 400) / 400);
+  //   co2range = constrain(co2range,0,4); // filter CO2 levels above 2400
+  //   display.setFont(&FreeSans12pt7b);
+  //   display.setCursor(xMargins,(display.height()*13/16));
+  //   display.setFont(&FreeSans9pt7b); 
+  //   display.print(String(co2Labels[co2range])+ " CO2");
+  //   if ((sensorData.ambientCO2-averageCO2)!=0)
+  //   {
+  //     display.setFont();
+  //     if(sensorData.ambientCO2-averageCO2>0)
+  //     {
+  //     // upward triangle (left pt, right pt, bottom pt)
+  //     display.fillTriangle(110,((display.height()*7/8)-10),130,((display.height()*7/8)-10),120,(((display.height()*7/8)-10)-9), EPD_BLACK);
+  //     }
+  //     else
+  //     {
+  //       // (left pt, right pt, bottom pt)
+  //       display.fillTriangle(110,(((display.height()*7/8)-10)-9),130,(((display.height()*7/8)-10)-9),120,((display.height()*7/8)-10), EPD_BLACK);
+  //     }
+  //     display.setCursor(130,((display.height()*7/8)-10));
+  //     display.print(abs(sensorData.ambientCO2 - averageCO2));
+  //   }
+  // }
 
   // Outside
   // location label
@@ -549,7 +601,7 @@ void screenInfo(String messageText)
   display.setFont(&FreeSans12pt7b);
   if (owmCurrentData.temp!=10000)
   {
-    display.setCursor(x_outdoor_left_margin,(display.height()/4));
+    display.setCursor(xOutdoorMargin,(display.height()/4));
     display.print(String((int)(owmCurrentData.temp+0.5)));
     display.setFont(&meteocons12pt7b);
     display.print("+");
@@ -570,7 +622,7 @@ void screenInfo(String messageText)
   display.setFont(&FreeSans12pt7b);
   if (owmCurrentData.humidity!=10000)
   {
-    display.setCursor(x_outdoor_left_margin,(display.height()*9/16));
+    display.setCursor(xOutdoorMargin,(display.height()*9/16));
     display.print(String(owmCurrentData.humidity) + "%");
   }
 
@@ -578,7 +630,7 @@ void screenInfo(String messageText)
   display.setFont(&FreeSans9pt7b);
   if (owmAirQuality.aqi!=10000)
   {
-    display.setCursor((x_outdoor_left_margin),(display.height()*13/16));
+    display.setCursor((xOutdoorMargin),(display.height()*13/16));
     // European standards-body value
     //display.print(aqiLabels[(owmAirQuality.aqi-1)]);
     // US standards-body value
@@ -586,21 +638,27 @@ void screenInfo(String messageText)
     display.print(" AQI");
   }
 
-  // status message
-  display.setFont();  // resets to system default monospace font
-  display.setCursor(5,(display.height()-9));
-  display.print(messageText);
-
   //update display
   display.display();
   debugMessage("Screen updated");
 #endif
 }
 
-void screenWiFiStatus()
-// helper function for XXXScreen() routines that draws WiFi signal strength
+void screenHelperStatusMessage(int initialX, int initialY, String messageText)
+// helper function for screenXXX() routines that draws a status message
+// uses system default font, so text drawn x+,y+ from initialX,Y
 {
-  if (internetAvailable) 
+  // IMPROVEMENT : Screen dimension boundary checks for function parameters
+  display.setFont();  // resets to system default monospace font (6x8 pixels)
+  display.setCursor(initialX, initialY);
+  display.print(messageText);
+}
+
+void screenHelperWiFiStatus()
+// helper function for screenXXX() routines that draws WiFi signal strength
+
+{
+  if (hardwareData.rssi!=0) 
   {
     const int barWidth = 3;
     const int barHeightMultiplier = 3;
@@ -610,15 +668,13 @@ void screenWiFiStatus()
 
     // Convert RSSI values to a 5 bar visual indicator
     // >90 means no signal
-    barCount = (6-((hardwareData.rssi/10)-3));
-    if (barCount>5) barCount = 5;
+    barCount = constrain((6-((hardwareData.rssi/10)-3)),0,5);
     if (barCount>0)
     {
       // <50 rssi value = 5 bars, each +10 rssi value range = one less bar
       // draw bars to represent WiFi strength
       for (int b = 1; b <= barCount; b++)
       {
-        // display.fillRect(((display.width() - 70) + (b * 5)), ((display.height()) - (b * 5)), barWidth, b * 5, EPD_BLACK);
         display.fillRect(((display.width() - barStartingXModifier) + (b * barSpacingMultipler)), ((display.height()) - (b * barHeightMultiplier)), barWidth, b * barHeightMultiplier, EPD_BLACK);
       }
       debugMessage(String("WiFi signal strength on screen as ") + barCount +" bars");
@@ -631,23 +687,21 @@ void screenWiFiStatus()
   }
 }
 
-void screenBatteryStatus()
-// helper function for XXXScreen() routines that draws remaining battery %
+void screenHelperBatteryStatus(int initialX, int initialY, int barWidth, int barHeight)
+// helper function for screenXXX() routines that draws battery charge %
 {
-#ifdef SCREEN
-  if (batteryVoltageAvailable) 
-  {
-    int barHeight = 10;
-    int barWidth = 28;
-
-    // battery nub (3pix wide, 6pix high)
-    display.drawRect((display.width()-5-3),((display.height()*7/8)+7),3,6,EPD_BLACK);
-    //battery percentage as rectangle fill
-    display.fillRect((display.width()-barWidth-5-3),((display.height()*7/8)+5),(int((hardwareData.batteryPercent/100)*barWidth)),barHeight,EPD_GRAY);
-    // battery border
-    display.drawRect((display.width()-barWidth-5-3),((display.height()*7/8)+5),barWidth,barHeight,EPD_BLACK);
-  }
-#endif
+  // IMPROVEMENT : Screen dimension boundary checks for function parameters
+  #ifdef SCREEN
+    if (hardwareData.batteryVoltage>0) 
+    {
+      // battery nub; width = 3pix, height = 60% of barHeight
+      display.fillRect((initialX+barWidth),(initialY+(int(barHeight/5))),3,(int(barHeight*3/5)),EPD_BLACK);
+      // battery border
+      display.drawRect(initialX,initialY,barWidth,barHeight,EPD_BLACK);
+      //battery percentage as rectangle fill, 1 pixel inset from the battery border
+      display.fillRect((initialX + 1),(initialY+1),(int((hardwareData.batteryPercent/100)*barWidth)-2),(barHeight-2),EPD_GRAY);
+    }
+  #endif
 }
 
 void batteryReadVoltage()
@@ -661,7 +715,6 @@ void batteryReadVoltage()
     lc.setPackAPA(BATTERY_APA);
     hardwareData.batteryPercent = lc.cellPercent();
     hardwareData.batteryVoltage = lc.cellVoltage();
-    batteryVoltageAvailable = true;
   } 
   else
   {
@@ -676,11 +729,9 @@ void batteryReadVoltage()
       // the 1.05 is a fudge factor original author used to align reading with multimeter
       hardwareData.batteryVoltage = ((float)analogRead(VBATPIN) / 4095) * 3.3 * 2 * 1.05;
       hardwareData.batteryPercent = (uint8_t)(((hardwareData.batteryVoltage - BATTV_MIN) / (BATTV_MAX - BATTV_MIN)) * 100);
-
-      batteryVoltageAvailable = true;
     #endif
   }
-  if (batteryVoltageAvailable) 
+  if (hardwareData.batteryVoltage>0) 
   {
     debugMessage("Battery voltage: " + String(hardwareData.batteryVoltage) + " v");
     debugMessage("Battery percentage: " + String(hardwareData.batteryPercent) + " %");
