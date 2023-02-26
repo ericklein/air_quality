@@ -32,6 +32,8 @@ typedef struct
 } envData;
 envData sensorData; // global variable for environment sensor data
 
+uint16_t co2Samples[co2MaxStoredSamples];
+
 // hardware status data
 typedef struct
 {
@@ -133,7 +135,7 @@ Adafruit_LC709203F lc;
   const int xOutdoorMargin = ((display.width()/2) + xMargins);
   const int yMargins = 2;
   // yCO2 not used
-  const int yCO2 = 50;
+  const int yCO2 = 20;
   const int ySparkline = 45;
   const int ytemp = 100;
   // BUG, 7/8 = 112, WiFi status is 15 (5*3) pixels high
@@ -301,7 +303,11 @@ void setup()
   else
   {
     // no internet connection, update screen with sensor data only
-    screenInfo("");
+    #ifdef DEBUG
+      screenInfo("Test msg from DEBUG");
+    #else
+      screenInfo("");
+    #endif
   }
   disableInternalPower(SAMPLE_INTERVAL);
 }
@@ -455,6 +461,10 @@ void screenInfo(String messageText)
 // Display environmental information on screen
 {
 #ifdef SCREEN  
+
+  // TEST ONLY: load values normally supplied by OWM
+  testOWMValues();
+  
   display.clearBuffer();
   display.setTextColor(EPD_BLACK);
 
@@ -467,9 +477,15 @@ void screenInfo(String messageText)
   // screen helper routines
   // draws battery in the lower right corner. -3 in first parameter accounts for battery nub
   screenHelperBatteryStatus((display.width()-xMargins-batteryBarWidth-3),(display.height()-yMargins-batteryBarHeight),batteryBarWidth,batteryBarHeight);
-  screenHelperWiFiStatus();
+  
+  // -70 moves it to the left of the battery display
+  screenHelperWiFiStatus((display.width() - xMargins - 70), (display.height() - yMargins),3,3,5);
+  
   // draws any status message in the lower left corner. -8 in the first parameter accounts for fixed font height
   screenHelperStatusMessage(xMargins,(display.height()-yMargins-8), messageText);
+
+  // display sparkline
+  screenHelperSparkLines(xMargins,ySparkline,(display.width() - (2 * xMargins)),sparklineHeight);
 
   // Indoor
   // CO2 level
@@ -477,119 +493,34 @@ void screenInfo(String messageText)
   int co2range = ((sensorData.ambientCO2 - 400) / 400);
   co2range = constrain(co2range,0,4); // filter CO2 levels above 2400
 
-  display.setFont(&FreeSans18pt7b);
-  display.setCursor(xMargins, yMargins);
-  display.print("CO");
-  display.setCursor(xMargins+65,yMargins);
-  display.print(": " + String(co2Labels[co2range]));
+  // main line
   display.setFont(&FreeSans12pt7b);
-  display.setCursor(xMargins+50,yMargins+10);
+  display.setCursor(xMargins, yCO2);
+  display.print("CO");
+  display.setCursor(xMargins+50,yCO2);
+  display.print(": " + String(co2Labels[co2range]));
+  display.setFont(&FreeSans9pt7b);
+  display.setCursor(xMargins+35,(yCO2+10));
   display.print("2");
-  display.setCursor((xMargins+90),yMargins+25);
+  // value line
+  display.setFont(&FreeSans9pt7b);
+  display.setCursor((xMargins+75),(yCO2+25));
   display.print("(" + String(sensorData.ambientCO2) + ")");
 
   // Indoor temp
   int tempF = sensorData.ambientTempF + 0.5;
-  display.setFont(&FreeSans18pt7b);
-  if(tempF < 100) {
-    display.setCursor(xMargins,ytemp);
-    display.print(String(tempF));
-    display.drawBitmap(xMargins+42,ytemp-21,epd_bitmap_temperatureF_icon_sm,20,28,EPD_BLACK);
-  }
-  else {
-    display.setCursor(xMargins,ytemp);
-    display.print(String(tempF));
-    display.setFont(&FreeSans12pt7b);
-    display.setCursor(xMargins+65,ytemp);
-    display.print("F"); 
-  }
+  display.setFont(&FreeSans12pt7b);
+  display.setCursor(xMargins,ytemp);
+  display.print(String(tempF));
+  display.setFont(&meteocons12pt7b);
+  display.print("+");
+  //display.drawBitmap(xMargins+42,ytemp-21,epd_bitmap_temperatureF_icon_sm,20,28,EPD_BLACK);
 
   // Indoor humidity
-  display.setFont(&FreeSans18pt7b);
-  display.setCursor(display.width()/2, ytemp);
+  display.setFont(&FreeSans12pt7b);
+  display.setCursor(xMargins+60, ytemp);
   display.print(String((int)(sensorData.ambientHumidity + 0.5)));
-  display.drawBitmap(display.width()/2+42,ytemp-21,epd_bitmap_humidity_icon_sm4,20,28,EPD_BLACK);
-
-  // Indoor
-  // int temperatureDelta = ((int)(sensorData.ambientTempF +0.5)) - ((int) (averageTempF + 0.5));
-  // int humidityDelta = ((int)(sensorData.ambientHumidity +0.5)) - ((int) (averageHumidity + 0.5));
-
-  // // Indoor temp
-  // display.setFont(&FreeSans24pt7b);
-  // display.setCursor(xMargins,(display.height()/3));
-  // display.print(String((int)(sensorData.ambientTempF+0.5)));
-  // // move the cursor to raise the F indicator
-  // //display.setCursor(x,y);
-  // display.setFont(&meteocons16pt7b);
-  // display.print("+");
-
-  // // Indoor temp delta
-  // if (temperatureDelta!=0)
-  // {
-  //   display.setFont();
-  //   if(temperatureDelta>0)
-  //   {
-  //     // upward triangle (left pt, right pt, bottom pt)
-  //     display.fillTriangle(110,((display.height()*3/8)-10),130,((display.height()*3/8)-10),120,(((display.height()*3/8)-10)-9), EPD_BLACK);
-  //   }
-  //   else
-  //   {
-  //     // downward triangle (left pt, right pt, bottom pt)
-  //     display.fillTriangle(110,(((display.height()*3/8)-10)-9),130,(((display.height()*3/8)-10)-9),120,((display.height()*3/8)-10), EPD_BLACK);
-  //   }
-  //   display.setCursor(130,((display.height()*3/8)-10));
-  //   display.print(abs(temperatureDelta));
-  // }
-
-  // // Indoor humidity
-  // display.setFont(&FreeSans12pt7b);
-  // display.setCursor(xMargins,((display.height()*9/16)));
-  // display.print(String((int)(sensorData.ambientHumidity+0.5)) + "%");
-  // // Indoor humidity delta
-  // if (humidityDelta!=0)
-  // {
-  //   display.setFont();
-  //   if(humidityDelta>0)
-  //   {
-  //     // upward triangle (left pt, right pt, bottom pt)
-  //     display.fillTriangle(110,((display.height()*5/8)-10),130,((display.height()*5/8)-10),120,(((display.height()*5/8)-10)-9), EPD_BLACK);
-  //   }
-  //   else
-  //   {
-  //     // (left pt, right pt, bottom pt)
-  //     display.fillTriangle(110,(((display.height()*5/8)-10)-9),130,(((display.height()*5/8)-10)-9),120,((display.height()*5/8)-10), EPD_BLACK);
-  //   }
-  //   display.setCursor(130,((display.height()*5/8)-10));
-  //   display.print(abs(humidityDelta));
-  // }
-
-  // // Indoor CO2 level
-  // if (sensorData.ambientCO2!=10000)
-  // {
-  //   // calculate CO2 value range in 400ppm bands
-  //   int co2range = ((sensorData.ambientCO2 - 400) / 400);
-  //   co2range = constrain(co2range,0,4); // filter CO2 levels above 2400
-  //   display.setFont(&FreeSans12pt7b);
-  //   display.setCursor(xMargins,(display.height()*13/16));
-  //   display.setFont(&FreeSans9pt7b); 
-  //   display.print(String(co2Labels[co2range])+ " CO2");
-  //   if ((sensorData.ambientCO2-averageCO2)!=0)
-  //   {
-  //     display.setFont();
-  //     if(sensorData.ambientCO2-averageCO2>0)
-  //     {
-  //     // upward triangle (left pt, right pt, bottom pt)
-  //     display.fillTriangle(110,((display.height()*7/8)-10),130,((display.height()*7/8)-10),120,(((display.height()*7/8)-10)-9), EPD_BLACK);
-  //     }
-  //     else
-  //     {
-  //       // (left pt, right pt, bottom pt)
-  //       display.fillTriangle(110,(((display.height()*7/8)-10)-9),130,(((display.height()*7/8)-10)-9),120,((display.height()*7/8)-10), EPD_BLACK);
-  //     }
-  //     display.setCursor(130,((display.height()*7/8)-10));
-  //     display.print(abs(sensorData.ambientCO2 - averageCO2));
-  //   }
-  // }
+  display.drawBitmap(xMargins+85,ytemp-21,epd_bitmap_humidity_icon_sm4,20,28,EPD_BLACK);
 
   // Outside
   // location label
@@ -627,14 +558,18 @@ void screenInfo(String messageText)
   }
 
   // Outside air quality index (AQI)
-  display.setFont(&FreeSans9pt7b);
   if (owmAirQuality.aqi!=10000)
   {
+    display.setFont(&FreeSans9pt7b);
     display.setCursor((xOutdoorMargin),(display.height()*13/16));
-    // European standards-body value
-    //display.print(aqiLabels[(owmAirQuality.aqi-1)]);
-    // US standards-body value
-    display.print(aqiLabels[int((pm25toAQI(owmAirQuality.pm25)-1))]);
+    // European standards-body AQI value
+    //display.print(aqiEuropeanLabels[(owmAirQuality.aqi-1)]);
+
+    // US standards-body AQI value
+    float aqiUS = pm25toAQI(owmAirQuality.pm25);
+    debugMessage(String("US AQI value is ") + aqiUS);
+
+    display.print(aqiUSALabels[aqiUSLabelValue(owmAirQuality.pm25)]);
     display.print(" AQI");
   }
 
@@ -654,28 +589,21 @@ void screenHelperStatusMessage(int initialX, int initialY, String messageText)
   display.print(messageText);
 }
 
-void screenHelperWiFiStatus()
+void screenHelperWiFiStatus(int initialX, int initialY, int barWidth, int barHeightMultiplier, int barSpacingMultipler)
 // helper function for screenXXX() routines that draws WiFi signal strength
-
 {
   if (hardwareData.rssi!=0) 
   {
-    const int barWidth = 3;
-    const int barHeightMultiplier = 3;
-    const int barSpacingMultipler = 5;
-    const int barStartingXModifier = 70;
-    int barCount;
-
     // Convert RSSI values to a 5 bar visual indicator
     // >90 means no signal
-    barCount = constrain((6-((hardwareData.rssi/10)-3)),0,5);
+    int barCount = constrain((6-((hardwareData.rssi/10)-3)),0,5);
     if (barCount>0)
     {
       // <50 rssi value = 5 bars, each +10 rssi value range = one less bar
       // draw bars to represent WiFi strength
       for (int b = 1; b <= barCount; b++)
       {
-        display.fillRect(((display.width() - barStartingXModifier) + (b * barSpacingMultipler)), ((display.height()) - (b * barHeightMultiplier)), barWidth, b * barHeightMultiplier, EPD_BLACK);
+        display.fillRect((initialX + (b * barSpacingMultipler)), (initialY - (b * barHeightMultiplier)), barWidth, b * barHeightMultiplier, EPD_BLACK);
       }
       debugMessage(String("WiFi signal strength on screen as ") + barCount +" bars");
     }
@@ -702,6 +630,52 @@ void screenHelperBatteryStatus(int initialX, int initialY, int barWidth, int bar
       display.fillRect((initialX + 1),(initialY+1),(int((hardwareData.batteryPercent/100)*barWidth)-2),(barHeight-2),EPD_GRAY);
     }
   #endif
+}
+
+void screenHelperSparkLines(int initialX, int initialY, int xWidth, int yHeight)
+{
+  // TEST ONLY: load test CO2
+  testSparkLineValues(co2MaxStoredSamples);
+
+  uint16_t co2Min, co2Max = co2Samples[0];
+  // # of pixels between each samples x and y coordinates
+  int xPixelStep, yPixelStep;
+
+  int sparkLineX[co2MaxStoredSamples], sparkLineY[co2MaxStoredSamples];
+
+  // horizontal distance (pixels) between each displayed co2 value
+  xPixelStep = (xWidth / (co2MaxStoredSamples - 1));
+
+  // determine min/max of CO2 samples
+  // could use recursive function but co2MaxStoredSamples should always be relatively small
+  for(int i=0;i<co2MaxStoredSamples;i++)
+  {
+    if(co2Samples[i] > co2Max) co2Max = co2Samples[i];
+    if(co2Samples[i] < co2Min) co2Min = co2Samples[i];
+  }
+  debugMessage(String("Max CO2 in stored sample range is ") + co2Max);
+  debugMessage(String("Min CO2 in stored sample range is ") + co2Min);
+ 
+  // vertical distance (pixels) between each displayed co2 value
+  yPixelStep = ((co2Max - co2Min) / yHeight);
+
+  // TEST ONLY : sparkline border box
+  display.drawRect(initialX,initialY, xWidth,yHeight, EPD_BLACK);
+
+  // determine sparkline x,y values
+  for(int i=0;i<co2MaxStoredSamples;i++)
+  {
+    sparkLineX[i] = (initialX + (i * xPixelStep));
+    sparkLineY[i] = ((initialY + yHeight) - int((co2Samples[i]-co2Min) / yPixelStep));
+    // draw/extend sparkline after first value is generated
+    if (i != 0)
+      display.drawLine(sparkLineX[i-1],sparkLineY[i-1],sparkLineX[i],sparkLineY[i],EPD_BLACK);  
+  }
+  for (int i=0;i<co2MaxStoredSamples;i++)
+  {
+    debugMessage(String("X,Y coordinates for CO2 sample ") + i + " is " + sparkLineX[i] + "," + sparkLineY[i]);
+  }
+    debugMessage("sparkline drawn to screen");
 }
 
 void batteryReadVoltage()
@@ -800,9 +774,9 @@ uint16_t readSensor()
         debugMessage(String(errorMessage) + " during SCD4X read");
         return 0;
       }
-      if (sensorData.ambientCO2<440 || sensorData.ambientCO2>6000)
+      if (sensorData.ambientCO2<400 || sensorData.ambientCO2>6000)
       {
-        debugMessage("SCD40 CO2 reading out of range");
+        debugMessage(String("SCD40 CO2 reading out of range at ") + sensorData.ambientCO2);
         return 0;
       }
       //convert C to F for temp
@@ -1054,4 +1028,40 @@ float pm25toAQI(float pm25)
 float fmap(float x, float xmin, float xmax, float ymin, float ymax)
 {
     return( ymin + ((x - xmin)*(ymax-ymin)/(xmax - xmin)));
+}
+
+int aqiUSLabelValue(float pm25)
+// converts pm25 value to a 0-5 value associated with US AQI labels
+{
+  if(pm25 <= 12.0)       return(0);
+  else if(pm25 <= 35.4)  return(1);
+  else if(pm25 <= 55.4)  return(2);
+  else if(pm25 <= 150.4) return(3);
+  else if(pm25 <= 250.4) return(4);
+  else if(pm25 <= 500.4) return(5);
+  else return(6);  // AQI above 500 not recognized 
+}
+
+void testOWMValues()
+// Test data to drive screenInfo() when not connected to Internet
+{
+  hardwareData.rssi = 47;
+  owmCurrentData.cityName = "Mercer Island";
+  owmCurrentData.temp = 101.01;
+  owmCurrentData.humidity = 56.43;
+  owmCurrentData.icon = "09d";
+  // aqi values
+  owmAirQuality.aqi = 3; // overrides error code value
+  owmAirQuality.pm25 = 248.04;
+}
+
+void testSparkLineValues(int sampleSetSize)
+// generates test data to exercise the screenSparkLine function
+{
+    // generate test data
+  for(int i=0;i<sampleSetSize;i++)
+  {
+    // standard range for indoor CO2 values
+    co2Samples[i]=random(600,2400);
+  }
 }

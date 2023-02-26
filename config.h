@@ -8,10 +8,10 @@
 // Step 1: Set conditional compile flags
 #define DEBUG 	// Output to serial port
 //#define RJ45  	// use Ethernet
-#define WIFI    	// use WiFi
-#define MQTT 	// log sensor data to MQTT broker
+// #define WIFI    	// use WiFi
+// #define MQTT 	// log sensor data to MQTT broker
 //#define DWEET     // Post sensor readings to dweet.io
-#define INFLUX  	// Log data to remote InfluxDB server
+// #define INFLUX  	// Log data to remote InfluxDB server
 #define	SCREEN		// use screen as output
 #define SCD40			// use SCD40 to read temp, humidity, and CO2
 
@@ -61,6 +61,9 @@
   #define SAMPLE_SIZE 			6
 #endif
 
+// nvStorageRead and nvStorageWrite currently don't work if >10
+const int co2MaxStoredSamples = 10;
+
 // Sleep time if hardware error occurs in seconds
 #define HARDWARE_ERROR_INTERVAL 10
 
@@ -70,9 +73,10 @@
 const String co2Labels[5]={"Good", "OK", "So-So", "Poor", "Bad"};
 
 // if using OWM aqi value, these are the European standards-body conversions from numeric valeu
-// const String aqiLabels[5] = { "Good", "Fair", "Moderate", "Poor", "Very Poor" };
+// const String aqiEuropeanLabels[5] = { "Good", "Fair", "Moderate", "Poor", "Very Poor" };
+
 // if using US standards-body conversions from numeric value
-const String aqiLabels[6] = {"Good", "Moderate", "Unhealthy (SG)", "Unhealthy", "Very Unhealthy", "Hazardous"};
+const String aqiUSALabels[6] = {"Good", "Moderate", "Unhealthy (SG)", "Unhealthy", "Very Unhealthy", "Hazardous"};
 
 // used in aq_network.cpp
 const String weekDays[7] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
