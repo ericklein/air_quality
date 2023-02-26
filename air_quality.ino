@@ -136,8 +136,8 @@ Adafruit_LC709203F lc;
   const int yMargins = 2;
   // yCO2 not used
   const int yCO2 = 20;
-  const int ySparkline = 45;
-  const int ytemp = 100;
+  const int ySparkline = 40;
+  const int yTemp = 100;
   // BUG, 7/8 = 112, WiFi status is 15 (5*3) pixels high
   const int yStatus = (display.height()*7/8);
   const int sparklineHeight = 40;
@@ -224,7 +224,7 @@ void setup()
     if (sensorData.ambientCO2 != 10000) {
       nvStorage.putUInt("co2", (sensorData.ambientCO2 + averageCO2));
     }
-    debugMessage(String("Intermediate values TO nv storage: Temp:") + (sensorData.ambientTempF + averageTempF) + ", Humidity:" + (sensorData.ambientHumidity + averageHumidity) + ", CO2:" + (sensorData.ambientCO2 + averageCO2));
+    debugMessage(String("Intermediate values TO nv storage: Temp:") + (sensorData.ambientTempF + averageTempF) + "F, Humidity:" + (sensorData.ambientHumidity + averageHumidity) + "%, CO2:" + (sensorData.ambientCO2 + averageCO2));
     disableInternalPower(SAMPLE_INTERVAL);
   } 
   else
@@ -449,7 +449,7 @@ void screenAlert(String messageText)
   display.clearBuffer();
   display.setTextColor(EPD_BLACK);
   display.setFont(&FreeSans12pt7b);
-  display.setCursor(40,(display.height()/2+6));
+  display.setCursor(xMargins,(display.height()/2));
   display.print(messageText);
 
   //update display
@@ -463,7 +463,7 @@ void screenInfo(String messageText)
 #ifdef SCREEN  
 
   // TEST ONLY: load values normally supplied by OWM
-  testOWMValues();
+  // testOWMValues();
   
   display.clearBuffer();
   display.setTextColor(EPD_BLACK);
@@ -485,7 +485,7 @@ void screenInfo(String messageText)
   screenHelperStatusMessage(xMargins,(display.height()-yMargins-8), messageText);
 
   // display sparkline
-  screenHelperSparkLines(xMargins,ySparkline,(display.width() - (2 * xMargins)),sparklineHeight);
+  screenHelperSparkLines(xMargins,ySparkline,((display.width()/2) - (2 * xMargins)),sparklineHeight);
 
   // Indoor
   // CO2 level
@@ -503,39 +503,47 @@ void screenInfo(String messageText)
   display.setCursor(xMargins+35,(yCO2+10));
   display.print("2");
   // value line
-  display.setFont(&FreeSans9pt7b);
-  display.setCursor((xMargins+75),(yCO2+25));
+  display.setFont();
+  display.setCursor((xMargins+88),(yCO2+7));
   display.print("(" + String(sensorData.ambientCO2) + ")");
 
   // Indoor temp
-  int tempF = sensorData.ambientTempF + 0.5;
   display.setFont(&FreeSans12pt7b);
-  display.setCursor(xMargins,ytemp);
-  display.print(String(tempF));
+  display.setCursor(xMargins,yTemp);
+  display.print(String((int)(sensorData.ambientTempF + .5)));
   display.setFont(&meteocons12pt7b);
   display.print("+");
-  //display.drawBitmap(xMargins+42,ytemp-21,epd_bitmap_temperatureF_icon_sm,20,28,EPD_BLACK);
 
   // Indoor humidity
   display.setFont(&FreeSans12pt7b);
-  display.setCursor(xMargins+60, ytemp);
+  display.setCursor(xMargins+60, yTemp);
   display.print(String((int)(sensorData.ambientHumidity + 0.5)));
-  display.drawBitmap(xMargins+85,ytemp-21,epd_bitmap_humidity_icon_sm4,20,28,EPD_BLACK);
+  // original icon ratio was 5:7?
+  display.drawBitmap(xMargins+90,yTemp-21,epd_bitmap_humidity_icon_sm4,20,28,EPD_BLACK);
 
   // Outside
   // location label
   display.setFont();
-  display.setCursor((display.width()*5/8),((display.height()*1/8)-11));
+  display.setCursor((display.width()*5/8),yMargins);
   display.print(owmCurrentData.cityName);
 
   // Outside temp
-  display.setFont(&FreeSans12pt7b);
   if (owmCurrentData.temp!=10000)
   {
-    display.setCursor(xOutdoorMargin,(display.height()/4));
+    display.setFont(&FreeSans12pt7b);
+    display.setCursor(xOutdoorMargin,yTemp);
     display.print(String((int)(owmCurrentData.temp+0.5)));
     display.setFont(&meteocons12pt7b);
     display.print("+");
+  }
+
+  // Outside humidity
+  if (owmCurrentData.humidity!=10000)
+  {
+    display.setFont(&FreeSans12pt7b);
+    display.setCursor(xOutdoorMargin + 60, yTemp);
+    display.print(String((int)(owmCurrentData.humidity+0.5)));
+    display.drawBitmap(xOutdoorMargin+90,yTemp-21,epd_bitmap_humidity_icon_sm4,20,28,EPD_BLACK);
   }
 
   // weather icon
@@ -549,19 +557,11 @@ void screenInfo(String messageText)
     display.print(weatherIcon);
   }
 
-  // Outside humidity
-  display.setFont(&FreeSans12pt7b);
-  if (owmCurrentData.humidity!=10000)
-  {
-    display.setCursor(xOutdoorMargin,(display.height()*9/16));
-    display.print(String(owmCurrentData.humidity) + "%");
-  }
-
   // Outside air quality index (AQI)
   if (owmAirQuality.aqi!=10000)
   {
     display.setFont(&FreeSans9pt7b);
-    display.setCursor((xOutdoorMargin),(display.height()*13/16));
+    display.setCursor((xOutdoorMargin),ySparkline);
     // European standards-body AQI value
     //display.print(aqiEuropeanLabels[(owmAirQuality.aqi-1)]);
 
@@ -627,7 +627,7 @@ void screenHelperBatteryStatus(int initialX, int initialY, int barWidth, int bar
       // battery border
       display.drawRect(initialX,initialY,barWidth,barHeight,EPD_BLACK);
       //battery percentage as rectangle fill, 1 pixel inset from the battery border
-      display.fillRect((initialX + 1),(initialY+1),(int((hardwareData.batteryPercent/100)*barWidth)-2),(barHeight-2),EPD_GRAY);
+      display.fillRect((initialX + 2),(initialY + 2),(int((hardwareData.batteryPercent/100)*barWidth) - 4),(barHeight - 4),EPD_GRAY);
     }
   #endif
 }
@@ -660,7 +660,7 @@ void screenHelperSparkLines(int initialX, int initialY, int xWidth, int yHeight)
   yPixelStep = ((co2Max - co2Min) / yHeight);
 
   // TEST ONLY : sparkline border box
-  display.drawRect(initialX,initialY, xWidth,yHeight, EPD_BLACK);
+  // display.drawRect(initialX,initialY, xWidth,yHeight, EPD_BLACK);
 
   // determine sparkline x,y values
   for(int i=0;i<co2MaxStoredSamples;i++)
@@ -781,7 +781,7 @@ uint16_t readSensor()
       }
       //convert C to F for temp
       sensorData.ambientTempF = (sensorData.ambientTempF * 1.8) + 32;
-      debugMessage(String("SCD40 read ") + loop + " of 5: " + sensorData.ambientTempF + "F, " + sensorData.ambientHumidity + "%, " + sensorData.ambientCO2 + " ppm");
+      debugMessage(String("SCD40 read ") + loop + " of " + READS_PER_SAMPLE + ": " + sensorData.ambientTempF + "F, " + sensorData.ambientHumidity + "%, " + sensorData.ambientCO2 + " ppm");
     }
     return 1;
   #else
@@ -828,7 +828,7 @@ int readNVStorage()
     averageHumidity = storedHumidity;
   }
   averageCO2 = nvStorage.getUInt("co2", sensorData.ambientCO2);
-  debugMessage(String("Intermediate values FROM nv storage: Temp:") + averageTempF + ", Humidity:" + averageHumidity + ", CO2:" + averageCO2);
+  debugMessage(String("Intermediate values FROM nv storage: Temp:") + averageTempF + "F, Humidity:" + averageHumidity + "%, CO2:" + averageCO2);
   debugMessage(String("Sample count FROM nv storage is ") + storedCounter);
   return storedCounter;
 }

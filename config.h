@@ -8,10 +8,10 @@
 // Step 1: Set conditional compile flags
 #define DEBUG 	// Output to serial port
 //#define RJ45  	// use Ethernet
-// #define WIFI    	// use WiFi
-// #define MQTT 	// log sensor data to MQTT broker
+#define WIFI    	// use WiFi
+#define MQTT 	// log sensor data to MQTT broker
 //#define DWEET     // Post sensor readings to dweet.io
-// #define INFLUX  	// Log data to remote InfluxDB server
+#define INFLUX  	// Log data to remote InfluxDB server
 #define	SCREEN		// use screen as output
 #define SCD40			// use SCD40 to read temp, humidity, and CO2
 
