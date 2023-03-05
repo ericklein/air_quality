@@ -126,10 +126,10 @@ Adafruit_LC709203F lc;
   // Special glyphs for the UI
   #include "glyphs.h"
 
-  ThinkInk_290_Grayscale4_T5 display(EPD_DC, EPD_RESET, EPD_CS, SRAM_CS, EPD_BUSY);
+  // 2.96" greyscale display with 196x128 pixels
   // colors are EPD_WHITE, EPD_BLACK, EPD_RED, EPD_GRAY, EPD_LIGHT, EPD_DARK
+  ThinkInk_290_Grayscale4_T5 display(EPD_DC, EPD_RESET, EPD_CS, SRAM_CS, EPD_BUSY);
 
-  // this eInk display is 296x128 pixels
   // screen layout assists
   const int xMargins = 5;
   const int xOutdoorMargin = ((display.width()/2) + xMargins);
@@ -156,12 +156,11 @@ Adafruit_LC709203F lc;
 #endif
 
 #ifdef MQTT
-  //extern void mqttConnect();
-  extern int mqttDeviceWiFiUpdate(int rssi);
-  extern int mqttDeviceBatteryUpdate(float batteryVoltage);
-  extern int mqttSensorTempFUpdate(float tempF);
-  extern int mqttSensorHumidityUpdate(float humidity);
-  extern int mqttSensorCO2Update(uint16_t co2);
+  extern bool mqttDeviceWiFiUpdate(int rssi);
+  extern bool mqttDeviceBatteryUpdate(float batteryVoltage);
+  extern bool mqttSensorTempFUpdate(float tempF);
+  extern bool mqttSensorHumidityUpdate(float humidity);
+  extern bool mqttSensorCO2Update(uint16_t co2);
 #endif
 
 void setup()
@@ -175,9 +174,9 @@ void setup()
   #endif
   // Confirm key site configuration parameters
   debugMessage("Air Quality started");
-    debugMessage(String("Sample interval is ") + SAMPLE_INTERVAL + " seconds");
-    debugMessage(String("Number of samples before reporting is ") + SAMPLE_SIZE);
-    debugMessage(String("Internet service reconnect delay is ") + CONNECT_ATTEMPT_INTERVAL + " seconds");
+  debugMessage(String("Sample interval is ") + SAMPLE_INTERVAL + " seconds");
+  debugMessage(String("Number of samples before reporting is ") + SAMPLE_SIZE);
+  debugMessage(String("Internet service reconnect delay is ") + CONNECT_ATTEMPT_INTERVAL + " seconds");
   #ifdef DWEET
     debugMessage("Dweet device: " + String(DWEET_DEVICE));
   #endif
@@ -193,12 +192,12 @@ void setup()
     debugMessage("Display ready");
   #endif
 
-  // Initialize environmental sensor.  Returns non-zero if initialization fails
+  // Initialize environmental sensor
   if (!initSensor()) 
   {
     debugMessage("Environment sensor failed to initialize, going to sleep");
     screenAlert("Env sensor not detected");
-    // This error often occurs right after a firmware flash and reset.
+    // This error often occurs after a firmware flash and then resetting the board
     // Hardware deep sleep typically resolves it, so quickly cycle the hardware
     disableInternalPower(HARDWARE_ERROR_INTERVAL);
   }
@@ -271,7 +270,7 @@ void setup()
   if (hardwareData.rssi!=0)
   {
     #ifdef MQTT
-      if ((mqttSensorTempFUpdate(sensorData.ambientTempF)) && (mqttSensorHumidityUpdate(sensorData.ambientHumidity)) && (mqttSensorCO2Update(sensorData.ambientCO2)) && (mqttDeviceWiFiUpdate(hardwareData.rssi)) && (mqttDeviceBatteryUpdate(hardwareData.batteryVoltage)))
+      if ((mqttSensorTempFUpdate(averageTempF)) && (mqttSensorHumidityUpdate(averageHumidity)) && (mqttSensorCO2Update(averageCO2)) && (mqttDeviceWiFiUpdate(hardwareData.rssi)) && (mqttDeviceBatteryUpdate(hardwareData.batteryVoltage)))
       {
         upd_flags += "M";
       }
@@ -628,6 +627,7 @@ void screenHelperBatteryStatus(int initialX, int initialY, int barWidth, int bar
       display.drawRect(initialX,initialY,barWidth,barHeight,EPD_BLACK);
       //battery percentage as rectangle fill, 1 pixel inset from the battery border
       display.fillRect((initialX + 2),(initialY + 2),(int((hardwareData.batteryPercent/100)*barWidth) - 4),(barHeight - 4),EPD_GRAY);
+      debugMessage(String("battery status drawn to screen as ") + hardwareData.batteryPercent + "%" );
     }
   #endif
 }
@@ -712,10 +712,9 @@ void batteryReadVoltage()
   }
 }
 
-int initSensor()
+bool initSensor()
 // initializes environment sensor if available. Supports SCD40, ATHX0, BME280 sensors
 {
-
   #ifdef SCD40
     uint16_t error;
     char errorMessage[256];
@@ -731,13 +730,13 @@ int initSensor()
       // Failed to initialize SCD40
       errorToString(error, errorMessage, 256);
       debugMessage(String(errorMessage) + " executing SCD40 startPeriodicMeasurement()");
-      return 0;
+      return false;
     }
     else 
     {
       debugMessage("SCD40 initialized, waiting 5 sec for first measurement");
       delay(5000);  // Give SCD40 time to warm up
-      return 1; // success
+      return true;
     }
   #else
     // ATHX0, BME280
@@ -745,16 +744,16 @@ int initSensor()
     {
       // ID of 0x56-0x58 or 0x60 is a BME 280, 0x61 is BME680, 0x77 is BME280 on ESP32S2 Feather
       debugMessage(String("Environment sensor ready, ID is: ")+envSensor.sensorID());
-      return 1;
+      return true;
     }
     else
     {
-      return 0;
+      return false;
     }
   #endif
 }
 
-uint16_t readSensor()
+bool readSensor()
 // stores environment sensor to environment global
 {
 
@@ -772,28 +771,29 @@ uint16_t readSensor()
       if (error) {
         errorToString(error, errorMessage, 256);
         debugMessage(String(errorMessage) + " during SCD4X read");
-        return 0;
+        return false;
       }
       if (sensorData.ambientCO2<400 || sensorData.ambientCO2>6000)
       {
         debugMessage(String("SCD40 CO2 reading out of range at ") + sensorData.ambientCO2);
-        return 0;
+        return false;
       }
       //convert C to F for temp
       sensorData.ambientTempF = (sensorData.ambientTempF * 1.8) + 32;
       debugMessage(String("SCD40 read ") + loop + " of " + READS_PER_SAMPLE + ": " + sensorData.ambientTempF + "F, " + sensorData.ambientHumidity + "%, " + sensorData.ambientCO2 + " ppm");
     }
-    return 1;
+    return true;
   #else
     // AHTX0, BME280
     sensors_event_t temp_event, humidity_event;
+    // FIX : Can we get error conditions from this API?
     envSensor_temp->getEvent(&temp_event);
     envSensor_humidity->getEvent(&humidity_event);
    
     sensorData.ambientTempF = (temp_event.temperature * 1.8) +32;
     sensorData.ambientHumidity = humidity_event.relative_humidity;
     sensorData.ambientCO2 = 10000;
-    return 1;
+    return true;
   #endif
 }
 

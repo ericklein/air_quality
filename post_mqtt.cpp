@@ -29,7 +29,7 @@ extern AQ_Network aq_network;
 
     int8_t mqttErr;
 
-    for(int tries =1; tries <= CONNECT_ATTEMPT_LIMIT; tries++)
+    for(int tries = 1; tries <= CONNECT_ATTEMPT_LIMIT; tries++)
     {
       if ((mqttErr = aq_mqtt.connect()) == 0)
       {
@@ -58,7 +58,7 @@ extern AQ_Network aq_network;
     bool result = false;
     if (batteryVoltage>0)
     {
-      // Adafruit_MQTT_Publish batteryVoltagePub = Adafruit_MQTT_Publish(&aq_mqtt, MQTT_PUB_BATTVOLT, MQTT_QOS_1); // if problematic, remove QOS parameter
+      // add ,MQTT_QOS_1); if problematic, remove QOS parameter
       Adafruit_MQTT_Publish batteryVoltagePub = Adafruit_MQTT_Publish(&aq_mqtt, MQTT_PUB_BATTVOLT);
       mqttConnect();
 
@@ -70,7 +70,7 @@ extern AQ_Network aq_network;
       }
       else
       {
-        debugMessage("MQTT publish: Battery Percent failed");
+        debugMessage("MQTT publish: Battery Voltage failed");
       }
     }
     return(result);
@@ -81,7 +81,7 @@ extern AQ_Network aq_network;
     bool result = false;
     if (rssi!=0)
     {
-      // Adafruit_MQTT_Publish rssiLevelPub = Adafruit_MQTT_Publish(&aq_mqtt, MQTT_PUB_RSSI, MQTT_QOS_1); // if problematic, remove QOS parameter
+      // add ,MQTT_QOS_1); if problematic, remove QOS parameter
       Adafruit_MQTT_Publish rssiLevelPub = Adafruit_MQTT_Publish(&aq_mqtt, MQTT_PUB_RSSI);
       
       mqttConnect();
@@ -103,7 +103,7 @@ extern AQ_Network aq_network;
   // Publishes temperature data to MQTT broker
   {
     bool result = false;
-    // Adafruit_MQTT_Publish tempPub = Adafruit_MQTT_Publish(&aq_mqtt, MQTT_PUB_TEMPF, MQTT_QOS_1); // if problematic, remove QOS parameter
+    // add ,MQTT_QOS_1); if problematic, remove QOS parameter
     Adafruit_MQTT_Publish tempPub = Adafruit_MQTT_Publish(&aq_mqtt, MQTT_PUB_TEMPF);
     
     mqttConnect();
@@ -124,7 +124,7 @@ extern AQ_Network aq_network;
   // Publishes humidity data to MQTT broker
   {
     bool result = false;
-    // Adafruit_MQTT_Publish humidityPub = Adafruit_MQTT_Publish(&aq_mqtt, MQTT_PUB_HUMIDITY, MQTT_QOS_1);
+    // add ,MQTT_QOS_1); if problematic, remove QOS parameter
     Adafruit_MQTT_Publish humidityPub = Adafruit_MQTT_Publish(&aq_mqtt, MQTT_PUB_HUMIDITY);
     
     mqttConnect();
@@ -145,7 +145,7 @@ extern AQ_Network aq_network;
   // Publishes CO2 data to MQTT broker
   {
     bool result = false;
-    // Adafruit_MQTT_Publish co2Pub = Adafruit_MQTT_Publish(&aq_mqtt, MQTT_PUB_CO2, MQTT_QOS_1);
+    // add ,MQTT_QOS_1); if problematic, remove QOS parameter
     Adafruit_MQTT_Publish co2Pub = Adafruit_MQTT_Publish(&aq_mqtt, MQTT_PUB_CO2);   
     
     mqttConnect();

@@ -17,27 +17,24 @@
   // required external functions and data structures
   extern void debugMessage(String messageText);
 
-  // Status variables shared across various functions
-
   #include <InfluxDbClient.h>
 
   // InfluxDB setup.  See config.h and secrets.h for site-specific settings.  Both InfluxDB v1.X
   // and v2.X are supported here depending on configuration settings in secrets.h.  Code here
   // reflects a number of presumptions about the data schema and InfluxDB configuration:
-  //
 
   #ifdef INFLUX_V1
-  // InfluxDB client instance for InfluxDB 1
-  InfluxDBClient dbclient(INFLUXDB_URL, INFLUXDB_DB_NAME);
+    // InfluxDB client instance for InfluxDB 1
+    InfluxDBClient dbclient(INFLUXDB_URL, INFLUXDB_DB_NAME);
   #endif
 
   #ifdef INFLUX_V2
-  // InfluxDB client instance for InfluxDB 2
-  InfluxDBClient dbclient(INFLUXDB_URL, INFLUXDB_ORG, INFLUXDB_BUCKET, INFLUXDB_TOKEN);
+    // InfluxDB client instance for InfluxDB 2
+    InfluxDBClient dbclient(INFLUXDB_URL, INFLUXDB_ORG, INFLUXDB_BUCKET, INFLUXDB_TOKEN);
   #endif
 
   // Post data to Influx DB using the connection established during setup
-  // Operates over the network, so may take a while to execute.
+  // Operates over the network, so may take a while to execute
   boolean post_influx(uint16_t co2, float tempF, float humidity, float batteryVoltage, int rssi)
   {
     bool result = false;
@@ -73,6 +70,7 @@
       debugMessage(String("influxDB connection attempt ") + tries + " of " + CONNECT_ATTEMPT_LIMIT + " failed with error msg: " + dbclient.getLastErrorMessage());
       delay(CONNECT_ATTEMPT_INTERVAL*1000);
     }
+    
     if (result){
       // Connected, so store sensor values into timeseries data point
       dbenvdata.clearFields();
