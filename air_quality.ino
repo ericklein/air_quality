@@ -32,7 +32,8 @@ typedef struct
 } envData;
 envData sensorData; // global variable for environment sensor data
 
-uint16_t co2Samples[co2MaxStoredSamples];
+// stores CO2 sample values for sparkline
+uint16_t co2Samples[SAMPLE_SIZE];
 
 // hardware status data
 typedef struct
@@ -203,54 +204,40 @@ void setup()
 
   // Environmental sensor available, so fetch values
   int sampleCounter;
-  if(!readSensor())
+  if(!sensorRead())
   {
     debugMessage("SCD40 returned no/bad data");
     screenAlert("SCD40 no/bad data");
     powerDisable(HARDWARE_ERROR_INTERVAL);
   }
-  sampleCounter = readNVStorage();
+  sampleCounter = nvStorageRead();
   sampleCounter++;
 
   if (sampleCounter < SAMPLE_SIZE)
-  // add to the accumulating, intermediate sensor values and go back to sleep
+  // add to the accumulating, intermediate sensor values and sleep device
   {
-    nvStorage.putInt("counter", sampleCounter);
-    debugMessage(String("Sample count TO nv storage is ") + sampleCounter);
-    nvStorage.putFloat("temp", (sensorData.ambientTempF + averageTempF));
-    nvStorage.putFloat("humidity", (sensorData.ambientHumidity + averageHumidity));
-    if (sensorData.ambientCO2 != 10000) {
-      nvStorage.putUInt("co2", (sensorData.ambientCO2 + averageCO2));
-    }
-    debugMessage(String("Intermediate values TO nv storage: Temp:") + (sensorData.ambientTempF + averageTempF) + "F, Humidity:" + (sensorData.ambientHumidity + averageHumidity) + "%, CO2:" + (sensorData.ambientCO2 + averageCO2));
+    nvStorageWrite(sampleCounter, sensorData.ambientTempF+averageTempF, sensorData.ambientHumidity+averageHumidity, sensorData.ambientCO2)
     powerDisable(SAMPLE_INTERVAL);
   } 
-  else
+  
+  // sampleCounter == SAMPLE_SIZE, so average values for reporting
+  averageTempF = ((sensorData.ambientTempF + averageTempF) / SAMPLE_SIZE);
+  averageHumidity = ((sensorData.ambientHumidity + averageHumidity) / SAMPLE_SIZE);
+  for(int i=0;i<SAMPLE_SIZE;i++)
   {
-    // average intermediate values
-    averageTempF = ((sensorData.ambientTempF + averageTempF) / SAMPLE_SIZE);
-    averageHumidity = ((sensorData.ambientHumidity + averageHumidity) / SAMPLE_SIZE);
-    if (sensorData.ambientCO2 != 10000) 
-    {
-      averageCO2 = ((sensorData.ambientCO2 + averageCO2) / SAMPLE_SIZE);
-    }
-    debugMessage(String("Averaged values Temp:") + averageTempF + "F, Humidity:" + averageHumidity + ", CO2:" + averageCO2);
-    //reset and store sample set variables
-    nvStorage.putInt("counter", 0);
-    nvStorage.putFloat("temp",0);
-    nvStorage.putFloat("humidity",0);
-    nvStorage.putUInt("co2",0);
-    debugMessage("Intermediate values in nv storage reset to zero");
+    averageCO2 = averageCO2 + co2Samples[i];
   }
+  averageCO2 = uint16_t(averageCO2/SAMPLE_SIZE);
+  debugMessage(String("Averaged values Temp:") + averageTempF + "F, Humidity:" + averageHumidity + ", CO2:" + averageCO2);
 
-  batteryReadVoltage();
+  batteryRead();
 
   // Setup network connection specified in config.h
   if (aq_network.networkBegin())
     hardwareData.rssi = abs(aq_network.getWiFiRSSI());    
 
   // Get local weather and air quality info from Open Weather Map
-  if (!getOWMCurrentWeatherData())
+  if (!OWMCurrentWeatherDataRead())
   {
     owmCurrentData.temp = 10000;
     owmCurrentData.humidity = 10000;
@@ -260,7 +247,7 @@ void setup()
   // PRIMARY: Set UTC time offset based on OWM local time zone
   aq_network.setTime(owmCurrentData.timezone, 0);
 
-  if (!getOWMAirPollution())
+  if (!OWMAirPollutionRead())
   {
     owmAirQuality.aqi = 10000;
   }
@@ -307,6 +294,10 @@ void setup()
       screenInfo("");
     #endif
   }
+  //reset nvStorage values for next recording period
+  nvStorageWrite(-1,0,0,0);
+  debugMessage("nvStorage values reset");
+
   powerDisable(SAMPLE_INTERVAL);
 }
 
@@ -321,7 +312,7 @@ void debugMessage(String messageText)
 #endif
 }
 
-bool getOWMCurrentWeatherData()
+bool OWMCurrentWeatherDataRead()
 // stores local current weather info from Open Weather Map in environment global
 {
   #if defined(WIFI) || defined(RJ45)
@@ -390,7 +381,7 @@ bool getOWMCurrentWeatherData()
   return false;
 }
 
-bool getOWMAirPollution()
+bool OWMAirPollutionRead()
 // stores local air pollution info from Open Weather Map in environment global
 {
   #if defined(WIFI) || defined(RJ45)
@@ -545,7 +536,7 @@ void screenInfo(String messageText)
   }
 
   // weather icon
-  String weatherIcon = getMeteoconIcon(owmCurrentData.icon);
+  String weatherIcon = OWMtoMeteoconIcon(owmCurrentData.icon);
   // if getMeteoIcon doesn't have a matching symbol, skip display
   if (weatherIcon!=")")
   {
@@ -677,7 +668,7 @@ void screenHelperSparkLines(int initialX, int initialY, int xWidth, int yHeight)
     debugMessage("sparkline drawn to screen");
 }
 
-void batteryReadVoltage()
+void batteryRead()
 // stores battery voltage if available in hardware characteristics global 
 {
   // check to see if i2C monitor is available
@@ -755,7 +746,7 @@ bool sensorInit()
   #endif
 }
 
-bool readSensor()
+bool sensorRead()
 // stores environment sensor to environment global
 {
 
@@ -798,40 +789,68 @@ bool readSensor()
   #endif
 }
 
-int readNVStorage() 
+int nvStorageRead() 
 // reads data from non-volatile storage and stores in appropriate global variables
+// FIX: CO2 values only need to be read for sparkline generation when counter == SAMPLE_SIZE, not every sample
 {
-  int storedCounter;
-  float storedTempF;
-  float storedHumidity;
-
   nvStorage.begin("air-quality", false);
-  // get previously stored values. If they don't exist, create them as zero
-  storedCounter = nvStorage.getInt("counter", 1);
+  int storedCounter = nvStorage.getInt("counter", -1); // counter tracks a 0 based array
+  debugMessage(String("Sample count FROM nv storage is ") + storedCounter);
+
   // read value or insert current sensor reading if this is the first read from nv storage
-  storedTempF = nvStorage.getFloat("temp", sensorData.ambientTempF);
+  averageTempF = nvStorage.getFloat("temp", 0);
   // BME280 often issues nan when not configured properly
-  if (isnan(storedTempF)) {
+  if (isnan(averageTempF))
+  {
     // bad value, replace with current temp
     averageTempF = (sensorData.ambientTempF * storedCounter);
     debugMessage("Unexpected tempF value in nv storage replaced with multiple of current temperature");
-  } else {
-    // good value, pass it along
-    averageTempF = storedTempF;
   }
-  storedHumidity = nvStorage.getFloat("humidity", sensorData.ambientHumidity);
-  if (isnan(storedHumidity)) {
+
+  averageHumidity = nvStorage.getFloat("humidity", 0);
+  if (isnan(averageHumidity)) 
+  {
     // bad value, replace with current temp
     averageHumidity = (sensorData.ambientHumidity * storedCounter);
     debugMessage("Unexpected humidity value in nv storage replaced with multiple of current humidity");
-  } else {
-    // good value, pass it along
-    averageHumidity = storedHumidity;
   }
-  averageCO2 = nvStorage.getUInt("co2", sensorData.ambientCO2);
-  debugMessage(String("Intermediate values FROM nv storage: Temp:") + averageTempF + "F, Humidity:" + averageHumidity + "%, CO2:" + averageCO2);
-  debugMessage(String("Sample count FROM nv storage is ") + storedCounter);
+
+  debugMessage(String("Intermediate values FROM nv storage: Temp:") + averageTempF + "F, Humidity:" + averageHumidity + "%");
+
+  // Read CO2 array. If they don't exist, create them as 400 (CO2 floor)
+  String nvStoreBaseName;
+  for (int i=0; i<SAMPLE_SIZE; i++)
+  {
+    nvStoreBaseName = "co2Sample" + String(i);
+    co2Samples[i] = nvStorage.getLong(nvStoreBaseName.c_str(),400);
+    debugMessage(String(nvStoreBaseName) + " retrieved from nv storage is " + co2Samples[i]);
+  }  
   return storedCounter;
+}
+
+void nvStorageWrite(int storedCounter, float tempF, float humidity, uint16_t co2)
+// tempF and humidity stored as running totals, CO2 stored in array for sparkline
+{
+  nvStorage.putInt("counter", storedCounter);
+  debugMessage(String("Sample count TO nv storage is ") + sampleCounter);
+  nvStorage.putFloat("temp", tempF);
+  nvStorage.putFloat("humidity", humidity);
+  debugMessage(String("Intermediate values TO nv storage: Temp: ") + tempF + "F, Humidity: " + humidity + "%");
+  if ((sensorData.ambientCO2 != 10000) && (co2 != 0))
+  {
+    String nvStoreBaseName = "co2Sample" + String(storedCounter);
+    nvStorage.putLong(nvStoreBaseName.c_str(),co2);
+    debugMessage(String(nvStoreBaseName) + " stored in nv storage as " + co2);
+  }
+  if (co2 == 0) // reset all the values
+  {
+    for (int i=0;i<SAMPLE_SIZE,i++)
+    {
+      String nvStoreBaseName = "co2Sample" + String(i);
+      nvStorage.putLong(nvStoreBaseName.c_str(),co2);
+      debugMessage(String(nvStoreBaseName) + " stoin nv storage as " + co2);
+    }
+  }
 }
 
 void powerEnable()
@@ -929,7 +948,7 @@ void powerDisable(int deepSleepTime)
   esp_deep_sleep_start();
 }
 
-String getMeteoconIcon(String icon)
+String OWMtoMeteoconIcon(String icon)
 // Maps OWM icon data to the appropropriate Meteocon font character 
 // https://www.alessioatzeni.com/meteocons/#:~:text=Meteocons%20is%20a%20set%20of,free%20and%20always%20will%20be.
 {

@@ -56,16 +56,13 @@ const float batteryMinVoltage	= 3.2; 	// what we regard as an empty battery
 	#define READS_PER_SAMPLE	1
 	// time between samples in seconds
 	#define SAMPLE_INTERVAL		60
-	// number of samples to average
+	// number of samples to average. this is also the # of uint_16 CO2 samples saved to nvStorage, so limit this
   #define SAMPLE_SIZE				2
 #else
 	#define READS_PER_SAMPLE	5
-	#define SAMPLE_INTERVAL 	180
+	#define SAMPLE_INTERVAL 	300
   #define SAMPLE_SIZE 			6
 #endif
-
-// nvStorageRead and nvStorageWrite currently don't work if >10
-const int co2MaxStoredSamples = 10;
 
 // Sleep time if hardware error occurs in seconds
 #define HARDWARE_ERROR_INTERVAL 10
