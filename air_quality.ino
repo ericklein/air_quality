@@ -124,7 +124,7 @@ Adafruit_LC709203F lc;
   #include <Fonts/FreeSans18pt7b.h>
 
   // Special glyphs for the UI
-  #include "glyphs.h"
+  #include "Fonts/glyphs.h"
 
   // 2.96" greyscale display with 196x128 pixels
   // colors are EPD_WHITE, EPD_BLACK, EPD_RED, EPD_GRAY, EPD_LIGHT, EPD_DARK
@@ -216,7 +216,7 @@ void setup()
   if (sampleCounter < SAMPLE_SIZE)
   // add to the accumulating, intermediate sensor values and sleep device
   {
-    nvStorageWrite(sampleCounter, sensorData.ambientTempF+averageTempF, sensorData.ambientHumidity+averageHumidity, sensorData.ambientCO2)
+    nvStorageWrite(sampleCounter, sensorData.ambientTempF+averageTempF, sensorData.ambientHumidity+averageHumidity, sensorData.ambientCO2);
     powerDisable(SAMPLE_INTERVAL);
   } 
   
@@ -550,7 +550,7 @@ void screenInfo(String messageText)
   if (owmAirQuality.aqi!=10000)
   {
     display.setFont(&FreeSans9pt7b);
-    display.setCursor((xOutdoorMargin),ySparkline);
+    display.setCursor(xOutdoorMargin,ySparkline - 5);
     // European standards-body AQI value
     //display.print(aqiEuropeanLabels[(owmAirQuality.aqi-1)]);
 
@@ -624,44 +624,46 @@ void screenHelperBatteryStatus(int initialX, int initialY, int barWidth, int bar
 
 void screenHelperSparkLines(int initialX, int initialY, int xWidth, int yHeight)
 {
-  // TEST ONLY: load test CO2
-  testSparkLineValues(co2MaxStoredSamples);
+  // TEST ONLY: load test CO2 values
+  // testSparkLineValues(SAMPLE_SIZE);
 
-  uint16_t co2Min, co2Max = co2Samples[0];
+  uint16_t co2Min = co2Samples[0];
+  uint16_t co2Max = co2Samples[0];
   // # of pixels between each samples x and y coordinates
   int xPixelStep, yPixelStep;
 
-  int sparkLineX[co2MaxStoredSamples], sparkLineY[co2MaxStoredSamples];
+  int sparkLineX[SAMPLE_SIZE], sparkLineY[SAMPLE_SIZE];
 
   // horizontal distance (pixels) between each displayed co2 value
-  xPixelStep = (xWidth / (co2MaxStoredSamples - 1));
+  xPixelStep = (xWidth / (SAMPLE_SIZE - 1));
 
   // determine min/max of CO2 samples
-  // could use recursive function but co2MaxStoredSamples should always be relatively small
-  for(int i=0;i<co2MaxStoredSamples;i++)
+  // could use recursive function but SAMPLE_SIZE should always be relatively small
+  for(int i=0;i<SAMPLE_SIZE;i++)
   {
     if(co2Samples[i] > co2Max) co2Max = co2Samples[i];
     if(co2Samples[i] < co2Min) co2Min = co2Samples[i];
   }
-  debugMessage(String("Max CO2 in stored sample range is ") + co2Max);
-  debugMessage(String("Min CO2 in stored sample range is ") + co2Min);
- 
+  debugMessage(String("Max CO2 in stored sample range is ") + co2Max +", min is " + co2Min);
+
   // vertical distance (pixels) between each displayed co2 value
-  yPixelStep = ((co2Max - co2Min) / yHeight);
+  yPixelStep = round(((co2Max - co2Min) / yHeight)+.5);
+
+  debugMessage(String("xPixelStep is ") + xPixelStep + ", yPixelStep is " + yPixelStep);
 
   // TEST ONLY : sparkline border box
   // display.drawRect(initialX,initialY, xWidth,yHeight, EPD_BLACK);
 
   // determine sparkline x,y values
-  for(int i=0;i<co2MaxStoredSamples;i++)
+  for(int i=0;i<SAMPLE_SIZE;i++)
   {
     sparkLineX[i] = (initialX + (i * xPixelStep));
-    sparkLineY[i] = ((initialY + yHeight) - int((co2Samples[i]-co2Min) / yPixelStep));
+    sparkLineY[i] = ((initialY + yHeight) - (int)((co2Samples[i]-co2Min) / yPixelStep));
     // draw/extend sparkline after first value is generated
     if (i != 0)
       display.drawLine(sparkLineX[i-1],sparkLineY[i-1],sparkLineX[i],sparkLineY[i],EPD_BLACK);  
   }
-  for (int i=0;i<co2MaxStoredSamples;i++)
+  for (int i=0;i<SAMPLE_SIZE;i++)
   {
     debugMessage(String("X,Y coordinates for CO2 sample ") + i + " is " + sparkLineX[i] + "," + sparkLineY[i]);
   }
@@ -832,7 +834,7 @@ void nvStorageWrite(int storedCounter, float tempF, float humidity, uint16_t co2
 // tempF and humidity stored as running totals, CO2 stored in array for sparkline
 {
   nvStorage.putInt("counter", storedCounter);
-  debugMessage(String("Sample count TO nv storage is ") + sampleCounter);
+  debugMessage(String("Sample count TO nv storage is ") + storedCounter);
   nvStorage.putFloat("temp", tempF);
   nvStorage.putFloat("humidity", humidity);
   debugMessage(String("Intermediate values TO nv storage: Temp: ") + tempF + "F, Humidity: " + humidity + "%");
@@ -844,7 +846,7 @@ void nvStorageWrite(int storedCounter, float tempF, float humidity, uint16_t co2
   }
   if (co2 == 0) // reset all the values
   {
-    for (int i=0;i<SAMPLE_SIZE,i++)
+    for (int i=0;i<SAMPLE_SIZE;i++)
     {
       String nvStoreBaseName = "co2Sample" + String(i);
       nvStorage.putLong(nvStoreBaseName.c_str(),co2);

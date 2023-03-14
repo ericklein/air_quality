@@ -19,10 +19,10 @@
 // based on a settings curve in the LC709203F datasheet
 // #define BATTERY_APA 0x08 // 100mAH
 // #define BATTERY_APA 0x0B // 200mAH
-// #define BATTERY_APA 0x10 // 500mAH
+#define BATTERY_APA 0x10 // 500mAH
 // #define BATTERY_APA 0x19 // 1000mAH
 // #define BATTERY_APA 0x1D // 1200mAH
-#define BATTERY_APA 0x2D // 2000mAH
+// #define BATTERY_APA 0x2D // 2000mAH
 // #define BATTERY_APA 0x32 // 2500mAH
 // #define BATTERY_APA 0x36 // 3000mAH
 
@@ -112,17 +112,17 @@ const int   daylightOffset_sec = 0;
 	// e.g. #define MQTT_PUB_TEMPF		"sircoolio/feeds/pocket-office.temperature"
 	
 	// structure: site/structure/room/device/data	
-	#define MQTT_PUB_TEMPF			"7828/lab-office/aq/temperature"
-	#define MQTT_PUB_HUMIDITY		"7828/lab-office/aq/humidity"
-	#define MQTT_PUB_CO2				"7828/lab-office/aq/co2"
-	#define MQTT_PUB_BATTVOLT		"7828/lab-office/aq/battery-voltage"
-	#define MQTT_PUB_RSSI				"7828/lab-office/aq/rssi"
+	// #define MQTT_PUB_TEMPF			"7828/lab-office/aq/temperature"
+	// #define MQTT_PUB_HUMIDITY		"7828/lab-office/aq/humidity"
+	// #define MQTT_PUB_CO2				"7828/lab-office/aq/co2"
+	// #define MQTT_PUB_BATTVOLT		"7828/lab-office/aq/battery-voltage"
+	// #define MQTT_PUB_RSSI				"7828/lab-office/aq/rssi"
 
-	// #define MQTT_PUB_TEMPF			"7828/demo/aq/temperature"
-	// #define MQTT_PUB_HUMIDITY	"7828/demo/aq/humidity"
-	// #define MQTT_PUB_CO2				"7828/demo/aq/co2"
-	// #define MQTT_PUB_BATTVOLT	"7828/demo/aq/battery-voltage"
-	// #define MQTT_PUB_RSSI			"7828/demo/aq/rssi"
+	#define MQTT_PUB_TEMPF			"7828/demo/aq/temperature"
+	#define MQTT_PUB_HUMIDITY	"7828/demo/aq/humidity"
+	#define MQTT_PUB_CO2				"7828/demo/aq/co2"
+	#define MQTT_PUB_BATTVOLT	"7828/demo/aq/battery-voltage"
+	#define MQTT_PUB_RSSI			"7828/demo/aq/rssi"
 #endif
 
 #ifdef INFLUX  
@@ -133,11 +133,10 @@ const int   daylightOffset_sec = 0;
 	// Standard set of tag values used for each sensor data point stored to InfluxDB.  Reuses
   // CLIENT_ID as defined anove here in config.h as well as device location (e.g., room in 
   // the house) and site (indoors vs. outdoors, typically).
-	// #define DEVICE_LOCATION "AQ-demo"
-  //#define DEVICE_LOCATION "test"
+	#define DEVICE_LOCATION "AQ-demo"
 	// #define DEVICE_LOCATION "kitchen"
 	// #define DEVICE_LOCATION "cellar"
-	#define DEVICE_LOCATION "lab-office"
+	// #define DEVICE_LOCATION "lab-office"
 	//#define DEVICE_LOCATION "master bedroom"
 
 	#define DEVICE_SITE "indoor"
