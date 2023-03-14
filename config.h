@@ -6,7 +6,7 @@
 */
 
 // Step 1: Set conditional compile flags
-#define DEBUG 	// Output to serial port
+// #define DEBUG 	// Output to serial port
 //#define RJ45  	// use Ethernet
 #define WIFI    	// use WiFi
 #define MQTT 	// log sensor data to MQTT broker
@@ -25,6 +25,9 @@
 // #define BATTERY_APA 0x2D // 2000mAH
 // #define BATTERY_APA 0x32 // 2500mAH
 // #define BATTERY_APA 0x36 // 3000mAH
+
+const float batteryMaxVoltage	= 4.2; 	// maximum battery voltage
+const float batteryMinVoltage	= 3.2; 	// what we regard as an empty battery
 
 // Pin config for e-paper display
 
@@ -53,11 +56,11 @@
 	#define READS_PER_SAMPLE	1
 	// time between samples in seconds
 	#define SAMPLE_INTERVAL		60
-	// number of samples to average
+	// number of samples to average. this is also the # of uint_16 CO2 samples saved to nvStorage, so limit this
   #define SAMPLE_SIZE				2
 #else
 	#define READS_PER_SAMPLE	5
-	#define SAMPLE_INTERVAL 	180
+	#define SAMPLE_INTERVAL 	300
   #define SAMPLE_SIZE 			6
 #endif
 
@@ -68,10 +71,15 @@
 #define CONNECT_ATTEMPT_INTERVAL 5 // seconds between internet service connect attempts
 
 const String co2Labels[5]={"Good", "OK", "So-So", "Poor", "Bad"};
-// used and defined by OWM
-const String aqiLabels[5] = { "Good", "Fair", "Moderate", "Poor", "Very Poor" };
+
+// if using OWM aqi value, these are the European standards-body conversions from numeric valeu
+// const String aqiEuropeanLabels[5] = { "Good", "Fair", "Moderate", "Poor", "Very Poor" };
+
+// if using US standards-body conversions from numeric value
+const String aqiUSALabels[6] = {"Good", "Moderate", "Unhealthy (SG)", "Unhealthy", "Very Unhealthy", "Hazardous"};
+
 // used in aq_network.cpp
-const String weekDays[7] = { "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday" };
+const String weekDays[7] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
 
 // Open Weather Map parameters
 #define OWM_SERVER			"http://api.openweathermap.org/data/2.5/"
@@ -91,9 +99,9 @@ const int   daylightOffset_sec = 0;
 // const int   daylightOffset_sec = 3600; // PST [+ 1]
 
 // set client ID; used by mqtt and wifi
-#define CLIENT_ID "AQ-demo"
+// #define CLIENT_ID "AQ-demo"
 //#define CLIENT_ID "AQ-test"
-// #define CLIENT_ID "AQ-lab-office"
+#define CLIENT_ID "AQ-lab-office"
 // #define CLIENT_ID "AQ-kitchen"
 //#define CLIENT_ID "AQ-cellar"
 //#define CLIENT_ID "AQ-master-bedroom"
@@ -103,7 +111,7 @@ const int   daylightOffset_sec = 0;
 	// structure: username/feeds/groupname.feedname or username/feeds/feedname
 	// e.g. #define MQTT_PUB_TEMPF		"sircoolio/feeds/pocket-office.temperature"
 	
-	// structure: site/room/device/data	
+	// structure: site/structure/room/device/data	
 	// #define MQTT_PUB_TEMPF			"7828/lab-office/aq/temperature"
 	// #define MQTT_PUB_HUMIDITY		"7828/lab-office/aq/humidity"
 	// #define MQTT_PUB_CO2				"7828/lab-office/aq/co2"
@@ -126,7 +134,6 @@ const int   daylightOffset_sec = 0;
   // CLIENT_ID as defined anove here in config.h as well as device location (e.g., room in 
   // the house) and site (indoors vs. outdoors, typically).
 	#define DEVICE_LOCATION "AQ-demo"
-  //#define DEVICE_LOCATION "test"
 	// #define DEVICE_LOCATION "kitchen"
 	// #define DEVICE_LOCATION "cellar"
 	// #define DEVICE_LOCATION "lab-office"

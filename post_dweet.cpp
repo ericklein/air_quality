@@ -15,12 +15,10 @@ extern AQ_Network aq_network;
 // Shared helper function we call here too...
 extern void debugMessage(String messageText);
 // extern int httpPOSTRequest(String serverurl, String contenttype, String payload);
-extern bool batteryAvailable;
-extern bool internetAvailable;
 
 // Post a dweet to report the various sensor reading.  This routine blocks while
 // talking to the network, so may take a while to execute.
-void post_dweet(uint16_t co2, float tempF, float humidity, float battpct, float battv, int rssi)
+void post_dweet(uint16_t co2, float tempF, float humidity, float batteryVoltage, int rssi)
 {
 
   /*
@@ -45,9 +43,8 @@ void post_dweet(uint16_t co2, float tempF, float humidity, float battpct, float 
   String device_info = "{\"rssi\":\""   + String(rssi)        + "\"," +
                        "\"ipaddr\":\"" + WiFi.localIP().toString()  + "\",";
   String battery_info;
-  if((battpct !=10000)&&(battv != 10000)) {
-    battery_info = "\"battery_percent\":\"" + String(battpct) + "\"," +
-                   "\"battery_voltage\":\"" + String(battv)   + "\",";
+  if(batteryVoltage > 0) {
+    battery_info = "\"battery_voltage\":\"" + String(batteryVoltage)   + "\",";
   }
   else {
     battery_info = "";

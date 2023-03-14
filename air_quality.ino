@@ -30,7 +30,10 @@ typedef struct
   float ambientHumidity;
   uint16_t ambientCO2;
 } envData;
-envData sensorData;
+envData sensorData; // global variable for environment sensor data
+
+// stores CO2 sample values for sparkline
+uint16_t co2Samples[SAMPLE_SIZE];
 
 // hardware status data
 typedef struct
@@ -39,85 +42,51 @@ typedef struct
   float batteryVoltage;
   int rssi;
 } hdweData;
-hdweData hardwareData;
+hdweData hardwareData;  // global variable for hardware characteristics          
 
 // OpenWeatherMap Current data
 typedef struct
 {
-  // "lon": 8.54
-  float lon;
-  // "lat": 47.37
-  float lat;
-  // "id": 521
-  uint16_t weatherId;
-  // "main": "Rain"
-  String main;
-  // "description": "shower rain"
-  String description;
-  // "icon": "09d"
-  String icon;
-  // "temp": 290.56
-  float temp;
-  // "pressure": 1013
-  uint16_t pressure;
-  // "humidity": 87
-  uint16_t humidity;
-  // "temp_min": 289.15
-  float tempMin;
-  // "temp_max": 292.15
-  float tempMax;
-  // visibility: 10000
-  uint16_t visibility;
-  // "wind": {"speed": 1.5}
-  float windSpeed;
-  // "wind": {deg: 226.505}
-  float windDeg;
-  // "clouds": {"all": 90}
-  uint8_t clouds;
-  // "dt": 1527015000
-  time_t observationTime;
-  // "country": "CH"
-  String country;
-  // "sunrise": 1526960448
-  time_t sunrise;
-  // "sunset": 1527015901
-  time_t sunset;
-  // "name": "Zurich"
-  String cityName;
-  time_t timezone;
+  float lon;              // "lon": 8.54
+  float lat;              // "lat": 47.37
+  uint16_t weatherId;     // "id": 521
+  String main;            // "main": "Rain"
+  String description;     // "description": "shower rain"
+  String icon;            // "icon": "09d"
+  float temp;             // "temp": 90.56
+  uint16_t pressure;      // "pressure": 1013, in hPa
+  uint16_t humidity;      // "humidity": 87, as %
+  float tempMin;          // "temp_min": 89.15
+  float tempMax;          // "temp_max": 92.15
+  uint16_t visibility;    // visibility: 10000, in meters
+  float windSpeed;        // "wind": {"speed": 1.5}, in meters/s
+  float windDeg;          // "wind": {deg: 226.505}
+  uint8_t clouds;         // "clouds": {"all": 90}, in %
+  time_t observationTime; // "dt": 1527015000, in UTC
+  String country;         // "country": "CH"
+  time_t sunrise;         // "sunrise": 1526960448, in UTC
+  time_t sunset;          // "sunset": 1527015901, in UTC
+  String cityName;        // "name": "Zurich"
+  time_t timezone;        // shift in seconds from UTC
 } OpenWeatherMapCurrentData;
-OpenWeatherMapCurrentData owmCurrentData;
+OpenWeatherMapCurrentData owmCurrentData; // global variable for OWM current data
 
 // OpenWeatherMap Air Quality data
 typedef struct
 {
-  // "lon": 8.54
-  float lon;
-  // "lat": 47.37
-  float lat;
-  // "aqi": 2
-  int aqi;
-  // "co": 453.95
-  float co;
-  // "no": 0.47
-  float no;
-  // "no2": 52.09
-  float no2;
-  // "o3": 17.17
-  float o3;
-  // "so2": 7.51
-  float so2;
-  // "pm2.5": 8.04
-  float pm2_5;
-  // "pm10": 9.96
-  float pm10;
-  // "nh3": 0.86
-  float nh3;
+  float lon;    // "lon": 8.54
+  float lat;    // "lat": 47.37
+  int aqi;      // "aqi": 2  [European standards body value]
+  float co;     // "co": 453.95, in μg/m3
+  float no;     // "no": 0.47, in μg/m3
+  float no2;    // "no2": 52.09, in μg/m3
+  float o3;     // "o3": 17.17, in μg/m3
+  float so2;    // "so2": 7.51, in μg/m3
+  float pm25;   // "pm2.5": 8.04, in μg/m3
+  float pm10;   // "pm10": 9.96, in μg/m3
+  float nh3;    // "nh3": 0.86, in μg/m3
 } OpenWeatherMapAirQuality;
-OpenWeatherMapAirQuality owmAirQuality;
-
-bool batteryVoltageAvailable = false;
-bool internetAvailable = false;
+OpenWeatherMapAirQuality owmAirQuality; // global variable for OWM current data
 
 // initialize environment sensors
 
@@ -153,27 +122,45 @@ Adafruit_LC709203F lc;
   #include <Fonts/FreeSans9pt7b.h>
   #include <Fonts/FreeSans12pt7b.h>
   #include <Fonts/FreeSans18pt7b.h>
-  #include <Fonts/FreeSans24pt7b.h>
 
-  ThinkInk_290_Grayscale4_T5 display(EPD_DC, EPD_RESET, EPD_CS, SRAM_CS, EPD_BUSY);
+  // Special glyphs for the UI
+  #include "Fonts/glyphs.h"
+
+  // 2.96" greyscale display with 196x128 pixels
   // colors are EPD_WHITE, EPD_BLACK, EPD_RED, EPD_GRAY, EPD_LIGHT, EPD_DARK
+  ThinkInk_290_Grayscale4_T5 display(EPD_DC, EPD_RESET, EPD_CS, SRAM_CS, EPD_BUSY);
+
+  // screen layout assists
+  const int xMargins = 5;
+  const int xOutdoorMargin = ((display.width()/2) + xMargins);
+  const int yMargins = 2;
+  // yCO2 not used
+  const int yCO2 = 20;
+  const int ySparkline = 40;
+  const int yTemp = 100;
+  // BUG, 7/8 = 112, WiFi status is 15 (5*3) pixels high
+  const int yStatus = (display.height()*7/8);
+  const int sparklineHeight = 40;
+  const int batteryBarWidth = 28;
+  const int batteryBarHeight = 10;
 #endif
 
 #include "ArduinoJson.h"  // Needed by OWM retrieval routines
 
 #ifdef INFLUX
-  extern boolean post_influx(uint16_t co2, float tempF, float humidity, float battery_v, int rssi);
+  extern boolean post_influx(uint16_t co2, float tempF, float humidity, float batteryVoltage, int rssi);
 #endif
 
 #ifdef DWEET
-  extern void post_dweet(uint16_t co2, float tempF, float humidity, float battpct, float battv, int rssi);
+  extern void post_dweet(uint16_t co2, float tempF, float humidity, float batteryVoltage, int rssi);
 #endif
 
 #ifdef MQTT
-  //extern void mqttConnect();
-  extern int mqttDeviceWiFiUpdate(int rssi);
-  extern int mqttDeviceBatteryUpdate(float cellVoltage);
-  extern int mqttSensorUpdate(uint16_t co2, float tempF, float humidity);
+  extern bool mqttDeviceWiFiUpdate(int rssi);
+  extern bool mqttDeviceBatteryUpdate(float batteryVoltage);
+  extern bool mqttSensorTempFUpdate(float tempF);
+  extern bool mqttSensorHumidityUpdate(float humidity);
+  extern bool mqttSensorCO2Update(uint16_t co2);
 #endif
 
 void setup()
@@ -187,16 +174,17 @@ void setup()
   #endif
   // Confirm key site configuration parameters
   debugMessage("Air Quality started");
-  // debugMessage(String(SAMPLE_INTERVAL) + " minute sample interval");
-  // debugMessage(String(SAMPLE_SIZE) + " samples before logging");
-  // debugMessage("Site lat/long: " + String(OWM_LAT_LONG));
-  // debugMessage("Site altitude: " + String(SITE_ALTITUDE));
-  // debugMessage("Client ID: " + String(CLIENT_ID));
+  debugMessage(String("Sample interval is ") + SAMPLE_INTERVAL + " seconds");
+  debugMessage(String("Number of samples before reporting is ") + SAMPLE_SIZE);
+  debugMessage(String("Internet service reconnect delay is ") + CONNECT_ATTEMPT_INTERVAL + " seconds");
   #ifdef DWEET
     debugMessage("Dweet device: " + String(DWEET_DEVICE));
   #endif
 
-  enableInternalPower();
+  hardwareData.batteryVoltage = 0;  // 0 = no battery attached
+  hardwareData.rssi = 0;            // 0 = no WiFi 
+
+  powerEnable();
 
   #ifdef SCREEN
     // there is no way to query screen for status
@@ -204,65 +192,52 @@ void setup()
     debugMessage("Display ready");
   #endif
 
-  // Initialize environmental sensor.  Returns non-zero if initialization fails
-  if (!initSensor()) 
+  // Initialize environmental sensor
+  if (!sensorInit()) 
   {
-    debugMessage("Environment sensor failed to initialize, going to sleep");
+    debugMessage("Environment sensor failed to initialize");
     screenAlert("Env sensor not detected");
-    // This error often occurs right after a firmware flash and reset.
+    // This error often occurs after a firmware flash and then resetting the board
     // Hardware deep sleep typically resolves it, so quickly cycle the hardware
-    disableInternalPower(HARDWARE_ERROR_INTERVAL);
+    powerDisable(HARDWARE_ERROR_INTERVAL);
   }
 
   // Environmental sensor available, so fetch values
   int sampleCounter;
-  if(!readSensor())
+  if(!sensorRead())
   {
-    debugMessage("SCD40 returned no/bad data, going to sleep");
+    debugMessage("SCD40 returned no/bad data");
     screenAlert("SCD40 no/bad data");
-    disableInternalPower(HARDWARE_ERROR_INTERVAL);
+    powerDisable(HARDWARE_ERROR_INTERVAL);
   }
-  sampleCounter = readNVStorage();
+  sampleCounter = nvStorageRead();
   sampleCounter++;
 
   if (sampleCounter < SAMPLE_SIZE)
-  // add to the accumulating, intermediate sensor values and go back to sleep
+  // add to the accumulating, intermediate sensor values and sleep device
   {
-    nvStorage.putInt("counter", sampleCounter);
-    debugMessage(String("Sample count TO nv storage is ") + sampleCounter);
-    nvStorage.putFloat("temp", (sensorData.ambientTempF + averageTempF));
-    nvStorage.putFloat("humidity", (sensorData.ambientHumidity + averageHumidity));
-    if (sensorData.ambientCO2 != 10000) {
-      nvStorage.putUInt("co2", (sensorData.ambientCO2 + averageCO2));
-    }
-    debugMessage(String("Intermediate values TO nv storage: Temp:") + (sensorData.ambientTempF + averageTempF) + ", Humidity:" + (sensorData.ambientHumidity + averageHumidity) + ", CO2:" + (sensorData.ambientCO2 + averageCO2));
-    disableInternalPower(SAMPLE_INTERVAL);
+    nvStorageWrite(sampleCounter, sensorData.ambientTempF+averageTempF, sensorData.ambientHumidity+averageHumidity, sensorData.ambientCO2);
+    powerDisable(SAMPLE_INTERVAL);
   } 
-  else
+  
+  // sampleCounter == SAMPLE_SIZE, so average values for reporting
+  averageTempF = ((sensorData.ambientTempF + averageTempF) / SAMPLE_SIZE);
+  averageHumidity = ((sensorData.ambientHumidity + averageHumidity) / SAMPLE_SIZE);
+  for(int i=0;i<SAMPLE_SIZE;i++)
   {
-    // average intermediate values
-    averageTempF = ((sensorData.ambientTempF + averageTempF) / SAMPLE_SIZE);
-    averageHumidity = ((sensorData.ambientHumidity + averageHumidity) / SAMPLE_SIZE);
-    if (sensorData.ambientCO2 != 10000) 
-    {
-      averageCO2 = ((sensorData.ambientCO2 + averageCO2) / SAMPLE_SIZE);
-    }
-    debugMessage(String("Averaged values Temp:") + averageTempF + "F, Humidity:" + averageHumidity + ", CO2:" + averageCO2);
-    //reset and store sample set variables
-    nvStorage.putInt("counter", 0);
-    nvStorage.putFloat("temp",0);
-    nvStorage.putFloat("humidity",0);
-    nvStorage.putUInt("co2",0);
-    debugMessage("Intermediate values in nv storage reset to zero");
+    averageCO2 = averageCO2 + co2Samples[i];
   }
+  averageCO2 = uint16_t(averageCO2/SAMPLE_SIZE);
+  debugMessage(String("Averaged values Temp:") + averageTempF + "F, Humidity:" + averageHumidity + ", CO2:" + averageCO2);
 
-  batteryReadVoltage();
+  batteryRead();
 
   // Setup network connection specified in config.h
-  internetAvailable = aq_network.networkBegin();
+  if (aq_network.networkBegin())
+    hardwareData.rssi = abs(aq_network.getWiFiRSSI());    
 
   // Get local weather and air quality info from Open Weather Map
-  if (!getOWMWeather())
+  if (!OWMCurrentWeatherDataRead())
   {
     owmCurrentData.temp = 10000;
     owmCurrentData.humidity = 10000;
@@ -272,25 +247,23 @@ void setup()
   // PRIMARY: Set UTC time offset based on OWM local time zone
   aq_network.setTime(owmCurrentData.timezone, 0);
 
-  if (!getOWMAQI())
+  if (!OWMAirPollutionRead())
   {
     owmAirQuality.aqi = 10000;
   }
 
   String upd_flags = "";  // To indicate whether services succeeded
-  if (internetAvailable)
+  if (hardwareData.rssi!=0)
   {
-    hardwareData.rssi = abs(aq_network.getWiFiRSSI());
-
     #ifdef MQTT
-      if ((mqttSensorUpdate(sensorData.ambientCO2, sensorData.ambientTempF,sensorData.ambientHumidity)) && (mqttDeviceWiFiUpdate(hardwareData.rssi)) && (mqttDeviceBatteryUpdate(hardwareData.batteryVoltage)))
+      if ((mqttSensorTempFUpdate(averageTempF)) && (mqttSensorHumidityUpdate(averageHumidity)) && (mqttSensorCO2Update(averageCO2)) && (mqttDeviceWiFiUpdate(hardwareData.rssi)) && (mqttDeviceBatteryUpdate(hardwareData.batteryVoltage)))
       {
         upd_flags += "M";
       }
     #endif
 
     #ifdef DWEET
-      post_dweet(averageCO2, averageTempF, averageHumidity, hardwareData.batteryPercent, hardwareData.batteryVoltage, hardwareData.rssi);
+      post_dweet(averageCO2, averageTempF, averageHumidity, hardwareData.batteryVoltage, hardwareData.rssi);
       upd_flags += "D";
     #endif
 
@@ -315,9 +288,17 @@ void setup()
   else
   {
     // no internet connection, update screen with sensor data only
-    screenInfo("");
+    #ifdef DEBUG
+      screenInfo("Test msg from DEBUG");
+    #else
+      screenInfo("");
+    #endif
   }
-  disableInternalPower(SAMPLE_INTERVAL);
+  //reset nvStorage values for next recording period
+  nvStorageWrite(-1,0,0,0);
+  debugMessage("nvStorage values reset");
+
+  powerDisable(SAMPLE_INTERVAL);
 }
 
 void loop() {}
@@ -331,12 +312,12 @@ void debugMessage(String messageText)
 #endif
 }
 
-bool getOWMWeather()
-// retrieves weather from Open Weather Map APIs and stores data to environment global
+bool OWMCurrentWeatherDataRead()
+// stores local current weather info from Open Weather Map in environment global
 {
   #if defined(WIFI) || defined(RJ45)
     // if there is a network interface (so it will compile)
-    if (internetAvailable)
+    if (hardwareData.rssi!=0)
     // and internet is verified
     {
       String jsonBuffer;
@@ -400,12 +381,12 @@ bool getOWMWeather()
   return false;
 }
 
-bool getOWMAQI()
+bool OWMAirPollutionRead()
+// stores local air pollution info from Open Weather Map in environment global
 {
-  // retrieves weather from Open Weather Map APIs and stores data to environment global
   #if defined(WIFI) || defined(RJ45)
     // if there is a network interface (so it will compile)
-    if (internetAvailable)
+    if (hardwareData.rssi!=0)
     // and internet is verified
     {
       String jsonBuffer;
@@ -440,10 +421,10 @@ bool getOWMAQI()
       owmAirQuality.no2 = (float) list_0_components["no2"];
       owmAirQuality.o3 = (float) list_0_components["o3"];
       owmAirQuality.so2 = (float) list_0_components["so2"];
-      owmAirQuality.pm2_5 = (float) list_0_components["pm2_5"];
+      owmAirQuality.pm25 = (float) list_0_components["pm2_5"];
+      debugMessage(String("OWM current PM2.5 is ") + owmAirQuality.pm25 + " in μg/m3");      
       owmAirQuality.pm10 = (float) list_0_components["pm10"];
       owmAirQuality.nh3 = (float) list_0_components["nh3"];
-      debugMessage(String("OWM AQI set: ") + owmAirQuality.aqi + " AQI");
       return true;
     }
   #endif
@@ -457,7 +438,7 @@ void screenAlert(String messageText)
   display.clearBuffer();
   display.setTextColor(EPD_BLACK);
   display.setFont(&FreeSans12pt7b);
-  display.setCursor(40,(display.height()/2+6));
+  display.setCursor(xMargins,(display.height()/2));
   display.print(messageText);
 
   //update display
@@ -469,127 +450,93 @@ void screenInfo(String messageText)
 // Display environmental information on screen
 {
 #ifdef SCREEN  
+
+  // TEST ONLY: load values normally supplied by OWM
+  // testOWMValues();
+  
   display.clearBuffer();
   display.setTextColor(EPD_BLACK);
 
-  // screen size cheats
-
-  int x_indoor_left_margin = (display.width()/20);
-  int x_mid_point = (display.width()/2);
-  int x_outdoor_left_margin = (display.width()*11/20);
-
   // borders
-  // ThinkInk 2.9" epd is 296x128 pixels
-  // label border
-  display.drawLine(0,(display.height()*7/8),display.width(),(display.height()*7/8),EPD_GRAY);
+  // label
+  display.drawLine(0,yStatus,display.width(),yStatus,EPD_GRAY);
   // splitting sensor vs. outside values
-  display.drawLine(x_mid_point,0,x_mid_point,(display.height()*7/8),EPD_GRAY);
+  display.drawLine((display.width()/2),0,(display.width()/2),yStatus,EPD_GRAY);
   
-  // battery status
-  screenBatteryStatus();
+  // screen helper routines
+  // draws battery in the lower right corner. -3 in first parameter accounts for battery nub
+  screenHelperBatteryStatus((display.width()-xMargins-batteryBarWidth-3),(display.height()-yMargins-batteryBarHeight),batteryBarWidth,batteryBarHeight);
+  
+  // -70 moves it to the left of the battery display
+  screenHelperWiFiStatus((display.width() - xMargins - 70), (display.height() - yMargins),3,3,5);
+  
+  // draws any status message in the lower left corner. -8 in the first parameter accounts for fixed font height
+  screenHelperStatusMessage(xMargins,(display.height()-yMargins-8), messageText);
 
-  // wifi status
-  screenWiFiStatus();
+  // display sparkline
+  screenHelperSparkLines(xMargins,ySparkline,((display.width()/2) - (2 * xMargins)),sparklineHeight);
 
   // Indoor
-  int temperatureDelta = ((int)(sensorData.ambientTempF +0.5)) - ((int) (averageTempF + 0.5));
-  int humidityDelta = ((int)(sensorData.ambientHumidity +0.5)) - ((int) (averageHumidity + 0.5));
+  // CO2 level
+  // calculate CO2 value range in 400ppm bands
+  int co2range = ((sensorData.ambientCO2 - 400) / 400);
+  co2range = constrain(co2range,0,4); // filter CO2 levels above 2400
+
+  // main line
+  display.setFont(&FreeSans12pt7b);
+  display.setCursor(xMargins, yCO2);
+  display.print("CO");
+  display.setCursor(xMargins+50,yCO2);
+  display.print(": " + String(co2Labels[co2range]));
+  display.setFont(&FreeSans9pt7b);
+  display.setCursor(xMargins+35,(yCO2+10));
+  display.print("2");
+  // value line
+  display.setFont();
+  display.setCursor((xMargins+88),(yCO2+7));
+  display.print("(" + String(sensorData.ambientCO2) + ")");
 
   // Indoor temp
-  display.setFont(&FreeSans24pt7b);
-  display.setCursor(x_indoor_left_margin,(display.height()/3));
-  display.print(String((int)(sensorData.ambientTempF+0.5)));
-  // move the cursor to raise the F indicator
-  //display.setCursor(x,y);
-  display.setFont(&meteocons16pt7b);
+  display.setFont(&FreeSans12pt7b);
+  display.setCursor(xMargins,yTemp);
+  display.print(String((int)(sensorData.ambientTempF + .5)));
+  display.setFont(&meteocons12pt7b);
   display.print("+");
-
-  // Indoor temp delta
-  if (temperatureDelta!=0)
-  {
-    display.setFont();
-    if(temperatureDelta>0)
-    {
-      // upward triangle (left pt, right pt, bottom pt)
-      display.fillTriangle(110,((display.height()*3/8)-10),130,((display.height()*3/8)-10),120,(((display.height()*3/8)-10)-9), EPD_BLACK);
-    }
-    else
-    {
-      // downward triangle (left pt, right pt, bottom pt)
-      display.fillTriangle(110,(((display.height()*3/8)-10)-9),130,(((display.height()*3/8)-10)-9),120,((display.height()*3/8)-10), EPD_BLACK);
-    }
-    display.setCursor(130,((display.height()*3/8)-10));
-    display.print(abs(temperatureDelta));
-  }
 
   // Indoor humidity
   display.setFont(&FreeSans12pt7b);
-  display.setCursor(x_indoor_left_margin,((display.height()*9/16)));
-  display.print(String((int)(sensorData.ambientHumidity+0.5)) + "%");
-  // Indoor humidity delta
-  if (humidityDelta!=0)
-  {
-    display.setFont();
-    if(humidityDelta>0)
-    {
-      // upward triangle (left pt, right pt, bottom pt)
-      display.fillTriangle(110,((display.height()*5/8)-10),130,((display.height()*5/8)-10),120,(((display.height()*5/8)-10)-9), EPD_BLACK);
-    }
-    else
-    {
-      // (left pt, right pt, bottom pt)
-      display.fillTriangle(110,(((display.height()*5/8)-10)-9),130,(((display.height()*5/8)-10)-9),120,((display.height()*5/8)-10), EPD_BLACK);
-    }
-    display.setCursor(130,((display.height()*5/8)-10));
-    display.print(abs(humidityDelta));
-  }
-
-  // Indoor CO2 level
-  if (sensorData.ambientCO2!=10000)
-  {
-    // calculate CO2 value range in 400ppm bands
-    int co2range = ((sensorData.ambientCO2 - 400) / 400);
-    co2range = constrain(co2range,0,4); // filter CO2 levels above 2400
-    display.setFont(&FreeSans12pt7b);
-    display.setCursor(x_indoor_left_margin,(display.height()*13/16));
-    display.setFont(&FreeSans9pt7b); 
-    display.print(String(co2Labels[co2range])+ " CO2");
-    if ((sensorData.ambientCO2-averageCO2)!=0)
-    {
-      display.setFont();
-      if(sensorData.ambientCO2-averageCO2>0)
-      {
-      // upward triangle (left pt, right pt, bottom pt)
-      display.fillTriangle(110,((display.height()*7/8)-10),130,((display.height()*7/8)-10),120,(((display.height()*7/8)-10)-9), EPD_BLACK);
-      }
-      else
-      {
-        // (left pt, right pt, bottom pt)
-        display.fillTriangle(110,(((display.height()*7/8)-10)-9),130,(((display.height()*7/8)-10)-9),120,((display.height()*7/8)-10), EPD_BLACK);
-      }
-      display.setCursor(130,((display.height()*7/8)-10));
-      display.print(abs(sensorData.ambientCO2 - averageCO2));
-    }
-  }
+  display.setCursor(xMargins+60, yTemp);
+  display.print(String((int)(sensorData.ambientHumidity + 0.5)));
+  // original icon ratio was 5:7?
+  display.drawBitmap(xMargins+90,yTemp-21,epd_bitmap_humidity_icon_sm4,20,28,EPD_BLACK);
 
   // Outside
   // location label
   display.setFont();
-  display.setCursor((display.width()*5/8),((display.height()*1/8)-11));
+  display.setCursor((display.width()*5/8),yMargins);
   display.print(owmCurrentData.cityName);
 
   // Outside temp
-  display.setFont(&FreeSans12pt7b);
   if (owmCurrentData.temp!=10000)
   {
-    display.setCursor(x_outdoor_left_margin,(display.height()/4));
+    display.setFont(&FreeSans12pt7b);
+    display.setCursor(xOutdoorMargin,yTemp);
     display.print(String((int)(owmCurrentData.temp+0.5)));
     display.setFont(&meteocons12pt7b);
     display.print("+");
   }
 
+  // Outside humidity
+  if (owmCurrentData.humidity!=10000)
+  {
+    display.setFont(&FreeSans12pt7b);
+    display.setCursor(xOutdoorMargin + 60, yTemp);
+    display.print(String((int)(owmCurrentData.humidity+0.5)));
+    display.drawBitmap(xOutdoorMargin+90,yTemp-21,epd_bitmap_humidity_icon_sm4,20,28,EPD_BLACK);
+  }
+
   // weather icon
-  String weatherIcon = getMeteoconIcon(owmCurrentData.icon);
+  String weatherIcon = OWMtoMeteoconIcon(owmCurrentData.icon);
   // if getMeteoIcon doesn't have a matching symbol, skip display
   if (weatherIcon!=")")
   {
@@ -599,27 +546,21 @@ void screenInfo(String messageText)
     display.print(weatherIcon);
   }
 
-  // Outside humidity
-  display.setFont(&FreeSans12pt7b);
-  if (owmCurrentData.humidity!=10000)
-  {
-    display.setCursor(x_outdoor_left_margin,(display.height()*9/16));
-    display.print(String(owmCurrentData.humidity) + "%");
-  }
-
   // Outside air quality index (AQI)
-  display.setFont(&FreeSans9pt7b);
   if (owmAirQuality.aqi!=10000)
   {
-    display.setCursor((x_outdoor_left_margin),(display.height()*13/16));
-    display.print(aqiLabels[(owmAirQuality.aqi-1)]);
+    display.setFont(&FreeSans9pt7b);
+    display.setCursor(xOutdoorMargin,ySparkline - 5);
+    // European standards-body AQI value
+    //display.print(aqiEuropeanLabels[(owmAirQuality.aqi-1)]);
+
+    // US standards-body AQI value
+    float aqiUS = pm25toAQI(owmAirQuality.pm25);
+    debugMessage(String("US AQI value is ") + aqiUS);
+
+    display.print(aqiUSALabels[aqiUSLabelValue(owmAirQuality.pm25)]);
     display.print(" AQI");
   }
-
-  // status message
-  display.setFont();  // resets to system default monospace font
-  display.setCursor(5,(display.height()-9));
-  display.print(messageText);
 
   //update display
   display.display();
@@ -627,28 +568,31 @@ void screenInfo(String messageText)
 #endif
 }
 
-void screenWiFiStatus() 
+void screenHelperStatusMessage(int initialX, int initialY, String messageText)
+// helper function for screenXXX() routines that draws a status message
+// uses system default font, so text drawn x+,y+ from initialX,Y
 {
-  if (internetAvailable) 
-  {
-    const int barWidth = 3;
-    const int barHeightMultiplier = 3;
-    const int barSpacingMultipler = 5;
-    const int barStartingXModifier = 70;
-    int barCount;
+  // IMPROVEMENT : Screen dimension boundary checks for function parameters
+  display.setFont();  // resets to system default monospace font (6x8 pixels)
+  display.setCursor(initialX, initialY);
+  display.print(messageText);
+}
 
+void screenHelperWiFiStatus(int initialX, int initialY, int barWidth, int barHeightMultiplier, int barSpacingMultipler)
+// helper function for screenXXX() routines that draws WiFi signal strength
+{
+  if (hardwareData.rssi!=0) 
+  {
     // Convert RSSI values to a 5 bar visual indicator
     // >90 means no signal
-    barCount = (6-((hardwareData.rssi/10)-3));
-    if (barCount>5) barCount = 5;
+    int barCount = constrain((6-((hardwareData.rssi/10)-3)),0,5);
     if (barCount>0)
     {
       // <50 rssi value = 5 bars, each +10 rssi value range = one less bar
       // draw bars to represent WiFi strength
       for (int b = 1; b <= barCount; b++)
       {
-        // display.fillRect(((display.width() - 70) + (b * 5)), ((display.height()) - (b * 5)), barWidth, b * 5, EPD_BLACK);
-        display.fillRect(((display.width() - barStartingXModifier) + (b * barSpacingMultipler)), ((display.height()) - (b * barHeightMultiplier)), barWidth, b * barHeightMultiplier, EPD_BLACK);
+        display.fillRect((initialX + (b * barSpacingMultipler)), (initialY - (b * barHeightMultiplier)), barWidth, b * barHeightMultiplier, EPD_BLACK);
       }
       debugMessage(String("WiFi signal strength on screen as ") + barCount +" bars");
     }
@@ -660,27 +604,74 @@ void screenWiFiStatus()
   }
 }
 
-void screenBatteryStatus()
-// Displays remaining battery % as graphic in lower right of screen
-// used in XXXScreen() routines
+void screenHelperBatteryStatus(int initialX, int initialY, int barWidth, int barHeight)
+// helper function for screenXXX() routines that draws battery charge %
 {
-#ifdef SCREEN
-  if (batteryVoltageAvailable) 
-  {
-    int barHeight = 10;
-    int barWidth = 28;
-
-    // battery nub (3pix wide, 6pix high)
-    display.drawRect((display.width()-5-3),((display.height()*7/8)+7),3,6,EPD_BLACK);
-    //battery percentage as rectangle fill
-    display.fillRect((display.width()-barWidth-5-3),((display.height()*7/8)+5),(int((hardwareData.batteryPercent/100)*barWidth)),barHeight,EPD_GRAY);
-    // battery border
-    display.drawRect((display.width()-barWidth-5-3),((display.height()*7/8)+5),barWidth,barHeight,EPD_BLACK);
-  }
-#endif
+  // IMPROVEMENT : Screen dimension boundary checks for function parameters
+  #ifdef SCREEN
+    if (hardwareData.batteryVoltage>0) 
+    {
+      // battery nub; width = 3pix, height = 60% of barHeight
+      display.fillRect((initialX+barWidth),(initialY+(int(barHeight/5))),3,(int(barHeight*3/5)),EPD_BLACK);
+      // battery border
+      display.drawRect(initialX,initialY,barWidth,barHeight,EPD_BLACK);
+      //battery percentage as rectangle fill, 1 pixel inset from the battery border
+      display.fillRect((initialX + 2),(initialY + 2),(int((hardwareData.batteryPercent/100)*barWidth) - 4),(barHeight - 4),EPD_GRAY);
+      debugMessage(String("battery status drawn to screen as ") + hardwareData.batteryPercent + "%" );
+    }
+  #endif
 }
 
-void batteryReadVoltage() 
+void screenHelperSparkLines(int initialX, int initialY, int xWidth, int yHeight)
+{
+  // TEST ONLY: load test CO2 values
+  // testSparkLineValues(SAMPLE_SIZE);
+
+  uint16_t co2Min = co2Samples[0];
+  uint16_t co2Max = co2Samples[0];
+  // # of pixels between each samples x and y coordinates
+  int xPixelStep, yPixelStep;
+
+  int sparkLineX[SAMPLE_SIZE], sparkLineY[SAMPLE_SIZE];
+
+  // horizontal distance (pixels) between each displayed co2 value
+  xPixelStep = (xWidth / (SAMPLE_SIZE - 1));
+
+  // determine min/max of CO2 samples
+  // could use recursive function but SAMPLE_SIZE should always be relatively small
+  for(int i=0;i<SAMPLE_SIZE;i++)
+  {
+    if(co2Samples[i] > co2Max) co2Max = co2Samples[i];
+    if(co2Samples[i] < co2Min) co2Min = co2Samples[i];
+  }
+  debugMessage(String("Max CO2 in stored sample range is ") + co2Max +", min is " + co2Min);
+
+  // vertical distance (pixels) between each displayed co2 value
+  yPixelStep = round(((co2Max - co2Min) / yHeight)+.5);
+
+  debugMessage(String("xPixelStep is ") + xPixelStep + ", yPixelStep is " + yPixelStep);
+
+  // TEST ONLY : sparkline border box
+  // display.drawRect(initialX,initialY, xWidth,yHeight, EPD_BLACK);
+
+  // determine sparkline x,y values
+  for(int i=0;i<SAMPLE_SIZE;i++)
+  {
+    sparkLineX[i] = (initialX + (i * xPixelStep));
+    sparkLineY[i] = ((initialY + yHeight) - (int)((co2Samples[i]-co2Min) / yPixelStep));
+    // draw/extend sparkline after first value is generated
+    if (i != 0)
+      display.drawLine(sparkLineX[i-1],sparkLineY[i-1],sparkLineX[i],sparkLineY[i],EPD_BLACK);  
+  }
+  for (int i=0;i<SAMPLE_SIZE;i++)
+  {
+    debugMessage(String("X,Y coordinates for CO2 sample ") + i + " is " + sparkLineX[i] + "," + sparkLineY[i]);
+  }
+    debugMessage("sparkline drawn to screen");
+}
+
+void batteryRead()
+// stores battery voltage if available in hardware characteristics global 
 {
   // check to see if i2C monitor is available
   if (lc.begin())
@@ -690,105 +681,57 @@ void batteryReadVoltage()
     lc.setPackAPA(BATTERY_APA);
     hardwareData.batteryPercent = lc.cellPercent();
     hardwareData.batteryVoltage = lc.cellVoltage();
-    batteryVoltageAvailable = true;
   } 
   else
   {
   // use supported boards to read voltage
     #if defined (ARDUINO_ADAFRUIT_FEATHER_ESP32_V2)
+      // see project supporting material for other ways to quantify battery %
       pinMode(VBATPIN,INPUT);
-      #define BATTV_MAX           4.2     // maximum voltage of battery
-      #define BATTV_MIN           3.2     // what we regard as an empty battery
 
       // assumes default ESP32 analogReadResolution (4095)
       // the 1.05 is a fudge factor original author used to align reading with multimeter
       hardwareData.batteryVoltage = ((float)analogRead(VBATPIN) / 4095) * 3.3 * 2 * 1.05;
       hardwareData.batteryPercent = (uint8_t)(((hardwareData.batteryVoltage - BATTV_MIN) / (BATTV_MAX - BATTV_MIN)) * 100);
-
-      // Adafruit ESP32 V2 power management guide code form https://learn.adafruit.com/adafruit-esp32-feather-v2/power-management-2, which does not work? [logged issue]
-      // hardwareData.batteryVoltage = analogReadMilliVolts(VBATPIN);
-      // hardwareData.batteryVoltage *= 2;    // we divided by 2, so multiply back
-      // hardwareData.batteryVoltage /= 1000; // convert to volts!
-
-      // manual percentage decay map from https://blog.ampow.com/lipo-voltage-chart/
-      // hardwareData.batteryPercent = 100;
-      // if ((hardwareData.batteryVoltage < 4.2) && (hardwareData.batteryVoltage > 4.15))
-      //   hardwareData.batteryPercent = 95;
-      // if ((hardwareData.batteryVoltage < 4.16) && (hardwareData.batteryVoltage > 4.10))
-      //   hardwareData.batteryPercent = 90;
-      // if ((hardwareData.batteryVoltage < 4.11) && (hardwareData.batteryVoltage > 4.07))
-      //   hardwareData.batteryPercent = 85;
-      // if ((hardwareData.batteryVoltage < 4.08) && (hardwareData.batteryVoltage > 4.01))
-      //   hardwareData.batteryPercent = 80;
-      // if ((hardwareData.batteryVoltage < 4.02) && (hardwareData.batteryVoltage > 3.97))
-      //   hardwareData.batteryPercent = 75;
-      // if ((hardwareData.batteryVoltage < 3.98) && (hardwareData.batteryVoltage > 3.94))
-      //   hardwareData.batteryPercent = 70;
-       // if ((hardwareData.batteryVoltage < 3.95) && (hardwareData.batteryVoltage > 3.90))
-      // hardwareData.batteryPercent = 65;
-      //  if ((hardwareData.batteryVoltage < 3.91) && (hardwareData.batteryVoltage > 3.87))
-      //    hardwareData.batteryPercent = 60;
-      //  if ((hardwareData.batteryVoltage < 3.87) && (hardwareData.batteryVoltage > 3.84))
-      //    hardwareData.batteryPercent = 55;
-      //  if (hardwareData.batteryVoltage = 3.84)
-      //    hardwareData.batteryPercent = 50;
-      //  if ((hardwareData.batteryVoltage < 3.84) && (hardwareData.batteryVoltage > 3.81))
-      //    hardwareData.batteryPercent = 45;
-      //  if ((hardwareData.batteryVoltage < 3.82) && (hardwareData.batteryVoltage > 3.79))
-      //    hardwareData.batteryPercent = 40;
-      //  if (hardwareData.batteryVoltage = 3.79)
-      //    hardwareData.batteryPercent = 35;
-      //  if ((hardwareData.batteryVoltage < 3.79) && (hardwareData.batteryVoltage > 3.76))
-      //    hardwareData.batteryPercent = 30;
-      //  if ((hardwareData.batteryVoltage < 3.77) && (hardwareData.batteryVoltage > 3.74))
-      //    hardwareData.batteryPercent = 25;
-      //  if ((hardwareData.batteryVoltage < 3.75) && (hardwareData.batteryVoltage > 3.72))
-      //    hardwareData.batteryPercent = 20;      
-      //  if ((hardwareData.batteryVoltage < 3.73) && (hardwareData.batteryVoltage > 3.70))
-      //    hardwareData.batteryPercent = 15;
-      //  if ((hardwareData.batteryVoltage < 3.73) && (hardwareData.batteryVoltage > 3.70))
-      //    hardwareData.batteryPercent = 15;
-      //  if ((hardwareData.batteryVoltage < 3.71) && (hardwareData.batteryVoltage > 3.68))
-      //    hardwareData.batteryPercent = 10;
-      //  if ((hardwareData.batteryVoltage < 3.69) && (hardwareData.batteryVoltage > 3.60))
-      //    hardwareData.batteryPercent = 5;
-      //  if (hardwareData.batteryVoltage < 3.61)
-      //    hardwareData.batteryPercent = 0;
-      batteryVoltageAvailable = true;
     #endif
   }
-  if (batteryVoltageAvailable) 
+  if (hardwareData.batteryVoltage!=0) 
   {
-    debugMessage("Battery voltage: " + String(hardwareData.batteryVoltage) + " v");
-    debugMessage("Battery percentage: " + String(hardwareData.batteryPercent) + " %");
+    debugMessage(String("Battery voltage: ") + hardwareData.batteryVoltage + "v, percent: " + hardwareData.batteryPercent + "%");
   }
 }
 
-int initSensor() 
+bool sensorInit()
+// initializes environment sensor if available. Supports SCD40, ATHX0, BME280 sensors
 {
-
   #ifdef SCD40
-    uint16_t error;
     char errorMessage[256];
 
-    Wire.begin();
-    envSensor.begin(Wire);
+    #if defined(ARDUINO_ADAFRUIT_QTPY_ESP32S2) || defined(ARDUINO_ADAFRUIT_QTPY_ESP32S3_NOPSRAM) || defined(ARDUINO_ADAFRUIT_QTPY_ESP32S3) || defined(ARDUINO_ADAFRUIT_QTPY_ESP32_PICO)
+      // these boards have two I2C ports so we have to initialize the appropriate port
+      Wire1.begin();
+      envSensor.begin(Wire1);
+    #else
+      // only one I2C port
+      Wire.begin();
+      envSensor.begin(Wire);
+    #endif
+
     envSensor.wakeUp();
     envSensor.setSensorAltitude(SITE_ALTITUDE); // optimizes CO2 reading
 
-    error = envSensor.startPeriodicMeasurement();
+    uint16_t error = envSensor.startPeriodicMeasurement();
     if (error) 
     {
       // Failed to initialize SCD40
       errorToString(error, errorMessage, 256);
       debugMessage(String(errorMessage) + " executing SCD40 startPeriodicMeasurement()");
-      return 0;
+      return false;
     }
     else 
     {
-      debugMessage("SCD40 initialized, waiting 5 sec for first measurement");
-      delay(5000);  // Give SCD40 time to warm up
-      return 1; // success
+      debugMessage("SCD40 initialized");
+      return true;
     }
   #else
     // ATHX0, BME280
@@ -796,21 +739,20 @@ int initSensor()
     {
       // ID of 0x56-0x58 or 0x60 is a BME 280, 0x61 is BME680, 0x77 is BME280 on ESP32S2 Feather
       debugMessage(String("Environment sensor ready, ID is: ")+envSensor.sensorID());
-      return 1;
+      return true;
     }
     else
     {
-      return 0;
+      return false;
     }
   #endif
 }
 
-uint16_t readSensor()
-// reads environment sensor and stores data to environment global
+bool sensorRead()
+// stores environment sensor to environment global
 {
 
   #ifdef SCD40
-    uint16_t error;
     char errorMessage[256];
 
     for (int loop=1; loop<=READS_PER_SAMPLE; loop++)
@@ -818,71 +760,103 @@ uint16_t readSensor()
       // minimum time between SCD40 reads
       delay(5000);
       // read and store data if successful
-      error = envSensor.readMeasurement(sensorData.ambientCO2, sensorData.ambientTempF, sensorData.ambientHumidity);
+      uint16_t error = envSensor.readMeasurement(sensorData.ambientCO2, sensorData.ambientTempF, sensorData.ambientHumidity);
       // handle SCD40 errors
       if (error) {
         errorToString(error, errorMessage, 256);
         debugMessage(String(errorMessage) + " during SCD4X read");
-        return 0;
+        return false;
       }
-      if (sensorData.ambientCO2<440 || sensorData.ambientCO2>6000)
+      if (sensorData.ambientCO2<400 || sensorData.ambientCO2>6000)
       {
-        debugMessage("SCD40 CO2 reading out of range");
-        return 0;
+        debugMessage(String("SCD40 CO2 reading out of range at ") + sensorData.ambientCO2);
+        return false;
       }
       //convert C to F for temp
       sensorData.ambientTempF = (sensorData.ambientTempF * 1.8) + 32;
-      debugMessage(String("SCD40 read ") + loop + " of 5: " + sensorData.ambientTempF + "F, " + sensorData.ambientHumidity + "%, " + sensorData.ambientCO2 + " ppm");
+      debugMessage(String("SCD40 read ") + loop + " of " + READS_PER_SAMPLE + ": " + sensorData.ambientTempF + "F, " + sensorData.ambientHumidity + "%, " + sensorData.ambientCO2 + " ppm");
     }
-    return 1;
+    return true;
   #else
     // AHTX0, BME280
     sensors_event_t temp_event, humidity_event;
+    // FIX : Can we get error conditions from this API?
     envSensor_temp->getEvent(&temp_event);
     envSensor_humidity->getEvent(&humidity_event);
    
     sensorData.ambientTempF = (temp_event.temperature * 1.8) +32;
     sensorData.ambientHumidity = humidity_event.relative_humidity;
     sensorData.ambientCO2 = 10000;
-    return 1;
+    return true;
   #endif
 }
 
-int readNVStorage() {
-  int storedCounter;
-  float storedTempF;
-  float storedHumidity;
-
+int nvStorageRead() 
+// reads data from non-volatile storage and stores in appropriate global variables
+// FIX: CO2 values only need to be read for sparkline generation when counter == SAMPLE_SIZE, not every sample
+{
   nvStorage.begin("air-quality", false);
-  // get previously stored values. If they don't exist, create them as zero
-  storedCounter = nvStorage.getInt("counter", 1);
+  int storedCounter = nvStorage.getInt("counter", -1); // counter tracks a 0 based array
+  debugMessage(String("Sample count FROM nv storage is ") + storedCounter);
+
   // read value or insert current sensor reading if this is the first read from nv storage
-  storedTempF = nvStorage.getFloat("temp", sensorData.ambientTempF);
+  averageTempF = nvStorage.getFloat("temp", 0);
   // BME280 often issues nan when not configured properly
-  if (isnan(storedTempF)) {
+  if (isnan(averageTempF))
+  {
     // bad value, replace with current temp
     averageTempF = (sensorData.ambientTempF * storedCounter);
     debugMessage("Unexpected tempF value in nv storage replaced with multiple of current temperature");
-  } else {
-    // good value, pass it along
-    averageTempF = storedTempF;
   }
-  storedHumidity = nvStorage.getFloat("humidity", sensorData.ambientHumidity);
-  if (isnan(storedHumidity)) {
+
+  averageHumidity = nvStorage.getFloat("humidity", 0);
+  if (isnan(averageHumidity)) 
+  {
     // bad value, replace with current temp
     averageHumidity = (sensorData.ambientHumidity * storedCounter);
     debugMessage("Unexpected humidity value in nv storage replaced with multiple of current humidity");
-  } else {
-    // good value, pass it along
-    averageHumidity = storedHumidity;
   }
-  averageCO2 = nvStorage.getUInt("co2", sensorData.ambientCO2);
-  debugMessage(String("Intermediate values FROM nv storage: Temp:") + averageTempF + ", Humidity:" + averageHumidity + ", CO2:" + averageCO2);
-  debugMessage(String("Sample count FROM nv storage is ") + storedCounter);
+
+  debugMessage(String("Intermediate values FROM nv storage: Temp:") + averageTempF + "F, Humidity:" + averageHumidity + "%");
+
+  // Read CO2 array. If they don't exist, create them as 400 (CO2 floor)
+  String nvStoreBaseName;
+  for (int i=0; i<SAMPLE_SIZE; i++)
+  {
+    nvStoreBaseName = "co2Sample" + String(i);
+    co2Samples[i] = nvStorage.getLong(nvStoreBaseName.c_str(),400);
+    debugMessage(String(nvStoreBaseName) + " retrieved from nv storage is " + co2Samples[i]);
+  }  
   return storedCounter;
 }
 
-void enableInternalPower()
+void nvStorageWrite(int storedCounter, float tempF, float humidity, uint16_t co2)
+// tempF and humidity stored as running totals, CO2 stored in array for sparkline
+{
+  nvStorage.putInt("counter", storedCounter);
+  debugMessage(String("Sample count TO nv storage is ") + storedCounter);
+  nvStorage.putFloat("temp", tempF);
+  nvStorage.putFloat("humidity", humidity);
+  debugMessage(String("Intermediate values TO nv storage: Temp: ") + tempF + "F, Humidity: " + humidity + "%");
+  if ((sensorData.ambientCO2 != 10000) && (co2 != 0))
+  {
+    String nvStoreBaseName = "co2Sample" + String(storedCounter);
+    nvStorage.putLong(nvStoreBaseName.c_str(),co2);
+    debugMessage(String(nvStoreBaseName) + " stored in nv storage as " + co2);
+  }
+  if (co2 == 0) // reset all the values
+  {
+    for (int i=0;i<SAMPLE_SIZE;i++)
+    {
+      String nvStoreBaseName = "co2Sample" + String(i);
+      nvStorage.putLong(nvStoreBaseName.c_str(),co2);
+      debugMessage(String(nvStoreBaseName) + " stoin nv storage as " + co2);
+    }
+  }
+}
+
+void powerEnable()
+// enable appropriate hardware
 {
   // Handle two ESP32 I2C ports
   #if defined(ARDUINO_ADAFRUIT_QTPY_ESP32S2) || defined(ARDUINO_ADAFRUIT_QTPY_ESP32S3_NOPSRAM) || defined(ARDUINO_ADAFRUIT_QTPY_ESP32S3) || defined(ARDUINO_ADAFRUIT_QTPY_ESP32_PICO)
@@ -926,24 +900,28 @@ void enableInternalPower()
   #endif
 }
 
-void disableInternalPower(int deepSleepTime)
-// Powers down hardware then board deep sleep
+void powerDisable(int deepSleepTime)
+// Powers down hardware activated via powerEnable() then deep sleep MCU
 {
-  display.powerDown();
-  digitalWrite(EPD_RESET, LOW);  // hardware power down mode
-  aq_network.networkStop();
-
-  uint16_t error;
   char errorMessage[256];
 
-  // stop potentially previously started measurement
-  error = envSensor.stopPeriodicMeasurement();
+  debugMessage("Starting power down activities");
+  // power down epd
+  display.powerDown();
+  digitalWrite(EPD_RESET, LOW);  // hardware power down mode
+  debugMessage("powered down epd");
+
+  aq_network.networkStop();
+
+  // power down SCD40
+  // stops potentially started measurement then powers down SCD40
+  uint16_t error = envSensor.stopPeriodicMeasurement();
   if (error) {
-    Serial.print("Error trying to execute stopPeriodicMeasurement(): ");
     errorToString(error, errorMessage, 256);
-    debugMessage(errorMessage);
+    debugMessage(String(errorMessage) + " executing SCD40 stopPeriodicMeasurement()");
   }
   envSensor.powerDown();
+  debugMessage("SCD40 powered down");
 
   #if defined(ARDUINO_ADAFRUIT_FEATHER_ESP32_V2)
     // Turn off the I2C power
@@ -967,94 +945,104 @@ void disableInternalPower(int deepSleepTime)
     debugMessage("disabled Adafruit Feather ESP32S2 I2C power");
   #endif
 
-  debugMessage(String("Going to sleep for ") + deepSleepTime + " seconds");
   esp_sleep_enable_timer_wakeup(deepSleepTime*1000000); // ESP microsecond modifier
+  debugMessage(String("Going to sleep for ") + deepSleepTime + " seconds");
   esp_deep_sleep_start();
 }
 
-String getMeteoconIcon(String icon)
+String OWMtoMeteoconIcon(String icon)
+// Maps OWM icon data to the appropropriate Meteocon font character 
+// https://www.alessioatzeni.com/meteocons/#:~:text=Meteocons%20is%20a%20set%20of,free%20and%20always%20will%20be.
 {
-  // clear sky
-  // 01d
-  if (icon == "01d")  {
+  if (icon == "01d")  // 01d = sunny = Meteocon "B"
     return "B";
-  }
-  // 01n
-  if (icon == "01n")  {
+  if (icon == "01n")  // 01n = clear night = Meteocon "C"
     return "C";
-  }
-  // few clouds
-  // 02d
-  if (icon == "02d")  {
+  if (icon == "02d")  // 02d = partially sunny = Meteocon "H"
     return "H";
-  }
-  // 02n
-  if (icon == "02n")  {
+  if (icon == "02n")  // 02n = partially clear night = Meteocon "4"
     return "4";
-  }
-  // scattered clouds
-  // 03d
-  if (icon == "03d")  {
+  if (icon == "03d")  // 03d = clouds = Meteocon "N"
     return "N";
-  }
-  // 03n
-  if (icon == "03n")  {
+  if (icon == "03n")  // 03n = clouds night = Meteocon "5"
     return "5";
-  }
-  // broken clouds
-  // 04d
-  if (icon == "04d")  {
+  if (icon == "04d")  // 04d = broken clouds = Meteocon "Y"
     return "Y";
-  }
-  // 04n
-  if (icon == "04n")  {
+  if (icon == "04n")  // 04n = broken night clouds = Meteocon "%"
     return "%";
-  }
-  // shower rain
-  // 09d
-  if (icon == "09d")  {
+   if (icon == "09d")  // 09d = rain = Meteocon "R"
     return "R";
-  }
-  // 09n
-  if (icon == "09n")  {
+  if (icon == "09n")  // 09n = night rain = Meteocon "8"
     return "8";
-  }
-  // rain
-  // 10d
-  if (icon == "10d")  {
+  if (icon == "10d")  // 10d = light rain = Meteocon "Q"
     return "Q";
-  }
-  // 10n
-  if (icon == "10n")  {
+  if (icon == "10n")  // 10n = night light rain = Meteocon "7"
     return "7";
-  }
-  // thunderstorm
-  // 11d
-  if (icon == "11d")  {
+  if (icon == "11d")  // 11d = thunderstorm = Meteocon "P"
     return "P";
-  }
-  // 11n
-  if (icon == "11n")  {
+  if (icon == "11n")  // 11n = night thunderstorm = Meteocon "6"
     return "6";
-  }
-  // snow
-  // 13d
-  if (icon == "13d")  {
+  if (icon == "13d")  // 13d = snow = Meteocon "W"
     return "W";
-  }
-  // 13n
-  if (icon == "13n")  {
+  if (icon == "13n")  // 13n = night snow = Meteocon "#"
     return "#";
-  }
-  // mist
-  // 50d
-  if (icon == "50d")  {
+  if ((icon == "50d") || (icon == "50n")) // 50d = mist = Meteocon "M"
     return "M";
-  }
-  // 50n
-  if (icon == "50n")  {
-    return "M";
-  }
-  // Nothing matched: N/A
+  // Nothing matched
+  debugMessage("OWM icon not matched to Meteocon, why?");
   return ")";
+}
+
+float pm25toAQI(float pm25)
+// Converts pm25 reading to AQI using the AQI Equation
+// (https://forum.airnowtech.org/t/the-aqi-equation/169)
+{  
+  if(pm25 <= 12.0)       return(fmap(pm25,  0.0, 12.0,  0.0, 50.0));
+  else if(pm25 <= 35.4)  return(fmap(pm25, 12.1, 35.4, 51.0,100.0));
+  else if(pm25 <= 55.4)  return(fmap(pm25, 35.5, 55.4,101.0,150.0));
+  else if(pm25 <= 150.4) return(fmap(pm25, 55.5,150.4,151.0,200.0));
+  else if(pm25 <= 250.4) return(fmap(pm25,150.5,250.4,201.0,300.0));
+  else if(pm25 <= 500.4) return(fmap(pm25,250.5,500.4,301.0,500.0));
+  else return(505.0);  // AQI above 500 not recognized
+}
+
+float fmap(float x, float xmin, float xmax, float ymin, float ymax)
+{
+    return( ymin + ((x - xmin)*(ymax-ymin)/(xmax - xmin)));
+}
+
+int aqiUSLabelValue(float pm25)
+// converts pm25 value to a 0-5 value associated with US AQI labels
+{
+  if(pm25 <= 12.0)       return(0);
+  else if(pm25 <= 35.4)  return(1);
+  else if(pm25 <= 55.4)  return(2);
+  else if(pm25 <= 150.4) return(3);
+  else if(pm25 <= 250.4) return(4);
+  else if(pm25 <= 500.4) return(5);
+  else return(6);  // AQI above 500 not recognized 
+}
+
+void testOWMValues()
+// Test data to drive screenInfo() when not connected to Internet
+{
+  hardwareData.rssi = 47;
+  owmCurrentData.cityName = "Mercer Island";
+  owmCurrentData.temp = 101.01;
+  owmCurrentData.humidity = 56.43;
+  owmCurrentData.icon = "09d";
+  // aqi values
+  owmAirQuality.aqi = 3; // overrides error code value
+  owmAirQuality.pm25 = 248.04;
+}
+
+void testSparkLineValues(int sampleSetSize)
+// generates test data to exercise the screenSparkLine function
+{
+    // generate test data
+  for(int i=0;i<sampleSetSize;i++)
+  {
+    // standard range for indoor CO2 values
+    co2Samples[i]=random(600,2400);
+  }
 }

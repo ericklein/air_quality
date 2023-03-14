@@ -4,16 +4,12 @@
 #include "config.h"
 // private credentials for network, MQTT, weather provider
 #include "secrets.h"
-
+// network functionality
 #include "aq_network.h"
-extern AQ_Network aq_network;
 
-// Shared helper function we call here too...
+// required external functions and data structures
 extern void debugMessage(String messageText);
-
-// Status variables shared across various functions
-extern bool batteryVoltageAvailable;
-extern bool internetAvailable;
+extern AQ_Network aq_network;
 
 #ifdef MQTT
   // MQTT setup
@@ -33,7 +29,7 @@ extern bool internetAvailable;
 
     int8_t mqttErr;
 
-    for(int tries =1; tries <= CONNECT_ATTEMPT_LIMIT; tries++)
+    for(int tries = 1; tries <= CONNECT_ATTEMPT_LIMIT; tries++)
     {
       if ((mqttErr = aq_mqtt.connect()) == 0)
       {
@@ -57,26 +53,25 @@ extern bool internetAvailable;
     }
   }
 
-  bool mqttDeviceBatteryUpdate(float cellVoltage)
+  bool mqttDeviceBatteryUpdate(float batteryVoltage)
   {
     bool result = false;
-    if (batteryVoltageAvailable)
+    if (batteryVoltage>0)
     {
-      // Adafruit_MQTT_Publish batteryVoltagePub = Adafruit_MQTT_Publish(&aq_mqtt, MQTT_PUB_BATTVOLT, MQTT_QOS_1); // if problematic, remove QOS parameter
+      // add ,MQTT_QOS_1); if problematic, remove QOS parameter
       Adafruit_MQTT_Publish batteryVoltagePub = Adafruit_MQTT_Publish(&aq_mqtt, MQTT_PUB_BATTVOLT);
       mqttConnect();
 
       // publish battery voltage
-      if (batteryVoltagePub.publish(cellVoltage))
+      if (batteryVoltagePub.publish(batteryVoltage))
       {
         debugMessage("MQTT publish: Battery Voltage succeeded");
         result = true;
       }
       else
       {
-        debugMessage("MQTT publish: Battery Percent failed");
+        debugMessage("MQTT publish: Battery Voltage failed");
       }
-      //aq_mqtt.disconnect(); 
     }
     return(result);
   }
@@ -84,9 +79,9 @@ extern bool internetAvailable;
   bool mqttDeviceWiFiUpdate(int rssi)
   {
     bool result = false;
-    if (internetAvailable)
+    if (rssi!=0)
     {
-      // Adafruit_MQTT_Publish rssiLevelPub = Adafruit_MQTT_Publish(&aq_mqtt, MQTT_PUB_RSSI, MQTT_QOS_1); // if problematic, remove QOS parameter
+      // add ,MQTT_QOS_1); if problematic, remove QOS parameter
       Adafruit_MQTT_Publish rssiLevelPub = Adafruit_MQTT_Publish(&aq_mqtt, MQTT_PUB_RSSI);
       
       mqttConnect();
@@ -100,58 +95,73 @@ extern bool internetAvailable;
       {
         debugMessage("MQTT publish: WiFi RSSI failed");
       }
-      //aq_mqtt.disconnect();
     }
     return(result);
   }
   
-  bool mqttSensorUpdate(uint16_t co2, float tempF, float humidity)
-  // Publishes sensor data to MQTT broker
+  bool mqttSensorTempFUpdate(float tempF)
+  // Publishes temperature data to MQTT broker
   {
     bool result = false;
-    if (internetAvailable)
-    {
-      // Adafruit_MQTT_Publish tempPub = Adafruit_MQTT_Publish(&aq_mqtt, MQTT_PUB_TEMPF, MQTT_QOS_1); // if problematic, remove QOS parameter
-      // Adafruit_MQTT_Publish humidityPub = Adafruit_MQTT_Publish(&aq_mqtt, MQTT_PUB_HUMIDITY, MQTT_QOS_1);
-      // Adafruit_MQTT_Publish co2Pub = Adafruit_MQTT_Publish(&aq_mqtt, MQTT_PUB_CO2, MQTT_QOS_1);
-      Adafruit_MQTT_Publish tempPub = Adafruit_MQTT_Publish(&aq_mqtt, MQTT_PUB_TEMPF);
-      Adafruit_MQTT_Publish humidityPub = Adafruit_MQTT_Publish(&aq_mqtt, MQTT_PUB_HUMIDITY);
-      Adafruit_MQTT_Publish co2Pub = Adafruit_MQTT_Publish(&aq_mqtt, MQTT_PUB_CO2);   
-      
-      mqttConnect();
+    // add ,MQTT_QOS_1); if problematic, remove QOS parameter
+    Adafruit_MQTT_Publish tempPub = Adafruit_MQTT_Publish(&aq_mqtt, MQTT_PUB_TEMPF);
+    
+    mqttConnect();
 
-      // Attempt to publish sensor data
-      if(tempPub.publish(tempF))
+    // Attempt to publish sensor data
+    if(tempPub.publish(tempF))
+    {
+      debugMessage("MQTT publish: Temperature succeeded");
+      result = true;
+    }
+    else {
+      debugMessage("MQTT publish: Temperature failed");
+    }
+    return(result);
+  }
+
+  bool mqttSensorHumidityUpdate(float humidity)
+  // Publishes humidity data to MQTT broker
+  {
+    bool result = false;
+    // add ,MQTT_QOS_1); if problematic, remove QOS parameter
+    Adafruit_MQTT_Publish humidityPub = Adafruit_MQTT_Publish(&aq_mqtt, MQTT_PUB_HUMIDITY);
+    
+    mqttConnect();
+    
+    // Attempt to publish sensor data
+    if(humidityPub.publish(humidity))
+    {
+      debugMessage("MQTT publish: Humidity succeeded");
+      result = true;
+    }
+    else {
+      debugMessage("MQTT publish: Humidity failed");
+    }
+    return(result);
+  }
+
+  bool mqttSensorCO2Update(uint16_t co2)
+  // Publishes CO2 data to MQTT broker
+  {
+    bool result = false;
+    // add ,MQTT_QOS_1); if problematic, remove QOS parameter
+    Adafruit_MQTT_Publish co2Pub = Adafruit_MQTT_Publish(&aq_mqtt, MQTT_PUB_CO2);   
+    
+    mqttConnect();
+
+    // Attempt to publish sensor data
+    if (co2 != 10000)
+    {
+      if(co2Pub.publish(co2))
       {
-        debugMessage("MQTT publish: Temperature succeeded");
+        debugMessage("MQTT publish: CO2 succeeded");
+        result = true;
       }
-      else {
-        debugMessage("MQTT publish: Temperature failed");
-        result = false;
-      }
-      
-      if(humidityPub.publish(humidity))
+      else
       {
-        debugMessage("MQTT publish: Humidity succeeded");
+        debugMessage("MQTT publish: CO2 failed");
       }
-      else {
-        debugMessage("MQTT publish: Humidity failed");
-        result = false;
-      }
-      
-      if (co2 != 10000)
-      {
-        if(co2Pub.publish(co2))
-        {
-          debugMessage("MQTT publish: CO2 succeeded");
-        }
-        else
-        {
-          debugMessage("MQTT publish: CO2 failed");
-          result = false;
-        }
-      }
-      //aq_mqtt.disconnect();
     }
     return(result);
   }
