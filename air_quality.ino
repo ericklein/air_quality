@@ -47,25 +47,25 @@ hdweData hardwareData;  // global variable for hardware characteristics
 // OpenWeatherMap Current data
 typedef struct
 {
-  float lon;              // "lon": 8.54
-  float lat;              // "lat": 47.37
-  uint16_t weatherId;     // "id": 521
-  String main;            // "main": "Rain"
-  String description;     // "description": "shower rain"
+  // float lon;              // "lon": 8.54
+  // float lat;              // "lat": 47.37
+  // uint16_t weatherId;     // "id": 521
+  // String main;            // "main": "Rain"
+  // String description;     // "description": "shower rain"
   String icon;            // "icon": "09d"
   float temp;             // "temp": 90.56
-  uint16_t pressure;      // "pressure": 1013, in hPa
+  // uint16_t pressure;      // "pressure": 1013, in hPa
   uint16_t humidity;      // "humidity": 87, as %
-  float tempMin;          // "temp_min": 89.15
-  float tempMax;          // "temp_max": 92.15
-  uint16_t visibility;    // visibility: 10000, in meters
-  float windSpeed;        // "wind": {"speed": 1.5}, in meters/s
-  float windDeg;          // "wind": {deg: 226.505}
-  uint8_t clouds;         // "clouds": {"all": 90}, in %
-  time_t observationTime; // "dt": 1527015000, in UTC
-  String country;         // "country": "CH"
-  time_t sunrise;         // "sunrise": 1526960448, in UTC
-  time_t sunset;          // "sunset": 1527015901, in UTC
+  // float tempMin;          // "temp_min": 89.15
+  // float tempMax;          // "temp_max": 92.15
+  // uint16_t visibility;    // visibility: 10000, in meters
+  // float windSpeed;        // "wind": {"speed": 1.5}, in meters/s
+  // float windDeg;          // "wind": {deg: 226.505}
+  // uint8_t clouds;         // "clouds": {"all": 90}, in %
+  // time_t observationTime; // "dt": 1527015000, in UTC
+  // String country;         // "country": "CH"
+  // time_t sunrise;         // "sunrise": 1526960448, in UTC
+  // time_t sunset;          // "sunset": 1527015901, in UTC
   String cityName;        // "name": "Zurich"
   time_t timezone;        // shift in seconds from UTC
 } OpenWeatherMapCurrentData;
@@ -74,8 +74,8 @@ OpenWeatherMapCurrentData owmCurrentData; // global variable for OWM current dat
 // OpenWeatherMap Air Quality data
 typedef struct
 {
-  float lon;    // "lon": 8.54
-  float lat;    // "lat": 47.37
+  // float lon;    // "lon": 8.54
+  // float lat;    // "lat": 47.37
   int aqi;      // "aqi": 2  [European standards body value]
   float co;     // "co": 453.95, in μg/m3
   float no;     // "no": 0.47, in μg/m3
@@ -333,7 +333,7 @@ bool OWMCurrentWeatherDataRead()
       {
         return false;
       }
-
+    
       DynamicJsonDocument doc(2048);
 
       DeserializationError error = deserializeJson(doc, jsonBuffer);
@@ -351,30 +351,30 @@ bool OWMCurrentWeatherDataRead()
         return false;
       }
 
-      owmCurrentData.lat = (float) doc["coord"]["lat"];
-      owmCurrentData.lon = (float) doc["coord"]["lon"];
+      // owmCurrentData.lat = (float) doc["coord"]["lat"];
+      // owmCurrentData.lon = (float) doc["coord"]["lon"];
       
-      owmCurrentData.main = (const char*) doc["weather"][0]["main"];  
-      owmCurrentData.description = (const char*) doc["weather"][0]["description"];
+      // owmCurrentData.main = (const char*) doc["weather"][0]["main"];  
+      // owmCurrentData.description = (const char*) doc["weather"][0]["description"];
       owmCurrentData.icon = (const char*) doc["weather"][0]["icon"];
       
       owmCurrentData.cityName = (const char*) doc["name"];
-      owmCurrentData.visibility = (uint16_t) doc["visibility"];
+      // owmCurrentData.visibility = (uint16_t) doc["visibility"];
       owmCurrentData.timezone = (time_t) doc["timezone"];
       
-      owmCurrentData.country = (const char*) doc["sys"]["country"];
-      owmCurrentData.observationTime = (time_t) doc["dt"];
-      owmCurrentData.sunrise = (time_t) doc["sys"]["sunrise"];
-      owmCurrentData.sunset = (time_t) doc["sys"]["sunset"];
+      // owmCurrentData.country = (const char*) doc["sys"]["country"];
+      // owmCurrentData.observationTime = (time_t) doc["dt"];
+      // owmCurrentData.sunrise = (time_t) doc["sys"]["sunrise"];
+      // owmCurrentData.sunset = (time_t) doc["sys"]["sunset"];
       
       owmCurrentData.temp = (float) doc["main"]["temp"];
-      owmCurrentData.pressure = (uint16_t) doc["main"]["pressure"];
+      // owmCurrentData.pressure = (uint16_t) doc["main"]["pressure"];
       owmCurrentData.humidity = (uint8_t) doc["main"]["humidity"];
-      owmCurrentData.tempMin = (float) doc["main"]["temp_min"];
-      owmCurrentData.tempMax = (float) doc["main"]["temp_max"];
+      // owmCurrentData.tempMin = (float) doc["main"]["temp_min"];
+      // owmCurrentData.tempMax = (float) doc["main"]["temp_max"];
 
-      owmCurrentData.windSpeed = (float) doc["wind"]["speed"];
-      owmCurrentData.windDeg = (float) doc["wind"]["deg"];
+      // owmCurrentData.windSpeed = (float) doc["wind"]["speed"];
+      // owmCurrentData.windDeg = (float) doc["wind"]["deg"];
       debugMessage(String("OWM Current Weather set: ") + owmCurrentData.temp + "F, " + owmCurrentData.humidity + "%");
       return true;
     }
@@ -412,8 +412,8 @@ bool OWMAirPollutionRead()
         return false;
       }
 
-      owmAirQuality.lon = (float) doc["coord"]["lon"];
-      owmAirQuality.lat = (float) doc["coord"]["lat"];
+      // owmAirQuality.lon = (float) doc["coord"]["lon"];
+      // owmAirQuality.lat = (float) doc["coord"]["lat"];
       JsonObject list_0 = doc["list"][0];
       owmAirQuality.aqi = list_0["main"]["aqi"];
       JsonObject list_0_components = list_0["components"];
