@@ -96,6 +96,7 @@ OpenWeatherMapAirQuality owmAirQuality; // global variable for OWM current data
   SensirionI2CScd4x envSensor;
 #else
   // unified Adafruit sensor setup
+  
   // AHTX0; temp, humidity
   //#include <Adafruit_AHTX0.h>
   //Adafruit_AHTX0 envSensor;
