@@ -13,7 +13,7 @@ extern AQ_Network aq_network;
 #include <HTTPClient.h> 
 
 // Shared helper function we call here too...
-extern void debugMessage(String messageText);
+extern void debugMessage(String messageText, int messageLevel);
 // extern int httpPOSTRequest(String serverurl, String contenttype, String payload);
 
 // Post a dweet to report the various sensor reading.  This routine blocks while
@@ -23,11 +23,11 @@ void post_dweet(uint16_t co2, float tempF, float humidity, float batteryVoltage,
 
   /*
   if(WiFi.status() != WL_CONNECTED) {
-    debugMessage("Lost network connection to '" + String(WIFI_SSID) + "'!");
+    debugMessage("Lost network connection to '" + String(WIFI_SSID) + "'!",1);
     // show_disconnected();  / Future feature to display state of network connectivity (LED?)
     return;
   }
-  debugMessage("connecting to " + String(DWEET_HOST));
+  debugMessage("connecting to " + String(DWEET_HOST),1);
   */
 
   String dweeturl = "http://" + String(DWEET_HOST) + "/dweet/for/" + String(DWEET_DEVICE);
@@ -69,9 +69,9 @@ void post_dweet(uint16_t co2, float tempF, float humidity, float batteryVoltage,
   // httpCode will be negative on error, but HTTP status might indicate failure
   if (httpCode > 0) {
     // HTTP POST complete, print result code
-    debugMessage("HTTP POST [dweet.io], result code: " + String(httpCode) );
+    debugMessage("HTTP POST [dweet.io], result code: " + String(httpCode),1);
   } else {
-    debugMessage("HTTP POST [dweet.io] failed, result code: " + String(httpCode));
+    debugMessage("HTTP POST [dweet.io] failed, result code: " + String(httpCode),1);
   }
 }
 #endif

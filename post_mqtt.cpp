@@ -8,7 +8,7 @@
 #include "aq_network.h"
 
 // required external functions and data structures
-extern void debugMessage(String messageText);
+extern void debugMessage(String messageText, int messageLevel);
 extern AQ_Network aq_network;
 
 #ifdef MQTT
@@ -23,7 +23,7 @@ extern AQ_Network aq_network;
     // exit if already connected
     if (aq_mqtt.connected())
     {
-      debugMessage(String("Already connected to MQTT broker ") + MQTT_BROKER);
+      debugMessage(String("Already connected to MQTT broker ") + MQTT_BROKER,2);
       return;
     }
 
@@ -33,22 +33,11 @@ extern AQ_Network aq_network;
     {
       if ((mqttErr = aq_mqtt.connect()) == 0)
       {
-        debugMessage(String("Connected to MQTT broker ") + MQTT_BROKER);
+        debugMessage(String("Connected to MQTT broker ") + MQTT_BROKER,1);
         return;
       }
-      // Adafruit IO connect errors
-      // switch (mqttErr)
-      // {
-      //   case 1: debugMessage("Adafruit MQTT: Wrong protocol"); break;
-      //   case 2: debugMessage("Adafruit MQTT: ID rejected"); break;
-      //   case 3: debugMessage("Adafruit MQTT: Server unavailable"); break;
-      //   case 4: debugMessage("Adafruit MQTT: Incorrect user or password"); break;
-      //   case 5: debugMessage("Adafruit MQTT: Not authorized"); break;
-      //   case 6: debugMessage("Adafruit MQTT: Failed to subscribe"); break;
-      //   default: debugMessage("Adafruit MQTT: GENERIC - Connection failed"); break;
-      // }
       aq_mqtt.disconnect();
-      debugMessage(String("MQTT connection attempt ") + tries + " of " + CONNECT_ATTEMPT_LIMIT + " failed with error msg: " + aq_mqtt.connectErrorString(mqttErr));
+      debugMessage(String("MQTT connection attempt ") + tries + " of " + CONNECT_ATTEMPT_LIMIT + " failed with error msg: " + aq_mqtt.connectErrorString(mqttErr),1);
       delay(CONNECT_ATTEMPT_INTERVAL*1000);
     }
   }
@@ -65,12 +54,12 @@ extern AQ_Network aq_network;
       // publish battery voltage
       if (batteryVoltagePub.publish(batteryVoltage))
       {
-        debugMessage("MQTT publish: Battery Voltage succeeded");
+        debugMessage("MQTT publish: Battery Voltage succeeded",1);
         result = true;
       }
       else
       {
-        debugMessage("MQTT publish: Battery Voltage failed");
+        debugMessage("MQTT publish: Battery Voltage failed",1);
       }
     }
     return(result);
@@ -88,12 +77,12 @@ extern AQ_Network aq_network;
 
       if (rssiLevelPub.publish(rssi))
       {
-        debugMessage("MQTT publish: WiFi RSSI succeeded");
+        debugMessage("MQTT publish: WiFi RSSI succeeded",1);
         result = true;
       }
       else
       {
-        debugMessage("MQTT publish: WiFi RSSI failed");
+        debugMessage("MQTT publish: WiFi RSSI failed",1);
       }
     }
     return(result);
@@ -111,11 +100,11 @@ extern AQ_Network aq_network;
     // Attempt to publish sensor data
     if(tempPub.publish(tempF))
     {
-      debugMessage("MQTT publish: Temperature succeeded");
+      debugMessage("MQTT publish: Temperature succeeded",1);
       result = true;
     }
     else {
-      debugMessage("MQTT publish: Temperature failed");
+      debugMessage("MQTT publish: Temperature failed",1);
     }
     return(result);
   }
@@ -132,11 +121,11 @@ extern AQ_Network aq_network;
     // Attempt to publish sensor data
     if(humidityPub.publish(humidity))
     {
-      debugMessage("MQTT publish: Humidity succeeded");
+      debugMessage("MQTT publish: Humidity succeeded",1);
       result = true;
     }
     else {
-      debugMessage("MQTT publish: Humidity failed");
+      debugMessage("MQTT publish: Humidity failed",1);
     }
     return(result);
   }
@@ -155,12 +144,12 @@ extern AQ_Network aq_network;
     {
       if(co2Pub.publish(co2))
       {
-        debugMessage("MQTT publish: CO2 succeeded");
+        debugMessage("MQTT publish: CO2 succeeded",1);
         result = true;
       }
       else
       {
-        debugMessage("MQTT publish: CO2 failed");
+        debugMessage("MQTT publish: CO2 failed",1);
       }
     }
     return(result);
