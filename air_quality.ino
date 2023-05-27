@@ -88,20 +88,21 @@ typedef struct
 } OpenWeatherMapAirQuality;
 OpenWeatherMapAirQuality owmAirQuality; // global variable for OWM current data
 
-// initialize environment sensors
+// initialize environment sensor
 #ifdef SCD40
   // SCD40; temp, humidity, CO2
   #include <SensirionI2CScd4x.h>
   SensirionI2CScd4x envSensor;
 #elif defined(BME280)
-  // unified Adafruit sensor setup
   #include <Adafruit_BME280.h>
   Adafruit_BME280 envSensor; // i2c interface
-  Adafruit_Sensor *envSensor_temp = envSensor.getTemperatureSensor();
-  Adafruit_Sensor *envSensor_humidity = envSensor.getHumiditySensor();
 #elif defined(AHTXX)
   #include <Adafruit_AHTX0.h>
   Adafruit_AHTX0 envSensor;
+#endif
+#if defined (BME280) || defined (AHTXX)
+  Adafruit_Sensor *envSensorTemp = envSensor.getTemperatureSensor();
+  Adafruit_Sensor *envSensorHumidity = envSensor.getHumiditySensor();
 #endif
 
 // Battery voltage sensor
@@ -192,7 +193,6 @@ void setup()
   // Initialize environmental sensor
   if (!sensorInit()) 
   {
-    debugMessage("Environment sensor failed to initialize",1);
     screenAlert("Env sensor not detected");
     // This error often occurs after a firmware flash and then resetting the board
     // Hardware deep sleep typically resolves it, so quickly cycle the hardware
@@ -203,6 +203,7 @@ void setup()
   int sampleCounter;
   if(!sensorRead())
   {
+    // hard coded for SCD40 as there is no way to read error condition on other sensors
     debugMessage("SCD40 returned no/bad data",1);
     screenAlert("SCD40 no/bad data");
     powerDisable(HARDWARE_ERROR_INTERVAL);
@@ -315,10 +316,10 @@ void debugMessage(String messageText, int messageLevel)
 bool OWMCurrentWeatherDataRead()
 // stores local current weather info from Open Weather Map in environment global
 {
-  #if defined(WIFI) || defined(RJ45)
-    // if there is a network interface (so it will compile)
+  // Only use if there is a network and a screen to display data...
+  #if (defined(WIFI) || defined(RJ45)) && (defined(SCREEN))
     if (hardwareData.rssi!=0)
-    // and internet is verified
+    // ...and internet is verified
     {
       String jsonBuffer;
 
@@ -384,50 +385,50 @@ bool OWMCurrentWeatherDataRead()
 bool OWMAirPollutionRead()
 // stores local air pollution info from Open Weather Map in environment global
 {
-  #if defined(WIFI) || defined(RJ45)
-    // if there is a network interface (so it will compile)
+    // Only use if there is a network and a screen to display data...
+    #if (defined(WIFI) || defined(RJ45)) && (defined(SCREEN))
     if (hardwareData.rssi!=0)
-    // and internet is verified
-    {
-      String jsonBuffer;
-
-      // Get local AQI
-      String serverPath = String(OWM_SERVER) + OWM_AQM_PATH + OWM_LAT_LONG + "&APPID=" + OWM_KEY;
-
-      jsonBuffer = aq_network.httpGETRequest(serverPath.c_str());
-      debugMessage("Raw JSON from OWM AQI feed",2);
-      debugMessage(jsonBuffer,2);      
-      if (jsonBuffer=="HTTP GET error")
+      // ...and internet is verified
       {
-        return false;
+        String jsonBuffer;
+
+        // Get local AQI
+        String serverPath = String(OWM_SERVER) + OWM_AQM_PATH + OWM_LAT_LONG + "&APPID=" + OWM_KEY;
+
+        jsonBuffer = aq_network.httpGETRequest(serverPath.c_str());
+        debugMessage("Raw JSON from OWM AQI feed",2);
+        debugMessage(jsonBuffer,2);      
+        if (jsonBuffer=="HTTP GET error")
+        {
+          return false;
+        }
+
+        DynamicJsonDocument doc(384);
+
+        DeserializationError error = deserializeJson(doc, jsonBuffer);
+        if (error)
+        {
+          debugMessage(String("deserializeJson failed with error message: ") + error.c_str(),1);
+          return false;
+        }
+
+        // owmAirQuality.lon = (float) doc["coord"]["lon"];
+        // owmAirQuality.lat = (float) doc["coord"]["lat"];
+        JsonObject list_0 = doc["list"][0];
+        owmAirQuality.aqi = list_0["main"]["aqi"];
+        JsonObject list_0_components = list_0["components"];
+        owmAirQuality.co = (float) list_0_components["co"];
+        owmAirQuality.no = (float) list_0_components["no"];
+        owmAirQuality.no2 = (float) list_0_components["no2"];
+        owmAirQuality.o3 = (float) list_0_components["o3"];
+        owmAirQuality.so2 = (float) list_0_components["so2"];
+        owmAirQuality.pm25 = (float) list_0_components["pm2_5"];
+        debugMessage(String("OWM current PM2.5 is ") + owmAirQuality.pm25 + " in μg/m3",1);      
+        owmAirQuality.pm10 = (float) list_0_components["pm10"];
+        owmAirQuality.nh3 = (float) list_0_components["nh3"];
+        return true;
       }
-
-      DynamicJsonDocument doc(384);
-
-      DeserializationError error = deserializeJson(doc, jsonBuffer);
-      if (error)
-      {
-        debugMessage(String("deserializeJson failed with error message: ") + error.c_str(),1);
-        return false;
-      }
-
-      // owmAirQuality.lon = (float) doc["coord"]["lon"];
-      // owmAirQuality.lat = (float) doc["coord"]["lat"];
-      JsonObject list_0 = doc["list"][0];
-      owmAirQuality.aqi = list_0["main"]["aqi"];
-      JsonObject list_0_components = list_0["components"];
-      owmAirQuality.co = (float) list_0_components["co"];
-      owmAirQuality.no = (float) list_0_components["no"];
-      owmAirQuality.no2 = (float) list_0_components["no2"];
-      owmAirQuality.o3 = (float) list_0_components["o3"];
-      owmAirQuality.so2 = (float) list_0_components["so2"];
-      owmAirQuality.pm25 = (float) list_0_components["pm2_5"];
-      debugMessage(String("OWM current PM2.5 is ") + owmAirQuality.pm25 + " in μg/m3",1);      
-      owmAirQuality.pm10 = (float) list_0_components["pm10"];
-      owmAirQuality.nh3 = (float) list_0_components["nh3"];
-      return true;
-    }
-  #endif
+    #endif
   return false;
 }
 
@@ -677,9 +678,9 @@ void screenHelperSparkLines(int initialX, int initialY, int xWidth, int yHeight)
 }
 
 void batteryRead()
-// stores battery voltage if available in hardware characteristics global 
+// stores battery voltage if available in hardware characteristics global
 {
-  // check to see if i2C monitor is available
+  // use LC709203 if available. Built-in on Adafruit ESP32S2 Feather (pt 5303)
   if (lc.begin())
   // Check battery monitoring status
   {
@@ -736,19 +737,19 @@ bool sensorInit()
     }
     else 
     {
-      debugMessage("SCD40 initialized",1);
+      debugMessage("SCD40 ready",1);
       return true;
     }
   #else
     // ATHX0, BME280
     if (envSensor.begin())
     {
-      // ID of 0x56-0x58 or 0x60 is a BME 280, 0x61 is BME680, 0x77 is BME280 on ESP32S2 Feather
-      debugMessage(String("Environment sensor ready, ID is: ")+envSensor.sensorID(),1);
+      debugMessage("Environment sensor ready",1);
       return true;
     }
     else
     {
+      debugMessage("Environment sensor failed to initialize",1);
       return false;
     }
   #endif
@@ -773,26 +774,27 @@ bool sensorRead()
         debugMessage(String(errorMessage) + " during SCD4X read",1);
         return false;
       }
-      if (sensorData.ambientCO2<400 || sensorData.ambientCO2>6000)
+      if (sensorData.ambientCO2<440 || sensorData.ambientCO2>6000)
       {
         debugMessage(String("SCD40 CO2 reading out of range at ") + sensorData.ambientCO2,1);
         return false;
       }
       //convert C to F for temp
       sensorData.ambientTempF = (sensorData.ambientTempF * 1.8) + 32;
-      debugMessage(String("SCD40 read ") + loop + " of " + READS_PER_SAMPLE + ": " + sensorData.ambientTempF + "F, " + sensorData.ambientHumidity + "%, " + sensorData.ambientCO2 + " ppm",1);
+      debugMessage(String("SCD40 read ") + loop + " of " + READS_PER_SAMPLE + ": " + sensorData.ambientTempF + "F, " + sensorData.ambientHumidity + "%, " + sensorData.ambientCO2 + " ppm",2);
     }
+    debugMessage(String("Final SCD40 measurement ") + sensorData.ambientTempF + "F, " + sensorData.ambientHumidity + "%, " + sensorData.ambientCO2 + " ppm",1);
     return true;
   #else
     // AHTX0, BME280
-    sensors_event_t temp_event, humidity_event;
     // FIX : Can we get error conditions from this API?
-    envSensor_temp->getEvent(&temp_event);
-    envSensor_humidity->getEvent(&humidity_event);
-   
-    sensorData.ambientTempF = (temp_event.temperature * 1.8) +32;
-    sensorData.ambientHumidity = humidity_event.relative_humidity;
+    sensors_event_t humidityEvent, tempEvent;
+    envSensorTemp->getEvent(&tempEvent);
+    envSensorHumidity->getEvent(&humidityEvent);
+    sensorData.ambientTempF = (tempEvent.temperature * 1.8) +32;
+    sensorData.ambientHumidity = humidityEvent.relative_humidity;
     sensorData.ambientCO2 = 10000;
+    debugMessage(String("Environment sensor measurement ") + sensorData.ambientTempF + "F, " + sensorData.ambientHumidity + "%, " + sensorData.ambientCO2 + " ppm",1);
     return true;
   #endif
 }
@@ -825,14 +827,18 @@ int nvStorageRead()
 
   debugMessage(String("Intermediate values FROM nv storage: Temp:") + averageTempF + "F, Humidity:" + averageHumidity + "%",2);
 
-  // Read CO2 array. If they don't exist, create them as 400 (CO2 floor)
-  String nvStoreBaseName;
-  for (int i=0; i<SAMPLE_SIZE; i++)
+  // only deal with CO2 if you are getting data from sensor
+  if (sensorData.ambientCO2 != 10000)
   {
-    nvStoreBaseName = "co2Sample" + String(i);
-    co2Samples[i] = nvStorage.getLong(nvStoreBaseName.c_str(),400);
-    debugMessage(String(nvStoreBaseName) + " retrieved from nv storage is " + co2Samples[i],2);
-  }  
+    // Read CO2 array. If they don't exist, create them as 400 (CO2 floor)
+    String nvStoreBaseName;
+    for (int i=0; i<SAMPLE_SIZE; i++)
+    {
+      nvStoreBaseName = "co2Sample" + String(i);
+      co2Samples[i] = nvStorage.getLong(nvStoreBaseName.c_str(),400);
+      debugMessage(String(nvStoreBaseName) + " retrieved from nv storage is " + co2Samples[i],2);
+    }
+  }
   return storedCounter;
 }
 
@@ -844,6 +850,7 @@ void nvStorageWrite(int storedCounter, float tempF, float humidity, uint16_t co2
   nvStorage.putFloat("temp", tempF);
   nvStorage.putFloat("humidity", humidity);
   debugMessage(String("Intermediate values TO nv storage: Temp: ") + tempF + "F, Humidity: " + humidity + "%",2);
+  // only deal with CO2 if there is sensor data
   if ((sensorData.ambientCO2 != 10000) && (co2 != 0))
   {
     String nvStoreBaseName = "co2Sample" + String(storedCounter);

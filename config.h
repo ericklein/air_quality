@@ -7,7 +7,7 @@
 
 // Configuration Step 1: Set debug message output
 // comment out to turn off; 1 = summary, 2 = verbose
-#define DEBUG 1
+// #define DEBUG 2
 
 // Configuration Step 2: Set network transport, if desired
 //#define RJ45  	// use Ethernet
@@ -19,10 +19,29 @@
 //#define DWEET // Post sensor readings to dweet.io
 #define INFLUX 	// Log data to remote InfluxDB server
 
-// Configuration Step 4: Select environment sensor
+// Configuration Step 4: Select environment sensor and configure read intervals
 // #define SCD40		// use SCD40 to read temperature, humidity, and CO2
 #define BME280	// use BME280 to read temperature and humidity
 // #define AHTXX		// use AHT series device to read temperature and humidity
+
+// environment sensor sample timing
+#ifdef DEBUG
+	// number of times sensor is read, last read is the sample value
+	#define READS_PER_SAMPLE	1
+	// time between samples in seconds
+	#define SAMPLE_INTERVAL		60
+	// number of samples to average. this is also the # of uint_16 CO2 samples saved to nvStorage, so limit this
+  #define SAMPLE_SIZE				2
+#else
+	#ifdef SCD40 
+		// SCD40 needs >= 5 samples to get to a reliable reading from a cold start
+		#define READS_PER_SAMPLE	5
+	#else
+		#define READS_PER_SAMPLE	1
+	#endif
+	#define SAMPLE_INTERVAL 	300
+  #define SAMPLE_SIZE 			6
+#endif
 
 // Configuration Step 5: Set screen parameters, if desired
 // #define	SCREEN		// use screen as output
@@ -77,15 +96,15 @@ const int   daylightOffset_sec = 3600; // US DT
 
 // set client ID; used by mqtt and wifi
 // structure is AQ_room-name; e.g. AQ_kitchen
-#define CLIENT_ID "AQ_demo"
+#define CLIENT_ID "AQ_cellar"
 
 #ifdef MQTT
 	// structure is site/structure/room/device/data
-	#define MQTT_PUB_TEMPF			"7828/master bedroom/aq/temperature"
-	#define MQTT_PUB_HUMIDITY	"7828/master bedroom/aq/humidity"
-	#define MQTT_PUB_CO2				"7828/master bedroom/aq/co2"
-	#define MQTT_PUB_BATTVOLT	"7828/master bedroom/aq/battery-voltage"
-	#define MQTT_PUB_RSSI			"7828/master bedroom/aq/rssi"
+	#define MQTT_PUB_TEMPF			"7828/cellar/aq/temperature"
+	#define MQTT_PUB_HUMIDITY	"7828/cellar/aq/humidity"
+	#define MQTT_PUB_CO2				"7828/cellar/aq/co2"
+	#define MQTT_PUB_BATTVOLT	"7828/cellar/aq/battery-voltage"
+	#define MQTT_PUB_RSSI			"7828/cellar/aq/rssi"
 #endif
 
 #ifdef INFLUX  
@@ -98,9 +117,9 @@ const int   daylightOffset_sec = 3600; // US DT
   // the house) and site (indoors vs. outdoors, typically).
 	// #define DEVICE_LOCATION "AQ-demo"
 	// #define DEVICE_LOCATION "kitchen"
-	// #define DEVICE_LOCATION "cellar"
+	#define DEVICE_LOCATION "cellar"
 	// #define DEVICE_LOCATION "lab-office"
-	#define DEVICE_LOCATION "master bedroom"
+	// #define DEVICE_LOCATION "master bedroom"
 
 	#define DEVICE_SITE "indoor"
 	#define DEVICE_TYPE "air quality"
@@ -116,20 +135,6 @@ const int   daylightOffset_sec = 3600; // US DT
 
 // Configuration variables that are less likely to require changes
 
-// environment sensor sample timing
-#ifdef DEBUG
-	// number of times SCD40 is read, last read is the sample value
-	#define READS_PER_SAMPLE	1
-	// time between samples in seconds
-	#define SAMPLE_INTERVAL		60
-	// number of samples to average. this is also the # of uint_16 CO2 samples saved to nvStorage, so limit this
-  #define SAMPLE_SIZE				2
-#else
-	#define READS_PER_SAMPLE	5
-	#define SAMPLE_INTERVAL 	300
-  #define SAMPLE_SIZE 			6
-#endif
-
 // Sleep time if hardware error occurs in seconds
 #define HARDWARE_ERROR_INTERVAL 10
 
@@ -141,7 +146,7 @@ const String co2Labels[5]={"Good", "OK", "So-So", "Poor", "Bad"};
 // if using OWM aqi value, these are the European standards-body conversions from numeric valeu
 // const String aqiEuropeanLabels[5] = { "Good", "Fair", "Moderate", "Poor", "Very Poor" };
 
-// if using US standards-body conversions from numeric value
+// US standards-body conversions from numeric value
 const String aqiUSALabels[6] = {"Good", "Moderate", "Unhealthy (SG)", "Unhealthy", "Very Unhealthy", "Hazardous"};
 
 // used in aq_network.cpp

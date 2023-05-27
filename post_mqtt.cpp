@@ -33,7 +33,7 @@ extern AQ_Network aq_network;
     {
       if ((mqttErr = aq_mqtt.connect()) == 0)
       {
-        debugMessage(String("Connected to MQTT broker ") + MQTT_BROKER,1);
+        debugMessage(String("Connected to MQTT broker ") + MQTT_BROKER,2);
         return;
       }
       aq_mqtt.disconnect();
