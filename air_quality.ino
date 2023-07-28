@@ -77,35 +77,32 @@ typedef struct
   // float lon;    // "lon": 8.54
   // float lat;    // "lat": 47.37
   int aqi;      // "aqi": 2  [European standards body value]
-  float co;     // "co": 453.95, in μg/m3
-  float no;     // "no": 0.47, in μg/m3
-  float no2;    // "no2": 52.09, in μg/m3
-  float o3;     // "o3": 17.17, in μg/m3
-  float so2;    // "so2": 7.51, in μg/m3
+  // float co;     // "co": 453.95, in μg/m3
+  // float no;     // "no": 0.47, in μg/m3
+  // float no2;    // "no2": 52.09, in μg/m3
+  // float o3;     // "o3": 17.17, in μg/m3
+  // float so2;    // "so2": 7.51, in μg/m3
   float pm25;   // "pm2.5": 8.04, in μg/m3
-  float pm10;   // "pm10": 9.96, in μg/m3
-  float nh3;    // "nh3": 0.86, in μg/m3
+  // float pm10;   // "pm10": 9.96, in μg/m3
+  // float nh3;    // "nh3": 0.86, in μg/m3
 } OpenWeatherMapAirQuality;
 OpenWeatherMapAirQuality owmAirQuality; // global variable for OWM current data
 
-// initialize environment sensors
-
+// initialize environment sensor
 #ifdef SCD40
   // SCD40; temp, humidity, CO2
   #include <SensirionI2CScd4x.h>
   SensirionI2CScd4x envSensor;
-#else
-  // unified Adafruit sensor setup
-  
-  // AHTX0; temp, humidity
-  //#include <Adafruit_AHTX0.h>
-  //Adafruit_AHTX0 envSensor;
-
-  // BME280; temp, humidity
+#elif defined(BME280)
   #include <Adafruit_BME280.h>
   Adafruit_BME280 envSensor; // i2c interface
-  Adafruit_Sensor *envSensor_temp = envSensor.getTemperatureSensor();
-  Adafruit_Sensor *envSensor_humidity = envSensor.getHumiditySensor();
+#elif defined(AHTXX)
+  #include <Adafruit_AHTX0.h>
+  Adafruit_AHTX0 envSensor;
+#endif
+#if defined (BME280) || defined (AHTXX)
+  Adafruit_Sensor *envSensorTemp = envSensor.getTemperatureSensor();
+  Adafruit_Sensor *envSensorHumidity = envSensor.getHumiditySensor();
 #endif
 
 // Battery voltage sensor
@@ -128,22 +125,25 @@ Adafruit_LC709203F lc;
   #include "Fonts/glyphs.h"
 
   // 2.96" greyscale display with 196x128 pixels
-  // colors are EPD_WHITE, EPD_BLACK, EPD_RED, EPD_GRAY, EPD_LIGHT, EPD_DARK
-  ThinkInk_290_Grayscale4_T5 display(EPD_DC, EPD_RESET, EPD_CS, SRAM_CS, EPD_BUSY);
+  // ThinkInk_290_Grayscale4_T5 display(EPD_DC, EPD_RESET, EPD_CS, SRAM_CS, EPD_BUSY);
+  // 2.96" tricolor display with 196x128 pixels
+  ThinkInk_290_Tricolor_Z10 display(EPD_DC, EPD_RESET, EPD_CS, SRAM_CS, EPD_BUSY);
 
   // screen layout assists
   const int xMargins = 5;
   const int xOutdoorMargin = ((display.width()/2) + xMargins);
   const int yMargins = 2;
-  // yCO2 not used
   const int yCO2 = 20;
   const int ySparkline = 40;
-  const int yTemp = 100;
+  const int yTemperature = 100;
   // BUG, 7/8 = 112, WiFi status is 15 (5*3) pixels high
   const int yStatus = (display.height()*7/8);
   const int sparklineHeight = 40;
   const int batteryBarWidth = 28;
   const int batteryBarHeight = 10;
+  const int wifiBarWidth = 3;
+  const int wifiBarHeightMultiplier = 3;
+  const int wifiBarSpacingMultipler = 5;
 #endif
 
 #include "ArduinoJson.h"  // Needed by OWM retrieval routines
@@ -173,13 +173,13 @@ void setup()
     // wait for serial port connection
     while (!Serial);
   #endif
-  // Confirm key site configuration parameters
-  debugMessage("Air Quality started");
-  debugMessage(String("Sample interval is ") + SAMPLE_INTERVAL + " seconds");
-  debugMessage(String("Number of samples before reporting is ") + SAMPLE_SIZE);
-  debugMessage(String("Internet service reconnect delay is ") + CONNECT_ATTEMPT_INTERVAL + " seconds");
+
+  debugMessage("Air Quality started",1);
+  debugMessage(String("Sample interval is ") + SAMPLE_INTERVAL + " seconds",2);
+  debugMessage(String("Number of samples before reporting is ") + SAMPLE_SIZE,2);
+  debugMessage(String("Internet service reconnect delay is ") + CONNECT_ATTEMPT_INTERVAL + " seconds",2);
   #ifdef DWEET
-    debugMessage("Dweet device: " + String(DWEET_DEVICE));
+    debugMessage("Dweet device: " + String(DWEET_DEVICE),2);
   #endif
 
   hardwareData.batteryVoltage = 0;  // 0 = no battery attached
@@ -189,15 +189,15 @@ void setup()
 
   #ifdef SCREEN
     // there is no way to query screen for status
-    display.begin(THINKINK_MONO); // changed from THINKINK_GRAYSCALE4 to eliminate black screen border
-    debugMessage("Display ready");
+    // changed from THINKINK_GRAYSCALE4 to eliminate black screen border, colors are EPD_WHITE, EPD_BLACK
+    display.begin(THINKINK_MONO);
+    debugMessage("Display ready",1);
   #endif
 
   // Initialize environmental sensor
   if (!sensorInit()) 
   {
-    debugMessage("Environment sensor failed to initialize");
-    screenAlert("Env sensor not detected");
+    screenAlert(xMargins, display.height()/2, "Env sensor not detected");
     // This error often occurs after a firmware flash and then resetting the board
     // Hardware deep sleep typically resolves it, so quickly cycle the hardware
     powerDisable(HARDWARE_ERROR_INTERVAL);
@@ -207,8 +207,9 @@ void setup()
   int sampleCounter;
   if(!sensorRead())
   {
-    debugMessage("SCD40 returned no/bad data");
-    screenAlert("SCD40 no/bad data");
+    // hard coded for SCD40 as there is no way to read error condition on other sensors
+    debugMessage("SCD40 returned no/bad data",1);
+    screenAlert(xMargins,display.height()/2,"SCD40 read issue");
     powerDisable(HARDWARE_ERROR_INTERVAL);
   }
   sampleCounter = nvStorageRead();
@@ -229,7 +230,7 @@ void setup()
     averageCO2 = averageCO2 + co2Samples[i];
   }
   averageCO2 = uint16_t(averageCO2/SAMPLE_SIZE);
-  debugMessage(String("Averaged values Temp:") + averageTempF + "F, Humidity:" + averageHumidity + ", CO2:" + averageCO2);
+  debugMessage(String("Averaged values Temp:") + averageTempF + "F, Humidity:" + averageHumidity + ", CO2:" + averageCO2,1);
 
   batteryRead();
 
@@ -297,29 +298,32 @@ void setup()
   }
   //reset nvStorage values for next recording period
   nvStorageWrite(-1,0,0,0);
-  debugMessage("nvStorage values reset");
+  debugMessage("nvStorage values reset",2);
 
   powerDisable(SAMPLE_INTERVAL);
 }
 
 void loop() {}
 
-void debugMessage(String messageText)
+void debugMessage(String messageText, int messageLevel)
 // wraps Serial.println as #define conditional
 {
-#ifdef DEBUG
-  Serial.println(messageText);
-  Serial.flush();  // Make sure the message gets output (before any sleeping...)
-#endif
+  #ifdef DEBUG
+    if (messageLevel <= DEBUG)
+    {
+      Serial.println(messageText);
+      Serial.flush();  // Make sure the message gets output (before any sleeping...)
+    }
+  #endif
 }
 
 bool OWMCurrentWeatherDataRead()
 // stores local current weather info from Open Weather Map in environment global
 {
-  #if defined(WIFI) || defined(RJ45)
-    // if there is a network interface (so it will compile)
+  // Only use if there is a network and a screen to display data...
+  #if (defined(WIFI) || defined(RJ45)) && (defined(SCREEN))
     if (hardwareData.rssi!=0)
-    // and internet is verified
+    // ...and internet is verified
     {
       String jsonBuffer;
 
@@ -327,8 +331,8 @@ bool OWMCurrentWeatherDataRead()
       String serverPath = String(OWM_SERVER) + OWM_WEATHER_PATH + OWM_LAT_LONG + "&units=imperial" + "&APPID=" + OWM_KEY;
 
       jsonBuffer = aq_network.httpGETRequest(serverPath.c_str());
-      debugMessage("Raw JSON from OWM Current Weather feed");
-      debugMessage(jsonBuffer);      
+      debugMessage("Raw JSON from OWM Current Weather feed",2);
+      debugMessage(jsonBuffer,2);      
       if (jsonBuffer=="HTTP GET error")
       {
         return false;
@@ -340,14 +344,14 @@ bool OWMCurrentWeatherDataRead()
 
       if (error)
       {
-        debugMessage(String("deserializeJson failed with error message: ") + error.c_str());
+        debugMessage(String("deserializeJson failed with error message: ") + error.c_str(),1);
         return false;
       }
       
       int code = (int) doc["cod"];
       if(code != 200)
       {
-        debugMessage(String("OWM error: ") + (const char *)doc["message"]);
+        debugMessage(String("OWM error: ") + (const char *)doc["message"],1);
         return false;
       }
 
@@ -375,7 +379,7 @@ bool OWMCurrentWeatherDataRead()
 
       // owmCurrentData.windSpeed = (float) doc["wind"]["speed"];
       // owmCurrentData.windDeg = (float) doc["wind"]["deg"];
-      debugMessage(String("OWM Current Weather set: ") + owmCurrentData.temp + "F, " + owmCurrentData.humidity + "%");
+      debugMessage(String("OWM Current Weather set: ") + owmCurrentData.temp + "F, " + owmCurrentData.humidity + "%",1);
       return true;
     }
   #endif
@@ -385,65 +389,69 @@ bool OWMCurrentWeatherDataRead()
 bool OWMAirPollutionRead()
 // stores local air pollution info from Open Weather Map in environment global
 {
-  #if defined(WIFI) || defined(RJ45)
-    // if there is a network interface (so it will compile)
+    // Only use if there is a network and a screen to display data...
+    #if (defined(WIFI) || defined(RJ45)) && (defined(SCREEN))
     if (hardwareData.rssi!=0)
-    // and internet is verified
-    {
-      String jsonBuffer;
-
-      // Get local AQI
-      String serverPath = String(OWM_SERVER) + OWM_AQM_PATH + OWM_LAT_LONG + "&APPID=" + OWM_KEY;
-
-      jsonBuffer = aq_network.httpGETRequest(serverPath.c_str());
-      debugMessage("Raw JSON from OWM AQI feed");
-      debugMessage(jsonBuffer);      
-      if (jsonBuffer=="HTTP GET error")
+      // ...and internet is verified
       {
-        return false;
+        String jsonBuffer;
+
+        // Get local AQI
+        String serverPath = String(OWM_SERVER) + OWM_AQM_PATH + OWM_LAT_LONG + "&APPID=" + OWM_KEY;
+
+        jsonBuffer = aq_network.httpGETRequest(serverPath.c_str());
+        debugMessage("Raw JSON from OWM AQI feed",2);
+        debugMessage(jsonBuffer,2);      
+        if (jsonBuffer=="HTTP GET error")
+        {
+          return false;
+        }
+
+        DynamicJsonDocument doc(384);
+
+        DeserializationError error = deserializeJson(doc, jsonBuffer);
+        if (error)
+        {
+          debugMessage(String("deserializeJson failed with error message: ") + error.c_str(),1);
+          return false;
+        }
+
+        // owmAirQuality.lon = (float) doc["coord"]["lon"];
+        // owmAirQuality.lat = (float) doc["coord"]["lat"];
+        JsonObject list_0 = doc["list"][0];
+        owmAirQuality.aqi = list_0["main"]["aqi"];
+        JsonObject list_0_components = list_0["components"];
+        // owmAirQuality.co = (float) list_0_components["co"];
+        // owmAirQuality.no = (float) list_0_components["no"];
+        // owmAirQuality.no2 = (float) list_0_components["no2"];
+        // owmAirQuality.o3 = (float) list_0_components["o3"];
+        // owmAirQuality.so2 = (float) list_0_components["so2"];
+        owmAirQuality.pm25 = (float) list_0_components["pm2_5"];
+        debugMessage(String("OWM current PM2.5 is ") + owmAirQuality.pm25 + " in μg/m3",1);      
+        // owmAirQuality.pm10 = (float) list_0_components["pm10"];
+        // owmAirQuality.nh3 = (float) list_0_components["nh3"];
+        return true;
       }
-
-      DynamicJsonDocument doc(384);
-
-      DeserializationError error = deserializeJson(doc, jsonBuffer);
-      if (error)
-      {
-        debugMessage(String("deserializeJson failed with error message: ") + error.c_str());
-        return false;
-      }
-
-      // owmAirQuality.lon = (float) doc["coord"]["lon"];
-      // owmAirQuality.lat = (float) doc["coord"]["lat"];
-      JsonObject list_0 = doc["list"][0];
-      owmAirQuality.aqi = list_0["main"]["aqi"];
-      JsonObject list_0_components = list_0["components"];
-      owmAirQuality.co = (float) list_0_components["co"];
-      owmAirQuality.no = (float) list_0_components["no"];
-      owmAirQuality.no2 = (float) list_0_components["no2"];
-      owmAirQuality.o3 = (float) list_0_components["o3"];
-      owmAirQuality.so2 = (float) list_0_components["so2"];
-      owmAirQuality.pm25 = (float) list_0_components["pm2_5"];
-      debugMessage(String("OWM current PM2.5 is ") + owmAirQuality.pm25 + " in μg/m3");      
-      owmAirQuality.pm10 = (float) list_0_components["pm10"];
-      owmAirQuality.nh3 = (float) list_0_components["nh3"];
-      return true;
-    }
-  #endif
+    #endif
   return false;
 }
 
-void screenAlert(String messageText)
+void screenAlert(int initialX, int initialY, String messageText)
 // Display critical error message on screen
 {
 #ifdef SCREEN
+
+  debugMessage("Starting screenAlert refresh",1);
+
   display.clearBuffer();
   display.setTextColor(EPD_BLACK);
   display.setFont(&FreeSans12pt7b);
-  display.setCursor(xMargins,(display.height()/2));
+  display.setCursor(initialX,initialY);
   display.print(messageText);
 
   //update display
   display.display();
+  debugMessage("screenAlert refresh complete",1);
 #endif
 }
 
@@ -454,28 +462,30 @@ void screenInfo(String messageText)
 
   // TEST ONLY: load values normally supplied by OWM
   // testOWMValues();
+
+  debugMessage("Starting screenInfo refresh",1);
   
   display.clearBuffer();
   display.setTextColor(EPD_BLACK);
 
   // borders
   // label
-  display.drawLine(0,yStatus,display.width(),yStatus,EPD_GRAY);
+  display.drawLine(0,yStatus,display.width(),yStatus,EPD_BLACK);
   // splitting sensor vs. outside values
-  display.drawLine((display.width()/2),0,(display.width()/2),yStatus,EPD_GRAY);
+  display.drawLine((display.width()/2),0,(display.width()/2),yStatus,EPD_BLACK);
   
   // screen helper routines
   // draws battery in the lower right corner. -3 in first parameter accounts for battery nub
   screenHelperBatteryStatus((display.width()-xMargins-batteryBarWidth-3),(display.height()-yMargins-batteryBarHeight),batteryBarWidth,batteryBarHeight);
   
   // -70 moves it to the left of the battery display
-  screenHelperWiFiStatus((display.width() - xMargins - 70), (display.height() - yMargins),3,3,5);
+  screenHelperWiFiStatus((display.width() - xMargins - 70), (display.height() - yMargins),wifiBarWidth,wifiBarHeightMultiplier,wifiBarSpacingMultipler);
   
   // draws any status message in the lower left corner. -8 in the first parameter accounts for fixed font height
   screenHelperStatusMessage(xMargins,(display.height()-yMargins-8), messageText);
 
   // display sparkline
-  screenHelperSparkLines(xMargins,ySparkline,((display.width()/2) - (2 * xMargins)),sparklineHeight);
+  screenHelperSparkLine(xMargins,ySparkline,((display.width()/2) - (2 * xMargins)),sparklineHeight);
 
   // Indoor
   // CO2 level
@@ -499,17 +509,17 @@ void screenInfo(String messageText)
 
   // Indoor temp
   display.setFont(&FreeSans12pt7b);
-  display.setCursor(xMargins,yTemp);
+  display.setCursor(xMargins,yTemperature);
   display.print(String((int)(sensorData.ambientTempF + .5)));
   display.setFont(&meteocons12pt7b);
   display.print("+");
 
   // Indoor humidity
   display.setFont(&FreeSans12pt7b);
-  display.setCursor(xMargins+60, yTemp);
+  display.setCursor(xMargins+60, yTemperature);
   display.print(String((int)(sensorData.ambientHumidity + 0.5)));
   // original icon ratio was 5:7?
-  display.drawBitmap(xMargins+90,yTemp-21,epd_bitmap_humidity_icon_sm4,20,28,EPD_BLACK);
+  display.drawBitmap(xMargins+90,yTemperature-21,epd_bitmap_humidity_icon_sm4,20,28,EPD_BLACK);
 
   // Outside
   // location label
@@ -521,7 +531,7 @@ void screenInfo(String messageText)
   if (owmCurrentData.temp!=10000)
   {
     display.setFont(&FreeSans12pt7b);
-    display.setCursor(xOutdoorMargin,yTemp);
+    display.setCursor(xOutdoorMargin,yTemperature);
     display.print(String((int)(owmCurrentData.temp+0.5)));
     display.setFont(&meteocons12pt7b);
     display.print("+");
@@ -531,9 +541,9 @@ void screenInfo(String messageText)
   if (owmCurrentData.humidity!=10000)
   {
     display.setFont(&FreeSans12pt7b);
-    display.setCursor(xOutdoorMargin + 60, yTemp);
+    display.setCursor(xOutdoorMargin + 60, yTemperature);
     display.print(String((int)(owmCurrentData.humidity+0.5)));
-    display.drawBitmap(xOutdoorMargin+90,yTemp-21,epd_bitmap_humidity_icon_sm4,20,28,EPD_BLACK);
+    display.drawBitmap(xOutdoorMargin+90,yTemperature-21,epd_bitmap_humidity_icon_sm4,20,28,EPD_BLACK);
   }
 
   // weather icon
@@ -543,13 +553,14 @@ void screenInfo(String messageText)
   {
     // display icon
     display.setFont(&meteocons20pt7b);
-    display.setCursor((display.width()*4/5),(display.height()/2));
+    display.setCursor((display.width()*17/20),(display.height()/2)+10);
     display.print(weatherIcon);
   }
 
-  // Outside air quality index (AQI)
+  // Outside air quality index (AQI) + PM25 value
   if (owmAirQuality.aqi!=10000)
   {
+    // main line
     display.setFont(&FreeSans9pt7b);
     display.setCursor(xOutdoorMargin,ySparkline - 5);
     // European standards-body AQI value
@@ -557,15 +568,19 @@ void screenInfo(String messageText)
 
     // US standards-body AQI value
     float aqiUS = pm25toAQI(owmAirQuality.pm25);
-    debugMessage(String("US AQI value is ") + aqiUS);
+    debugMessage(String("US AQI value is ") + aqiUS,2);
 
     display.print(aqiUSALabels[aqiUSLabelValue(owmAirQuality.pm25)]);
     display.print(" AQI");
+    // value line
+    display.setFont();
+    display.setCursor((xOutdoorMargin+20),(ySparkline+3));
+    display.print("(" + String(owmAirQuality.pm25) + ")");
   }
 
   //update display
   display.display();
-  debugMessage("Screen updated");
+  debugMessage("screenInfo refresh complete",1);
 #endif
 }
 
@@ -574,41 +589,46 @@ void screenHelperStatusMessage(int initialX, int initialY, String messageText)
 // uses system default font, so text drawn x+,y+ from initialX,Y
 {
   // IMPROVEMENT : Screen dimension boundary checks for function parameters
-  display.setFont();  // resets to system default monospace font (6x8 pixels)
-  display.setCursor(initialX, initialY);
-  display.print(messageText);
+  #ifdef SCREEN
+    display.setFont();  // resets to system default monospace font (6x8 pixels)
+    display.setCursor(initialX, initialY);
+    display.print(messageText);
+  #endif
 }
 
 void screenHelperWiFiStatus(int initialX, int initialY, int barWidth, int barHeightMultiplier, int barSpacingMultipler)
 // helper function for screenXXX() routines that draws WiFi signal strength
 {
-  if (hardwareData.rssi!=0) 
-  {
-    // Convert RSSI values to a 5 bar visual indicator
-    // >90 means no signal
-    int barCount = constrain((6-((hardwareData.rssi/10)-3)),0,5);
-    if (barCount>0)
+  #ifdef SCREEN
+    if (hardwareData.rssi!=0) 
     {
-      // <50 rssi value = 5 bars, each +10 rssi value range = one less bar
-      // draw bars to represent WiFi strength
-      for (int b = 1; b <= barCount; b++)
+      // Convert RSSI values to a 5 bar visual indicator
+      // >90 means no signal
+      int barCount = constrain((6-((hardwareData.rssi/10)-3)),0,5);
+      if (barCount>0)
       {
-        display.fillRect((initialX + (b * barSpacingMultipler)), (initialY - (b * barHeightMultiplier)), barWidth, b * barHeightMultiplier, EPD_BLACK);
+        // <50 rssi value = 5 bars, each +10 rssi value range = one less bar
+        // draw bars to represent WiFi strength
+        for (int b = 1; b <= barCount; b++)
+        {
+          display.fillRect((initialX + (b * barSpacingMultipler)), (initialY - (b * barHeightMultiplier)), barWidth, b * barHeightMultiplier, EPD_BLACK);
+        }
+        debugMessage(String("WiFi signal strength on screen as ") + barCount +" bars",2);
       }
-      debugMessage(String("WiFi signal strength on screen as ") + barCount +" bars");
+      else
+      {
+        // you could do a visual representation of no WiFi strength here
+        debugMessage("RSSI too low, no display",1);
+      }
     }
-    else
-    {
-      // you could do a visual representation of no WiFi strength here
-      debugMessage("RSSI too low, no display");
-    }
-  }
+  #endif
 }
 
 void screenHelperBatteryStatus(int initialX, int initialY, int barWidth, int barHeight)
 // helper function for screenXXX() routines that draws battery charge %
 {
-  // IMPROVEMENT : Screen dimension boundary checks for function parameters
+  // IMPROVEMENT : Screen dimension boundary checks for passed parameters
+  // IMPROVEMENT : Check for offscreen drawing based on passed parameters
   #ifdef SCREEN
     if (hardwareData.batteryVoltage>0) 
     {
@@ -617,68 +637,70 @@ void screenHelperBatteryStatus(int initialX, int initialY, int barWidth, int bar
       // battery border
       display.drawRect(initialX,initialY,barWidth,barHeight,EPD_BLACK);
       //battery percentage as rectangle fill, 1 pixel inset from the battery border
-      display.fillRect((initialX + 2),(initialY + 2),(int((hardwareData.batteryPercent/100)*barWidth) - 4),(barHeight - 4),EPD_GRAY);
-      debugMessage(String("battery status drawn to screen as ") + hardwareData.batteryPercent + "%" );
+      display.fillRect((initialX + 2),(initialY + 2),int(0.5+(hardwareData.batteryPercent*((barWidth-4)/100))),(barHeight - 4),EPD_BLACK);
+      debugMessage(String("battery status drawn to screen as ") + hardwareData.batteryPercent + "%",2);
     }
   #endif
 }
 
-void screenHelperSparkLines(int initialX, int initialY, int xWidth, int yHeight)
+void screenHelperSparkLine(int initialX, int initialY, int xWidth, int yHeight)
 {
-  // TEST ONLY: load test CO2 values
-  // testSparkLineValues(SAMPLE_SIZE);
+  #ifdef SCREEN
+    // TEST ONLY: load test CO2 values
+    // testSparkLineValues(SAMPLE_SIZE);
 
-  uint16_t co2Min = co2Samples[0];
-  uint16_t co2Max = co2Samples[0];
-  // # of pixels between each samples x and y coordinates
-  int xPixelStep, yPixelStep;
+    uint16_t co2Min = co2Samples[0];
+    uint16_t co2Max = co2Samples[0];
+    // # of pixels between each samples x and y coordinates
+    int xPixelStep, yPixelStep;
 
-  int sparkLineX[SAMPLE_SIZE], sparkLineY[SAMPLE_SIZE];
+    int sparkLineX[SAMPLE_SIZE], sparkLineY[SAMPLE_SIZE];
 
-  // horizontal distance (pixels) between each displayed co2 value
-  xPixelStep = (xWidth / (SAMPLE_SIZE - 1));
+    // horizontal distance (pixels) between each displayed co2 value
+    xPixelStep = (xWidth / (SAMPLE_SIZE - 1));
 
-  // determine min/max of CO2 samples
-  // could use recursive function but SAMPLE_SIZE should always be relatively small
-  for(int i=0;i<SAMPLE_SIZE;i++)
-  {
-    if(co2Samples[i] > co2Max) co2Max = co2Samples[i];
-    if(co2Samples[i] < co2Min) co2Min = co2Samples[i];
-  }
-  debugMessage(String("Max CO2 in stored sample range is ") + co2Max +", min is " + co2Min);
+    // determine min/max of CO2 samples
+    // could use recursive function but SAMPLE_SIZE should always be relatively small
+    for(int i=0;i<SAMPLE_SIZE;i++)
+    {
+      if(co2Samples[i] > co2Max) co2Max = co2Samples[i];
+      if(co2Samples[i] < co2Min) co2Min = co2Samples[i];
+    }
+    debugMessage(String("Max CO2 in stored sample range is ") + co2Max +", min is " + co2Min,2);
 
-  // vertical distance (pixels) between each displayed co2 value
-  yPixelStep = round(((co2Max - co2Min) / yHeight)+.5);
+    // vertical distance (pixels) between each displayed co2 value
+    yPixelStep = round(((co2Max - co2Min) / yHeight)+.5);
 
-  debugMessage(String("xPixelStep is ") + xPixelStep + ", yPixelStep is " + yPixelStep);
+    debugMessage(String("xPixelStep is ") + xPixelStep + ", yPixelStep is " + yPixelStep,2);
 
-  // TEST ONLY : sparkline border box
-  // display.drawRect(initialX,initialY, xWidth,yHeight, EPD_BLACK);
+    // TEST ONLY : sparkline border box
+    // display.drawRect(initialX,initialY, xWidth,yHeight, EPD_BLACK);
 
-  // determine sparkline x,y values
-  for(int i=0;i<SAMPLE_SIZE;i++)
-  {
-    sparkLineX[i] = (initialX + (i * xPixelStep));
-    sparkLineY[i] = ((initialY + yHeight) - (int)((co2Samples[i]-co2Min) / yPixelStep));
-    // draw/extend sparkline after first value is generated
-    if (i != 0)
-      display.drawLine(sparkLineX[i-1],sparkLineY[i-1],sparkLineX[i],sparkLineY[i],EPD_BLACK);  
-  }
-  for (int i=0;i<SAMPLE_SIZE;i++)
-  {
-    debugMessage(String("X,Y coordinates for CO2 sample ") + i + " is " + sparkLineX[i] + "," + sparkLineY[i]);
-  }
-    debugMessage("sparkline drawn to screen");
+    // determine sparkline x,y values
+    for(int i=0;i<SAMPLE_SIZE;i++)
+    {
+      sparkLineX[i] = (initialX + (i * xPixelStep));
+      sparkLineY[i] = ((initialY + yHeight) - (int)((co2Samples[i]-co2Min) / yPixelStep));
+      // draw/extend sparkline after first value is generated
+      if (i != 0)
+        display.drawLine(sparkLineX[i-1],sparkLineY[i-1],sparkLineX[i],sparkLineY[i],EPD_BLACK);  
+    }
+    for (int i=0;i<SAMPLE_SIZE;i++)
+    {
+      debugMessage(String("X,Y coordinates for CO2 sample ") + i + " is " + sparkLineX[i] + "," + sparkLineY[i],2);
+    }
+      debugMessage("sparkline drawn to screen",1);
+  #endif
 }
 
 void batteryRead()
-// stores battery voltage if available in hardware characteristics global 
+// stores battery voltage if available in hardware characteristics global
 {
-  // check to see if i2C monitor is available
+  // use LC709203 if available. Built-in on Adafruit ESP32S2 Feather (pt 5303)
   if (lc.begin())
   // Check battery monitoring status
   {
-    debugMessage("Reading battery voltage from LC709203F");
+    debugMessage("Reading battery voltage from LC709203F",2);
     lc.setPackAPA(BATTERY_APA);
     hardwareData.batteryPercent = lc.cellPercent();
     hardwareData.batteryVoltage = lc.cellVoltage();
@@ -693,12 +715,12 @@ void batteryRead()
       // assumes default ESP32 analogReadResolution (4095)
       // the 1.05 is a fudge factor original author used to align reading with multimeter
       hardwareData.batteryVoltage = ((float)analogRead(VBATPIN) / 4095) * 3.3 * 2 * 1.05;
-      hardwareData.batteryPercent = (uint8_t)(((hardwareData.batteryVoltage - BATTV_MIN) / (BATTV_MAX - BATTV_MIN)) * 100);
+      hardwareData.batteryPercent = (uint8_t)(((hardwareData.batteryVoltage - batteryMinVoltage) / (batteryMaxVoltage - batteryMinVoltage)) * 100);
     #endif
   }
   if (hardwareData.batteryVoltage!=0) 
   {
-    debugMessage(String("Battery voltage: ") + hardwareData.batteryVoltage + "v, percent: " + hardwareData.batteryPercent + "%");
+    debugMessage(String("Battery voltage: ") + hardwareData.batteryVoltage + "v, percent: " + hardwareData.batteryPercent + "%",1);
   }
 }
 
@@ -726,24 +748,24 @@ bool sensorInit()
     {
       // Failed to initialize SCD40
       errorToString(error, errorMessage, 256);
-      debugMessage(String(errorMessage) + " executing SCD40 startPeriodicMeasurement()");
+      debugMessage(String(errorMessage) + " executing SCD40 startPeriodicMeasurement()",1);
       return false;
     }
     else 
     {
-      debugMessage("SCD40 initialized");
+      debugMessage("SCD40 ready",1);
       return true;
     }
   #else
     // ATHX0, BME280
     if (envSensor.begin())
     {
-      // ID of 0x56-0x58 or 0x60 is a BME 280, 0x61 is BME680, 0x77 is BME280 on ESP32S2 Feather
-      debugMessage(String("Environment sensor ready, ID is: ")+envSensor.sensorID());
+      debugMessage("Environment sensor ready",1);
       return true;
     }
     else
     {
+      debugMessage("Environment sensor failed to initialize",1);
       return false;
     }
   #endif
@@ -765,29 +787,30 @@ bool sensorRead()
       // handle SCD40 errors
       if (error) {
         errorToString(error, errorMessage, 256);
-        debugMessage(String(errorMessage) + " during SCD4X read");
+        debugMessage(String(errorMessage) + " during SCD4X read",1);
         return false;
       }
-      if (sensorData.ambientCO2<400 || sensorData.ambientCO2>6000)
+      if (sensorData.ambientCO2<440 || sensorData.ambientCO2>6000)
       {
-        debugMessage(String("SCD40 CO2 reading out of range at ") + sensorData.ambientCO2);
+        debugMessage(String("SCD40 CO2 reading out of range at ") + sensorData.ambientCO2,1);
         return false;
       }
       //convert C to F for temp
       sensorData.ambientTempF = (sensorData.ambientTempF * 1.8) + 32;
-      debugMessage(String("SCD40 read ") + loop + " of " + READS_PER_SAMPLE + ": " + sensorData.ambientTempF + "F, " + sensorData.ambientHumidity + "%, " + sensorData.ambientCO2 + " ppm");
+      debugMessage(String("SCD40 read ") + loop + " of " + READS_PER_SAMPLE + ": " + sensorData.ambientTempF + "F, " + sensorData.ambientHumidity + "%, " + sensorData.ambientCO2 + " ppm",2);
     }
+    debugMessage(String("Final SCD40 measurement ") + sensorData.ambientTempF + "F, " + sensorData.ambientHumidity + "%, " + sensorData.ambientCO2 + " ppm",1);
     return true;
   #else
     // AHTX0, BME280
-    sensors_event_t temp_event, humidity_event;
     // FIX : Can we get error conditions from this API?
-    envSensor_temp->getEvent(&temp_event);
-    envSensor_humidity->getEvent(&humidity_event);
-   
-    sensorData.ambientTempF = (temp_event.temperature * 1.8) +32;
-    sensorData.ambientHumidity = humidity_event.relative_humidity;
+    sensors_event_t humidityEvent, tempEvent;
+    envSensorTemp->getEvent(&tempEvent);
+    envSensorHumidity->getEvent(&humidityEvent);
+    sensorData.ambientTempF = (tempEvent.temperature * 1.8) +32;
+    sensorData.ambientHumidity = humidityEvent.relative_humidity;
     sensorData.ambientCO2 = 10000;
+    debugMessage(String("Environment sensor measurement ") + sensorData.ambientTempF + "F, " + sensorData.ambientHumidity + "%, " + sensorData.ambientCO2 + " ppm",1);
     return true;
   #endif
 }
@@ -798,7 +821,7 @@ int nvStorageRead()
 {
   nvStorage.begin("air-quality", false);
   int storedCounter = nvStorage.getInt("counter", -1); // counter tracks a 0 based array
-  debugMessage(String("Sample count FROM nv storage is ") + storedCounter);
+  debugMessage(String("Sample count FROM nv storage is ") + storedCounter,2);
 
   // read value or insert current sensor reading if this is the first read from nv storage
   averageTempF = nvStorage.getFloat("temp", 0);
@@ -807,7 +830,7 @@ int nvStorageRead()
   {
     // bad value, replace with current temp
     averageTempF = (sensorData.ambientTempF * storedCounter);
-    debugMessage("Unexpected tempF value in nv storage replaced with multiple of current temperature");
+    debugMessage("Unexpected tempF value in nv storage replaced with multiple of current temperature",2);
   }
 
   averageHumidity = nvStorage.getFloat("humidity", 0);
@@ -815,19 +838,23 @@ int nvStorageRead()
   {
     // bad value, replace with current temp
     averageHumidity = (sensorData.ambientHumidity * storedCounter);
-    debugMessage("Unexpected humidity value in nv storage replaced with multiple of current humidity");
+    debugMessage("Unexpected humidity value in nv storage replaced with multiple of current humidity",2);
   }
 
-  debugMessage(String("Intermediate values FROM nv storage: Temp:") + averageTempF + "F, Humidity:" + averageHumidity + "%");
+  debugMessage(String("Intermediate values FROM nv storage: Temp:") + averageTempF + "F, Humidity:" + averageHumidity + "%",2);
 
-  // Read CO2 array. If they don't exist, create them as 400 (CO2 floor)
-  String nvStoreBaseName;
-  for (int i=0; i<SAMPLE_SIZE; i++)
+  // only deal with CO2 if you are getting data from sensor
+  if (sensorData.ambientCO2 != 10000)
   {
-    nvStoreBaseName = "co2Sample" + String(i);
-    co2Samples[i] = nvStorage.getLong(nvStoreBaseName.c_str(),400);
-    debugMessage(String(nvStoreBaseName) + " retrieved from nv storage is " + co2Samples[i]);
-  }  
+    // Read CO2 array. If they don't exist, create them as 400 (CO2 floor)
+    String nvStoreBaseName;
+    for (int i=0; i<SAMPLE_SIZE; i++)
+    {
+      nvStoreBaseName = "co2Sample" + String(i);
+      co2Samples[i] = nvStorage.getLong(nvStoreBaseName.c_str(),400);
+      debugMessage(String(nvStoreBaseName) + " retrieved from nv storage is " + co2Samples[i],2);
+    }
+  }
   return storedCounter;
 }
 
@@ -835,15 +862,16 @@ void nvStorageWrite(int storedCounter, float tempF, float humidity, uint16_t co2
 // tempF and humidity stored as running totals, CO2 stored in array for sparkline
 {
   nvStorage.putInt("counter", storedCounter);
-  debugMessage(String("Sample count TO nv storage is ") + storedCounter);
+  debugMessage(String("Sample count TO nv storage is ") + storedCounter,2);
   nvStorage.putFloat("temp", tempF);
   nvStorage.putFloat("humidity", humidity);
-  debugMessage(String("Intermediate values TO nv storage: Temp: ") + tempF + "F, Humidity: " + humidity + "%");
+  debugMessage(String("Intermediate values TO nv storage: Temp: ") + tempF + "F, Humidity: " + humidity + "%",2);
+  // only deal with CO2 if there is sensor data
   if ((sensorData.ambientCO2 != 10000) && (co2 != 0))
   {
     String nvStoreBaseName = "co2Sample" + String(storedCounter);
     nvStorage.putLong(nvStoreBaseName.c_str(),co2);
-    debugMessage(String(nvStoreBaseName) + " stored in nv storage as " + co2);
+    debugMessage(String(nvStoreBaseName) + " stored in nv storage as " + co2,2);
   }
   if (co2 == 0) // reset all the values
   {
@@ -851,7 +879,7 @@ void nvStorageWrite(int storedCounter, float tempF, float humidity, uint16_t co2
     {
       String nvStoreBaseName = "co2Sample" + String(i);
       nvStorage.putLong(nvStoreBaseName.c_str(),co2);
-      debugMessage(String(nvStoreBaseName) + " stoin nv storage as " + co2);
+      debugMessage(String(nvStoreBaseName) + " stored in nv storage as " + co2,2);
     }
   }
 }
@@ -864,7 +892,7 @@ void powerEnable()
     // ESP32 is kinda odd in that secondary ports must be manually
     // assigned their pins with setPins()!
     Wire1.setPins(SDA1, SCL1);
-    debugMessage("enabled ESP32 hardware with two I2C ports");
+    debugMessage("enabled ESP32 hardware with two I2C ports",2);
   #endif
 
   // Adafruit ESP32 I2C power management
@@ -881,7 +909,7 @@ void powerEnable()
     // if you need to turn the neopixel on
     // pinMode(NEOPIXEL_POWER, OUTPUT);
     // digitalWrite(NEOPIXEL_POWER, HIGH);
-    debugMessage("enabled Adafruit Feather ESP32S2 I2C power");
+    debugMessage("enabled Adafruit Feather ESP32S2 I2C power",1);
   #endif
 
   #if defined(ARDUINO_ADAFRUIT_FEATHER_ESP32S2_TFT)
@@ -897,32 +925,35 @@ void powerEnable()
     // Turn on neopixel
     // pinMode(NEOPIXEL_POWER, OUTPUT);
     // digitalWrite(NEOPIXEL_POWER, HIGH);
-    debugMessage("enabled Adafruit Feather ESP32 V2 I2C power");
+    debugMessage("enabled Adafruit Feather ESP32 V2 I2C power",1);
   #endif
 }
 
 void powerDisable(int deepSleepTime)
 // Powers down hardware activated via powerEnable() then deep sleep MCU
 {
-  char errorMessage[256];
+  debugMessage("Starting power down activities",1);
 
-  debugMessage("Starting power down activities");
   // power down epd
-  display.powerDown();
-  digitalWrite(EPD_RESET, LOW);  // hardware power down mode
-  debugMessage("powered down epd");
+  #ifdef SCREEN
+    display.powerDown();
+    digitalWrite(EPD_RESET, LOW);  // hardware power down mode
+    debugMessage("powered down epd",1);
+  #endif
 
   aq_network.networkStop();
 
-  // power down SCD40
-  // stops potentially started measurement then powers down SCD40
-  uint16_t error = envSensor.stopPeriodicMeasurement();
-  if (error) {
-    errorToString(error, errorMessage, 256);
-    debugMessage(String(errorMessage) + " executing SCD40 stopPeriodicMeasurement()");
-  }
-  envSensor.powerDown();
-  debugMessage("SCD40 powered down");
+  // power down SCD40 by stopping potentially started measurement then power down SCD40
+  #ifdef SCD40
+    char errorMessage[256];
+    uint16_t error = envSensor.stopPeriodicMeasurement();
+    if (error) {
+      errorToString(error, errorMessage, 256);
+      debugMessage(String(errorMessage) + " executing SCD40 stopPeriodicMeasurement()",1);
+    }
+    envSensor.powerDown();
+    debugMessage("SCD40 powered down",1);
+  #endif
 
   #if defined(ARDUINO_ADAFRUIT_FEATHER_ESP32_V2)
     // Turn off the I2C power
@@ -932,7 +963,7 @@ void powerDisable(int deepSleepTime)
     // if you need to turn the neopixel off
     // pinMode(NEOPIXEL_POWER, OUTPUT);
     // digitalWrite(NEOPIXEL_POWER, LOW);
-    debugMessage("disabled Adafruit Feather ESP32 V2 I2C power");
+    debugMessage("disabled Adafruit Feather ESP32 V2 I2C power",1);
   #endif
 
   #if defined(ARDUINO_ADAFRUIT_FEATHER_ESP32S2)
@@ -943,11 +974,11 @@ void powerDisable(int deepSleepTime)
     // if you need to turn the neopixel off
     // pinMode(NEOPIXEL_POWER, OUTPUT);
     // digitalWrite(NEOPIXEL_POWER, LOW);
-    debugMessage("disabled Adafruit Feather ESP32S2 I2C power");
+    debugMessage("disabled Adafruit Feather ESP32S2 I2C power",1);
   #endif
 
   esp_sleep_enable_timer_wakeup(deepSleepTime*1000000); // ESP microsecond modifier
-  debugMessage(String("Going to sleep for ") + deepSleepTime + " seconds");
+  debugMessage(String("Going to sleep for ") + deepSleepTime + " seconds",1);
   esp_deep_sleep_start();
 }
 
@@ -990,7 +1021,7 @@ String OWMtoMeteoconIcon(String icon)
   if ((icon == "50d") || (icon == "50n")) // 50d = mist = Meteocon "M"
     return "M";
   // Nothing matched
-  debugMessage("OWM icon not matched to Meteocon, why?");
+  debugMessage("OWM icon not matched to Meteocon, why?",1);
   return ")";
 }
 

@@ -15,7 +15,7 @@
 // Only compile if InfluxDB enabled
 #ifdef INFLUX
   // required external functions and data structures
-  extern void debugMessage(String messageText);
+  extern void debugMessage(String messageText, int messageLevel);
 
   #include <InfluxDbClient.h>
 
@@ -63,11 +63,11 @@
     // Attempts influxDB connection, and if unsuccessful, re-attempts after CONNECT_ATTEMPT_INTERVAL second delay for CONNECT_ATTEMPT_LIMIT times
     for (int tries = 1; tries <= CONNECT_ATTEMPT_LIMIT; tries++) {
       if (dbclient.validateConnection()) {
-        debugMessage(String("Connected to InfluxDB: ") + dbclient.getServerUrl());
+        debugMessage(String("Connected to InfluxDB: ") + dbclient.getServerUrl(),2);
         result = true;
         break;
       }
-      debugMessage(String("influxDB connection attempt ") + tries + " of " + CONNECT_ATTEMPT_LIMIT + " failed with error msg: " + dbclient.getLastErrorMessage());
+      debugMessage(String("influxDB connection attempt ") + tries + " of " + CONNECT_ATTEMPT_LIMIT + " failed with error msg: " + dbclient.getLastErrorMessage(),1);
       delay(CONNECT_ATTEMPT_INTERVAL*1000);
     }
     
@@ -81,12 +81,12 @@
         dbenvdata.addField("co2", co2);
       // Write point via connection to InfluxDB host
       if (!dbclient.writePoint(dbenvdata)) {
-        debugMessage("InfluxDB write failed: " + dbclient.getLastErrorMessage());
+        debugMessage("InfluxDB write failed: " + dbclient.getLastErrorMessage(),1);
         result = false;
       }
       else
       {
-        debugMessage(String("InfluxDB write success: ") + dbclient.pointToLineProtocol(dbenvdata));
+        debugMessage(String("InfluxDB write success: ") + dbclient.pointToLineProtocol(dbenvdata),1);
       }
 
       // Now store device information 
@@ -100,12 +100,12 @@
       {
         if (!dbclient.writePoint(dbdevdata))
         {
-          debugMessage("InfluxDB write failed: " + dbclient.getLastErrorMessage());
+          debugMessage("InfluxDB write failed: " + dbclient.getLastErrorMessage(),1);
           result = false;
         }
         else
         {
-          debugMessage(String("InfluxDB write success: ") + dbclient.pointToLineProtocol(dbdevdata));
+          debugMessage(String("InfluxDB write success: ") + dbclient.pointToLineProtocol(dbdevdata),1);
         }
       }
       dbclient.flushBuffer();  // Clear pending writes (before going to sleep)

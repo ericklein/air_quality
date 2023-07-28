@@ -7,7 +7,7 @@
 #include "secrets.h"
 
 // Shared helper function we call here too...
-extern void debugMessage(String messageText);
+extern void debugMessage(String messageText, int messageLevel);
 
 // Includes and defines specific to WiFi network connectivity
 #ifdef WIFI
@@ -73,12 +73,12 @@ bool AQ_Network::networkBegin() {
       // Attempts WiFi connection, and if unsuccessful, re-attempts after CONNECT_ATTEMPT_INTERVAL second delay for CONNECT_ATTEMPT_LIMIT times
       if (WiFi.status() == WL_CONNECTED)
       {
-        debugMessage("WiFi IP address is: " + WiFi.localIP().toString());
-        debugMessage("RSSI is: " + String(getWiFiRSSI()) + " dBm");
+        debugMessage("WiFi IP address is: " + WiFi.localIP().toString(),1);
+        debugMessage("RSSI is: " + String(getWiFiRSSI()) + " dBm",1);
         result = true;
         break;
       }
-      debugMessage(String("Connection attempt ") + tries + " of " + CONNECT_ATTEMPT_LIMIT + " to " + WIFI_SSID + " failed");
+      debugMessage(String("Connection attempt ") + tries + " of " + CONNECT_ATTEMPT_LIMIT + " to " + WIFI_SSID + " failed",1);
       // use of delay() OK as this is initialization code
       delay(CONNECT_ATTEMPT_INTERVAL * 1000); // convered into milliseconds
     }
@@ -97,26 +97,28 @@ bool AQ_Network::networkBegin() {
     if (Ethernet.begin(mac) == 0) {
       // identified errors
       if (Ethernet.hardwareStatus() == EthernetNoHardware) {
-        debugMessage("Ethernet hardware not found");
+        debugMessage("Ethernet hardware not found",1);
       } else if (Ethernet.linkStatus() == LinkOFF) {
-        debugMessage("Ethernet cable not connected");
+        debugMessage("Ethernet cable not connected",1);
       } else {
         // generic error
-        debugMessage("Failed to configure Ethernet");
+        debugMessage("Failed to configure Ethernet",1);
       }
     } else {
-      debugMessage(String("Ethernet IP address is: ") + Ethernet.localIP().toString());
+      debugMessage(String("Ethernet IP address is: ") + Ethernet.localIP().toString(),1);
       result = true;
     }
   #endif
   return (result);
 }
 
-void AQ_Network::setTime(long timeZoneOffset, long daylightOffset) {
-  #if defined(WIFI) || defined(RJ45)
+void AQ_Network::setTime(long timeZoneOffset, long daylightOffset) 
+{
+  // Only use if there is a network and a screen to display data...
+  #if (defined(WIFI) || defined(RJ45)) && (defined(SCREEN))
     // Get time from NTP
     configTime(timeZoneOffset, daylightOffset, ntpServer);
-    debugMessage("Time zone adjusted local time : " + dateTimeString());
+    debugMessage("Time zone adjusted local time : " + dateTimeString(),1);
   #endif
 }
 
@@ -136,7 +138,7 @@ String AQ_Network::httpGETRequest(const char* serverName) {
     // HTTP reponse OK code
     payload = http.getString();
   } else {
-    debugMessage("HTTP GET error code: " + httpResponseCode);
+    debugMessage("HTTP GET error code: " + httpResponseCode,1);
     payload = "HTTP GET error";
   }
   // free resources
@@ -164,21 +166,21 @@ int AQ_Network::httpPOSTRequest(String serverurl, String contenttype, String pay
   // httpCode will be negative on error, but HTTP status might indicate failure
   if (httpCode > 0) {
     // HTTP POST complete, print result code
-    debugMessage("HTTP POST [" + serverurl + "], result code: " + String(httpCode));
+    debugMessage("HTTP POST [" + serverurl + "], result code: " + String(httpCode),2);
 
     // If POST succeeded, output response as debug messages
     if (httpCode == HTTP_CODE_OK) {
       const String& payload = http.getString();
-      debugMessage("received payload:\n<<");
-      debugMessage(payload);
-      debugMessage(">>");
+      debugMessage("received payload:\n<<",2);
+      debugMessage(payload,2);
+      debugMessage(">>",2);
     }
   } else {
-    debugMessage("HTTP POST [" + serverurl + "] failed, error: " + http.errorToString(httpCode).c_str());
+    debugMessage("HTTP POST [" + serverurl + "] failed, error: " + http.errorToString(httpCode).c_str(),1);
   }
 
   http.end();
-  debugMessage("closing connection for dweeting");
+  debugMessage("closing connection for dweeting",1);
 #endif
 
   return (httpCode);
