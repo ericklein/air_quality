@@ -77,14 +77,14 @@ typedef struct
   // float lon;    // "lon": 8.54
   // float lat;    // "lat": 47.37
   int aqi;      // "aqi": 2  [European standards body value]
-  float co;     // "co": 453.95, in μg/m3
-  float no;     // "no": 0.47, in μg/m3
-  float no2;    // "no2": 52.09, in μg/m3
-  float o3;     // "o3": 17.17, in μg/m3
-  float so2;    // "so2": 7.51, in μg/m3
+  // float co;     // "co": 453.95, in μg/m3
+  // float no;     // "no": 0.47, in μg/m3
+  // float no2;    // "no2": 52.09, in μg/m3
+  // float o3;     // "o3": 17.17, in μg/m3
+  // float so2;    // "so2": 7.51, in μg/m3
   float pm25;   // "pm2.5": 8.04, in μg/m3
-  float pm10;   // "pm10": 9.96, in μg/m3
-  float nh3;    // "nh3": 0.86, in μg/m3
+  // float pm10;   // "pm10": 9.96, in μg/m3
+  // float nh3;    // "nh3": 0.86, in μg/m3
 } OpenWeatherMapAirQuality;
 OpenWeatherMapAirQuality owmAirQuality; // global variable for OWM current data
 
@@ -125,22 +125,25 @@ Adafruit_LC709203F lc;
   #include "Fonts/glyphs.h"
 
   // 2.96" greyscale display with 196x128 pixels
-  // colors are EPD_WHITE, EPD_BLACK, EPD_RED, EPD_GRAY, EPD_LIGHT, EPD_DARK
-  ThinkInk_290_Grayscale4_T5 display(EPD_DC, EPD_RESET, EPD_CS, SRAM_CS, EPD_BUSY);
+  // ThinkInk_290_Grayscale4_T5 display(EPD_DC, EPD_RESET, EPD_CS, SRAM_CS, EPD_BUSY);
+  // 2.96" tricolor display with 196x128 pixels
+  ThinkInk_290_Tricolor_Z10 display(EPD_DC, EPD_RESET, EPD_CS, SRAM_CS, EPD_BUSY);
 
   // screen layout assists
   const int xMargins = 5;
   const int xOutdoorMargin = ((display.width()/2) + xMargins);
   const int yMargins = 2;
-  // yCO2 not used
   const int yCO2 = 20;
   const int ySparkline = 40;
-  const int yTemp = 100;
+  const int yTemperature = 100;
   // BUG, 7/8 = 112, WiFi status is 15 (5*3) pixels high
   const int yStatus = (display.height()*7/8);
   const int sparklineHeight = 40;
   const int batteryBarWidth = 28;
   const int batteryBarHeight = 10;
+  const int wifiBarWidth = 3;
+  const int wifiBarHeightMultiplier = 3;
+  const int wifiBarSpacingMultipler = 5;
 #endif
 
 #include "ArduinoJson.h"  // Needed by OWM retrieval routines
@@ -170,7 +173,7 @@ void setup()
     // wait for serial port connection
     while (!Serial);
   #endif
-  // Confirm key site configuration parameters
+
   debugMessage("Air Quality started",1);
   debugMessage(String("Sample interval is ") + SAMPLE_INTERVAL + " seconds",2);
   debugMessage(String("Number of samples before reporting is ") + SAMPLE_SIZE,2);
@@ -186,14 +189,15 @@ void setup()
 
   #ifdef SCREEN
     // there is no way to query screen for status
-    display.begin(THINKINK_MONO); // changed from THINKINK_GRAYSCALE4 to eliminate black screen border
+    // changed from THINKINK_GRAYSCALE4 to eliminate black screen border, colors are EPD_WHITE, EPD_BLACK
+    display.begin(THINKINK_MONO);
     debugMessage("Display ready",1);
   #endif
 
   // Initialize environmental sensor
   if (!sensorInit()) 
   {
-    screenAlert("Env sensor not detected");
+    screenAlert(xMargins, display.height()/2, "Env sensor not detected");
     // This error often occurs after a firmware flash and then resetting the board
     // Hardware deep sleep typically resolves it, so quickly cycle the hardware
     powerDisable(HARDWARE_ERROR_INTERVAL);
@@ -205,7 +209,7 @@ void setup()
   {
     // hard coded for SCD40 as there is no way to read error condition on other sensors
     debugMessage("SCD40 returned no/bad data",1);
-    screenAlert("SCD40 no/bad data");
+    screenAlert(xMargins,display.height()/2,"SCD40 read issue");
     powerDisable(HARDWARE_ERROR_INTERVAL);
   }
   sampleCounter = nvStorageRead();
@@ -417,33 +421,37 @@ bool OWMAirPollutionRead()
         JsonObject list_0 = doc["list"][0];
         owmAirQuality.aqi = list_0["main"]["aqi"];
         JsonObject list_0_components = list_0["components"];
-        owmAirQuality.co = (float) list_0_components["co"];
-        owmAirQuality.no = (float) list_0_components["no"];
-        owmAirQuality.no2 = (float) list_0_components["no2"];
-        owmAirQuality.o3 = (float) list_0_components["o3"];
-        owmAirQuality.so2 = (float) list_0_components["so2"];
+        // owmAirQuality.co = (float) list_0_components["co"];
+        // owmAirQuality.no = (float) list_0_components["no"];
+        // owmAirQuality.no2 = (float) list_0_components["no2"];
+        // owmAirQuality.o3 = (float) list_0_components["o3"];
+        // owmAirQuality.so2 = (float) list_0_components["so2"];
         owmAirQuality.pm25 = (float) list_0_components["pm2_5"];
         debugMessage(String("OWM current PM2.5 is ") + owmAirQuality.pm25 + " in μg/m3",1);      
-        owmAirQuality.pm10 = (float) list_0_components["pm10"];
-        owmAirQuality.nh3 = (float) list_0_components["nh3"];
+        // owmAirQuality.pm10 = (float) list_0_components["pm10"];
+        // owmAirQuality.nh3 = (float) list_0_components["nh3"];
         return true;
       }
     #endif
   return false;
 }
 
-void screenAlert(String messageText)
+void screenAlert(int initialX, int initialY, String messageText)
 // Display critical error message on screen
 {
 #ifdef SCREEN
+
+  debugMessage("Starting screenAlert refresh",1);
+
   display.clearBuffer();
   display.setTextColor(EPD_BLACK);
   display.setFont(&FreeSans12pt7b);
-  display.setCursor(xMargins,(display.height()/2));
+  display.setCursor(initialX,initialY);
   display.print(messageText);
 
   //update display
   display.display();
+  debugMessage("screenAlert refresh complete",1);
 #endif
 }
 
@@ -454,28 +462,30 @@ void screenInfo(String messageText)
 
   // TEST ONLY: load values normally supplied by OWM
   // testOWMValues();
+
+  debugMessage("Starting screenInfo refresh",1);
   
   display.clearBuffer();
   display.setTextColor(EPD_BLACK);
 
   // borders
   // label
-  display.drawLine(0,yStatus,display.width(),yStatus,EPD_GRAY);
+  display.drawLine(0,yStatus,display.width(),yStatus,EPD_BLACK);
   // splitting sensor vs. outside values
-  display.drawLine((display.width()/2),0,(display.width()/2),yStatus,EPD_GRAY);
+  display.drawLine((display.width()/2),0,(display.width()/2),yStatus,EPD_BLACK);
   
   // screen helper routines
   // draws battery in the lower right corner. -3 in first parameter accounts for battery nub
   screenHelperBatteryStatus((display.width()-xMargins-batteryBarWidth-3),(display.height()-yMargins-batteryBarHeight),batteryBarWidth,batteryBarHeight);
   
   // -70 moves it to the left of the battery display
-  screenHelperWiFiStatus((display.width() - xMargins - 70), (display.height() - yMargins),3,3,5);
+  screenHelperWiFiStatus((display.width() - xMargins - 70), (display.height() - yMargins),wifiBarWidth,wifiBarHeightMultiplier,wifiBarSpacingMultipler);
   
   // draws any status message in the lower left corner. -8 in the first parameter accounts for fixed font height
   screenHelperStatusMessage(xMargins,(display.height()-yMargins-8), messageText);
 
   // display sparkline
-  screenHelperSparkLines(xMargins,ySparkline,((display.width()/2) - (2 * xMargins)),sparklineHeight);
+  screenHelperSparkLine(xMargins,ySparkline,((display.width()/2) - (2 * xMargins)),sparklineHeight);
 
   // Indoor
   // CO2 level
@@ -499,17 +509,17 @@ void screenInfo(String messageText)
 
   // Indoor temp
   display.setFont(&FreeSans12pt7b);
-  display.setCursor(xMargins,yTemp);
+  display.setCursor(xMargins,yTemperature);
   display.print(String((int)(sensorData.ambientTempF + .5)));
   display.setFont(&meteocons12pt7b);
   display.print("+");
 
   // Indoor humidity
   display.setFont(&FreeSans12pt7b);
-  display.setCursor(xMargins+60, yTemp);
+  display.setCursor(xMargins+60, yTemperature);
   display.print(String((int)(sensorData.ambientHumidity + 0.5)));
   // original icon ratio was 5:7?
-  display.drawBitmap(xMargins+90,yTemp-21,epd_bitmap_humidity_icon_sm4,20,28,EPD_BLACK);
+  display.drawBitmap(xMargins+90,yTemperature-21,epd_bitmap_humidity_icon_sm4,20,28,EPD_BLACK);
 
   // Outside
   // location label
@@ -521,7 +531,7 @@ void screenInfo(String messageText)
   if (owmCurrentData.temp!=10000)
   {
     display.setFont(&FreeSans12pt7b);
-    display.setCursor(xOutdoorMargin,yTemp);
+    display.setCursor(xOutdoorMargin,yTemperature);
     display.print(String((int)(owmCurrentData.temp+0.5)));
     display.setFont(&meteocons12pt7b);
     display.print("+");
@@ -531,9 +541,9 @@ void screenInfo(String messageText)
   if (owmCurrentData.humidity!=10000)
   {
     display.setFont(&FreeSans12pt7b);
-    display.setCursor(xOutdoorMargin + 60, yTemp);
+    display.setCursor(xOutdoorMargin + 60, yTemperature);
     display.print(String((int)(owmCurrentData.humidity+0.5)));
-    display.drawBitmap(xOutdoorMargin+90,yTemp-21,epd_bitmap_humidity_icon_sm4,20,28,EPD_BLACK);
+    display.drawBitmap(xOutdoorMargin+90,yTemperature-21,epd_bitmap_humidity_icon_sm4,20,28,EPD_BLACK);
   }
 
   // weather icon
@@ -543,13 +553,14 @@ void screenInfo(String messageText)
   {
     // display icon
     display.setFont(&meteocons20pt7b);
-    display.setCursor((display.width()*4/5),(display.height()/2));
+    display.setCursor((display.width()*17/20),(display.height()/2)+10);
     display.print(weatherIcon);
   }
 
-  // Outside air quality index (AQI)
+  // Outside air quality index (AQI) + PM25 value
   if (owmAirQuality.aqi!=10000)
   {
+    // main line
     display.setFont(&FreeSans9pt7b);
     display.setCursor(xOutdoorMargin,ySparkline - 5);
     // European standards-body AQI value
@@ -561,11 +572,15 @@ void screenInfo(String messageText)
 
     display.print(aqiUSALabels[aqiUSLabelValue(owmAirQuality.pm25)]);
     display.print(" AQI");
+    // value line
+    display.setFont();
+    display.setCursor((xOutdoorMargin+20),(ySparkline+3));
+    display.print("(" + String(owmAirQuality.pm25) + ")");
   }
 
   //update display
   display.display();
-  debugMessage("Screen updated",1);
+  debugMessage("screenInfo refresh complete",1);
 #endif
 }
 
@@ -612,7 +627,8 @@ void screenHelperWiFiStatus(int initialX, int initialY, int barWidth, int barHei
 void screenHelperBatteryStatus(int initialX, int initialY, int barWidth, int barHeight)
 // helper function for screenXXX() routines that draws battery charge %
 {
-  // IMPROVEMENT : Screen dimension boundary checks for function parameters
+  // IMPROVEMENT : Screen dimension boundary checks for passed parameters
+  // IMPROVEMENT : Check for offscreen drawing based on passed parameters
   #ifdef SCREEN
     if (hardwareData.batteryVoltage>0) 
     {
@@ -621,13 +637,13 @@ void screenHelperBatteryStatus(int initialX, int initialY, int barWidth, int bar
       // battery border
       display.drawRect(initialX,initialY,barWidth,barHeight,EPD_BLACK);
       //battery percentage as rectangle fill, 1 pixel inset from the battery border
-      display.fillRect((initialX + 2),(initialY + 2),(int((hardwareData.batteryPercent/100)*barWidth) - 4),(barHeight - 4),EPD_GRAY);
+      display.fillRect((initialX + 2),(initialY + 2),int(0.5+(hardwareData.batteryPercent*((barWidth-4)/100))),(barHeight - 4),EPD_BLACK);
       debugMessage(String("battery status drawn to screen as ") + hardwareData.batteryPercent + "%",2);
     }
   #endif
 }
 
-void screenHelperSparkLines(int initialX, int initialY, int xWidth, int yHeight)
+void screenHelperSparkLine(int initialX, int initialY, int xWidth, int yHeight)
 {
   #ifdef SCREEN
     // TEST ONLY: load test CO2 values
@@ -699,7 +715,7 @@ void batteryRead()
       // assumes default ESP32 analogReadResolution (4095)
       // the 1.05 is a fudge factor original author used to align reading with multimeter
       hardwareData.batteryVoltage = ((float)analogRead(VBATPIN) / 4095) * 3.3 * 2 * 1.05;
-      hardwareData.batteryPercent = (uint8_t)(((hardwareData.batteryVoltage - BATTV_MIN) / (BATTV_MAX - BATTV_MIN)) * 100);
+      hardwareData.batteryPercent = (uint8_t)(((hardwareData.batteryVoltage - batteryMinVoltage) / (batteryMaxVoltage - batteryMinVoltage)) * 100);
     #endif
   }
   if (hardwareData.batteryVoltage!=0) 

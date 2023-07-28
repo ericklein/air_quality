@@ -1,5 +1,5 @@
 ### Purpose
-Air Quality (aka AQ) samples and logs device temperature, humidity, and if available, co2 levels
+Air Quality (aka AQ) samples local temperature, humidity, and if connected to the appropriate sensor, CO2 (carbon dioxide) levels. It can log this data to a number of network endpoints. It can also display the local outdoor weather to compliment local sensor readings.
 
 ### Features
 ![Screenshot](readme/ui_mar23.jpg)
@@ -18,20 +18,28 @@ Air Quality (aka AQ) samples and logs device temperature, humidity, and if avail
 - #4 = WiFi signal strength based on RSSI
 - #5 = Battery level
 
-### Configuring targets
-- Step 1: set conditional compile flags in config.h
-Set parameters in secrets.h (see config.h for list of required parameters)
-- Set parameters in config.h
-- Switch between AHT2x/BME280 and SCD40 in multiple locations within air_quality.ino
+### What is AQI Anyway?
+It's worth noting that while most people have heard of an "Air Quality Index" from their local weather service or news, the calculation of AQI from sensor readings is less well known.  Sensors measure and report particulate concentrations in various size ranges, the
+most widely used of which is "PM2.5", meaning airborne particulates of 2.5 microns in diameter or smaller, measured in micrograms per cubic meter.  
+- The more particulates measured the worse the air quality and, eventually, the greater the danger to humans and animals.  Howeveer, the perceived quality of the air and the risk from exposure vary in a non-obvious way based on the actual PM2.5 values observed.
+- That variability is what gave rise to the idea of an Air Quality Index in the
+first place, though as is often the case in associating health factors and risk with environmental data different governing bodies and standards organizations have put forward different ways of calculating risk from sensor data.  You can read much more about this in the Wikipedia page for [Air Quality](https://en.wikipedia.org/wiki/Air_quality_index).
+In the US, the Environmental Protection Agency (EPA) developed its own AQI measure, dividing the normal range of measured particulates and pollutants into six categories indicating increased levels of health concerns.  An overall AQI value is calculated from a piecewise linear function, with scaling and transition points defined by the EPA.  More details on that math are shared in the
+Wikipedia page cited above, as well as this [post](https://forum.airnowtech.org/t/the-aqi-equation/169) on the AirNow tech forum.
+- Most information is kept in the "supporting material" folder, which is not synched to GitHub. Maybe I should do that? ping me if you want more info on CO2 measurements, etc.
 
-### working BOM [hardware configuration]
+### Target configuration
+- Important access settings like WiFi SSID and password, ThingSpeak keys, and InfluxDB credentials are contained in a `secrets.h` file that is not included in this repo.  Instead you'll find the file `secrets_template.h`, which should be copied to `secrets.h` and then edited to supply the right access credentials and configuration values to match your deployment environment.
+- See config.h for parameter configuration
+
+### Bill of Materials (BOM)
 - MCU
 	- ESP32
 - Ethernet
 	- uncomment #define RJ45, comment #define WIFI in config.h
 	- Supported hardware
-		- Particle Ethernet Featherwing: https://www.adafruit.com/product/4003
-		- Silicognition PoE Featherwing: https://www.crowdsupply.com/silicognition/poe-featherwing
+		- [Particle Ethernet Featherwing](https://www.adafruit.com/product/4003)
+		- [Silicognition PoE Featherwing](https://www.crowdsupply.com/silicognition/poe-featherwing)
 	- Technical References
 		- https://docs.particle.io/datasheets/accessories/gen3-accessories/
 		- https://www.adafruit.com/product/4003#:~:text=Description%2D-,Description,along%20with%20a%20Feather%20accessory
@@ -51,9 +59,9 @@ Set parameters in secrets.h (see config.h for list of required parameters)
 			- uncomment AHTX0 section
 			- comment BME280 section 
 	- Supported hardware
-		- AHT20 temp/humidity sensor: https://www.adafruit.com/product/4566, https://www.adafruit.com/product/5183
-		- SCD40 True CO2, Temperature and Humidity Sensor: https://www.adafruit.com/product/5187
-		- BME280 temp/humidity sensor: https://www.adafruit.com/product/2652
+		- [AHT20 temp/humidity sensor](https://www.adafruit.com/product/4566) or similar products
+		- [SCD40 temp/humidity/CO2 sensor](https://www.adafruit.com/product/5187)
+		- [BME280 temp/humidity sensor](https://www.adafruit.com/product/2652)
 	- Technical references 
 		- https://learn.adafruit.com/adafruit-aht20
 		- https://cdn-learn.adafruit.com/assets/assets/000/104/015/original/Sensirion_CO2_Sensors_SCD4x_Datasheet.pdf?1629489682
@@ -65,23 +73,22 @@ Set parameters in secrets.h (see config.h for list of required parameters)
 	- batteryRead() looks for LC709203F, then tries to use supported board's voltage monitor GPIO pin
 		- if neither is found, battery voltage is not displayed or reported
 	- Supported hardware
-	- 	LC709203F battery voltage monitor: https://www.adafruit.com/product/4712
-		- Adafruit batteries: https://www.adafruit.com/product/2011
+		- 	[LC709203F battery voltage monitor](https://www.adafruit.com/product/4712)
+		- [Adafruit batteries](https://www.adafruit.com/product/2011)
 - Screen
 	- uncomment #define SCREEN
 	- code assumes MagTag
 		- if using Featherwing, comment MagTag specific code inside config.h
 	- Supported hardware
 		- 296x128 e-paper display
-			- Adafruit MagTag (EPD): https://www.adafruit.com/product/4800
-			- Adafruit 2.9" E-Ink Featherwing: https://www.adafruit.com/product/4777
-		- LCD and OLED screens
-			- see code history before 02/2022
-			- any adafruit gfx compatible display will work, but AQ doesn't currently support screens requiring continuous power
+			- [Adafruit MagTag (EPD)](https://www.adafruit.com/product/4800)
+			- [Adafruit 2.9" E-Ink Featherwing](https://www.adafruit.com/product/4777)
 	- Technical References
 		- https://cdn-learn.adafruit.com/downloads/pdf/adafruit-gfx-graphics-library.pdf
 
 ### Supported Internet Services for data logging
+- The routines that post data to back end services are generalized as much as practical, though do need to be customized to match the data fieles of interest both within the scope of the project and based on what users want to report and monitor.  Configuration values in config.h help with basic customization, e.g. name of the device, tags to use for Influx data, though in some cases code may need to be modified in the associated post routine.
+
 - MQTT Broker
 	- uncomment #define MQTT
 	- set appropriate parameters in config.h and secrets.h
@@ -90,25 +97,10 @@ Set parameters in secrets.h (see config.h for list of required parameters)
 - Influx
 - DWEET
 
-### External Software Dependencies
-- add library for appropriate sensor from known, working BOM
-	- Sensirion I2C SCD4x library or Adafruit Unified Sensor + appropriate hardware (AHT2x or BME280) library
-	- Adafruit LC709203F library (#define BATTERY)
-	- Adafruit EPD library (MagTag)
-	- Arduino_json (parsing OWM data)
-- include all dependencies to these libraries
-- Time
-	-
-	- Technical References
-		- 
+### Issues and Feature Requests
+- See GitHub Issues for project
 
 ### .plan (big ticket items)
 - WiFI Manager support
 - OTA Firmware update
 - GPIO (button) ESP32 wakeup support to have multiple screens of information
-
-### Information Sources
-- Most information is kept in the "supporting material" folder, which is not synched to GitHub. Maybe I should do that? ping me if you want more info on CO2 measurements, etc.
-
-### Issues and Feature Requests
-- See GitHub Issues for project

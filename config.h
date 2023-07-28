@@ -7,7 +7,7 @@
 
 // Configuration Step 1: Set debug message output
 // comment out to turn off; 1 = summary, 2 = verbose
-// #define DEBUG 2
+#define DEBUG 1
 
 // Configuration Step 2: Set network transport, if desired
 //#define RJ45  	// use Ethernet
@@ -15,13 +15,13 @@
 
 // Configuration Step 3: Set network data endpoints
 // these require a network transport from Step 2
-#define MQTT 		// log sensor data to MQTT broker
+// #define MQTT 		// log sensor data to MQTT broker
 //#define DWEET // Post sensor readings to dweet.io
 #define INFLUX 	// Log data to remote InfluxDB server
 
 // Configuration Step 4: Select environment sensor and configure read intervals
-// #define SCD40		// use SCD40 to read temperature, humidity, and CO2
-#define BME280	// use BME280 to read temperature and humidity
+#define SCD40		// use SCD40 to read temperature, humidity, and CO2
+// #define BME280	// use BME280 to read temperature and humidity
 // #define AHTXX		// use AHT series device to read temperature and humidity
 
 // environment sensor sample timing
@@ -44,27 +44,25 @@
 #endif
 
 // Configuration Step 5: Set screen parameters, if desired
-// #define	SCREEN		// use screen as output
+#define	SCREEN		// use screen as output
 
 // Pin config for e-paper display
 #ifdef SCREEN
-  #if defined (ARDUINO_ADAFRUIT_FEATHER_ESP32S2)
-    // ESP32-S2 with Adafruit 2.9" E-Ink Featherwing (PID 4777)
-    #define EPD_CS      9
-    #define EPD_DC      10     
-    #define SRAM_CS     6  // can set to -1 to not use a pin (uses a lot of RAM!)
-    // on Featherwing EPD_RESET and EPD_BUSY must be set to -1 as these lines are not connected
-    #define EPD_RESET   -1
-    #define EPD_BUSY    -1
-    // #define EPD_RESET   8 // can set to -1 and share with microcontroller Reset!
-    // #define EPD_BUSY    7 // can set to -1 to not use a pin (will wait a fixed delay)
+	#if defined (ARDUINO_ADAFRUIT_FEATHER_ESP32_V2)
+		// new primary development hardware
+		#define EPD_CS      12
+    #define EPD_DC      27     
+    #define SRAM_CS     14  // can set to -1 to not use a pin, which uses a lot of RAM
+    #define EPD_RESET   15  // can set to -1 and share with MCU Reset, can't deep sleep
+    #define EPD_BUSY    32  // can set to -1 to not use a pin and wait a fixed delay
   #else
     // Adafruit MagTag, some values come from board definition package
+		// primary production build target, being replaced with ESP32V2 and epd friend plus screen
     #define EPD_CS      8   
     #define EPD_DC      7   
-    #define SRAM_CS     -1  // can set to -1 to not use a pin (uses a lot of RAM!)
-    // #define EPD_RESET   6   // can set to -1 and share with chip Reset (can't deep sleep)
-    #define EPD_BUSY    5   // can set to -1 to not use a pin (will wait a fixed delay)
+    #define SRAM_CS     -1  // can set to -1 to not use a pin, which uses a lot of RAM
+    // #define EPD_RESET   6   // can set to -1 and share with MCU Reset, can't deep sleep
+    #define EPD_BUSY    5   // can set to -1 to not use a pin and wait a fixed delay
   #endif
 #endif
 
@@ -82,6 +80,8 @@
 // used for reading battery voltage from analog PIN on applicable devices
 const float batteryMaxVoltage	= 4.2; 	// maximum battery voltage
 const float batteryMinVoltage	= 3.2; 	// what we regard as an empty battery
+// battery pin for Adafruit ESP32V2 (part#5400)
+#define VBATPIN A13
 
 // Configuration Step 7: Set parameters for NTP time configuration
 // this will only be used if network transport is defined in Step 2
@@ -96,15 +96,15 @@ const int   daylightOffset_sec = 3600; // US DT
 
 // set client ID; used by mqtt and wifi
 // structure is AQ_room-name; e.g. AQ_kitchen
-#define CLIENT_ID "AQ_cellar"
+#define CLIENT_ID "AQ_dev"
 
 #ifdef MQTT
 	// structure is site/structure/room/device/data
-	#define MQTT_PUB_TEMPF			"7828/cellar/aq/temperature"
-	#define MQTT_PUB_HUMIDITY	"7828/cellar/aq/humidity"
-	#define MQTT_PUB_CO2				"7828/cellar/aq/co2"
-	#define MQTT_PUB_BATTVOLT	"7828/cellar/aq/battery-voltage"
-	#define MQTT_PUB_RSSI			"7828/cellar/aq/rssi"
+	#define MQTT_PUB_TEMPF			"7828/dev/aq/temperature"
+	#define MQTT_PUB_HUMIDITY	"7828/dev/aq/humidity"
+	#define MQTT_PUB_CO2				"7828/dev/aq/co2"
+	#define MQTT_PUB_BATTVOLT	"7828/dev/aq/battery-voltage"
+	#define MQTT_PUB_RSSI			"7828/dev/aq/rssi"
 #endif
 
 #ifdef INFLUX  
@@ -117,7 +117,7 @@ const int   daylightOffset_sec = 3600; // US DT
   // the house) and site (indoors vs. outdoors, typically).
 	// #define DEVICE_LOCATION "AQ-demo"
 	// #define DEVICE_LOCATION "kitchen"
-	#define DEVICE_LOCATION "cellar"
+	#define DEVICE_LOCATION "AQ-dev"
 	// #define DEVICE_LOCATION "lab-office"
 	// #define DEVICE_LOCATION "master bedroom"
 

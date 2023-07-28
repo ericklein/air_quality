@@ -74,7 +74,7 @@ bool AQ_Network::networkBegin() {
       if (WiFi.status() == WL_CONNECTED)
       {
         debugMessage("WiFi IP address is: " + WiFi.localIP().toString(),1);
-        debugMessage("RSSI is: " + String(getWiFiRSSI()) + " dBm",2);
+        debugMessage("RSSI is: " + String(getWiFiRSSI()) + " dBm",1);
         result = true;
         break;
       }
