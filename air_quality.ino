@@ -596,32 +596,28 @@ void screenHelperStatusMessage(int initialX, int initialY, String messageText)
   #endif
 }
 
-void screenHelperWiFiStatus(int initialX, int initialY, int barWidth, int barHeightMultiplier, int barSpacingMultipler)
+void screenHelperWiFiStatus(int initialX, int initialY, int barWidth, int barHeightIncrement, int barSpacing)
 // helper function for screenXXX() routines that draws WiFi signal strength
 {
-  #ifdef SCREEN
-    if (hardwareData.rssi!=0) 
-    {
-      // Convert RSSI values to a 5 bar visual indicator
-      // >90 means no signal
-      int barCount = constrain((6-((hardwareData.rssi/10)-3)),0,5);
-      if (barCount>0)
-      {
-        // <50 rssi value = 5 bars, each +10 rssi value range = one less bar
-        // draw bars to represent WiFi strength
-        for (int b = 1; b <= barCount; b++)
-        {
-          display.fillRect((initialX + (b * barSpacingMultipler)), (initialY - (b * barHeightMultiplier)), barWidth, b * barHeightMultiplier, EPD_BLACK);
+#ifdef SCREEN
+    if (hardwareData.rssi != 0) {
+        // Convert RSSI values to a 5 bar visual indicator
+        // >90 means no signal
+        int barCount = constrain((6 - ((hardwareData.rssi / 10) - 3)), 0, 5);
+        if (barCount > 0) {
+            // <50 rssi value = 5 bars, each +10 rssi value range = one less bar
+            // draw bars to represent WiFi strength
+            for (int b = 1; b <= barCount; b++) {
+                display.fillRect((initialX + (b * barSpacing)), (initialY - (b * barHeightIncrement)), barWidth, b * barHeightIncrement, EPD_BLACK);
+            }
+            debugMessage(String("WiFi signal strength on screen as ") + barCount + " bars", 2);
         }
-        debugMessage(String("WiFi signal strength on screen as ") + barCount +" bars",2);
-      }
-      else
-      {
-        // you could do a visual representation of no WiFi strength here
-        debugMessage("RSSI too low, no display",1);
-      }
+        else {
+            // you could do a visual representation of no WiFi strength here
+            debugMessage("RSSI too low, no display", 1);
+        }
     }
-  #endif
+#endif
 }
 
 void screenHelperBatteryStatus(int initialX, int initialY, int barWidth, int barHeight)
