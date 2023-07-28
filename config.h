@@ -17,7 +17,7 @@
 // these require a network transport from Step 2
 // #define MQTT 		// log sensor data to MQTT broker
 //#define DWEET // Post sensor readings to dweet.io
-#define INFLUX 	// Log data to remote InfluxDB server
+//#define INFLUX 	// Log data to remote InfluxDB server
 
 // Configuration Step 4: Select environment sensor and configure read intervals
 #define SCD40		// use SCD40 to read temperature, humidity, and CO2
@@ -56,13 +56,13 @@
     #define EPD_RESET   15  // can set to -1 and share with MCU Reset, can't deep sleep
     #define EPD_BUSY    32  // can set to -1 to not use a pin and wait a fixed delay
   #else
-    // Adafruit MagTag, some values come from board definition package
+	// Adafruit MagTag, some values come from board definition package
 		// primary production build target, being replaced with ESP32V2 and epd friend plus screen
-    #define EPD_CS      8   
-    #define EPD_DC      7   
-    #define SRAM_CS     -1  // can set to -1 to not use a pin, which uses a lot of RAM
-    // #define EPD_RESET   6   // can set to -1 and share with MCU Reset, can't deep sleep
-    #define EPD_BUSY    5   // can set to -1 to not use a pin and wait a fixed delay
+	#define EPD_CS      8   
+	#define EPD_DC      7   
+	#define SRAM_CS     -1  // can set to -1 to not use a pin, which uses a lot of RAM
+	// #define EPD_RESET   6   // can set to -1 and share with MCU Reset, can't deep sleep
+	#define EPD_BUSY    5   // can set to -1 to not use a pin and wait a fixed delay
   #endif
 #endif
 
@@ -77,11 +77,10 @@
 // #define BATTERY_APA 0x32 // 2500mAH
 // #define BATTERY_APA 0x36 // 3000mAH
 
+// battery pin for Adafruit ESP32V2 used for reading battery voltage
 // used for reading battery voltage from analog PIN on applicable devices
-const float batteryMaxVoltage	= 4.2; 	// maximum battery voltage
-const float batteryMinVoltage	= 3.2; 	// what we regard as an empty battery
-// battery pin for Adafruit ESP32V2 (part#5400)
 #define VBATPIN A13
+const int   batteryReads = 5;
 
 // Configuration Step 7: Set parameters for NTP time configuration
 // this will only be used if network transport is defined in Step 2
@@ -156,3 +155,23 @@ const String weekDays[7] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursda
 #define OWM_SERVER			"http://api.openweathermap.org/data/2.5/"
 #define OWM_WEATHER_PATH	"weather?"
 #define OWM_AQM_PATH		"air_pollution?"
+
+// battery charge level lookup table
+const float voltageTable[101] = {
+  3.200,  3.250,  3.300,  3.350,  3.400,  3.450,
+  3.500,  3.550,  3.600,  3.650,  3.700,  3.703,
+  3.706,  3.710,  3.713,  3.716,  3.719,  3.723,
+  3.726,  3.729,  3.732,  3.735,  3.739,  3.742,
+  3.745,  3.748,  3.752,  3.755,  3.758,  3.761,
+  3.765,  3.768,  3.771,  3.774,  3.777,  3.781,
+  3.784,  3.787,  3.790,  3.794,  3.797,  3.800,
+  3.805,  3.811,  3.816,  3.821,  3.826,  3.832,
+  3.837,  3.842,  3.847,  3.853,  3.858,  3.863,
+  3.868,  3.874,  3.879,  3.884,  3.889,  3.895,
+  3.900,  3.906,  3.911,  3.917,  3.922,  3.928,
+  3.933,  3.939,  3.944,  3.950,  3.956,  3.961,
+  3.967,  3.972,  3.978,  3.983,  3.989,  3.994,
+  4.000,  4.008,  4.015,  4.023,  4.031,  4.038,
+  4.046,  4.054,  4.062,  4.069,  4.077,  4.085,
+  4.092,  4.100,  4.111,  4.122,  4.133,  4.144,
+  4.156,  4.167,  4.178,  4.189,  4.200 };

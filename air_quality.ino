@@ -131,19 +131,18 @@ Adafruit_LC709203F lc;
 
   // screen layout assists
   const int xMargins = 5;
-  const int xOutdoorMargin = ((display.width()/2) + xMargins);
+  const int xOutdoorMargin = ((display.width() / 2) + xMargins);
   const int yMargins = 2;
   const int yCO2 = 20;
   const int ySparkline = 40;
   const int yTemperature = 100;
-  // BUG, 7/8 = 112, WiFi status is 15 (5*3) pixels high
-  const int yStatus = (display.height()*7/8);
+  const int yStatus = (display.height() * 7 / 8);
   const int sparklineHeight = 40;
   const int batteryBarWidth = 28;
   const int batteryBarHeight = 10;
   const int wifiBarWidth = 3;
-  const int wifiBarHeightMultiplier = 3;
-  const int wifiBarSpacingMultipler = 5;
+  const int wifiBarHeightIncrement = 2;
+  const int wifiBarSpacing = 5;
 #endif
 
 #include "ArduinoJson.h"  // Needed by OWM retrieval routines
@@ -232,7 +231,7 @@ void setup()
   averageCO2 = uint16_t(averageCO2/SAMPLE_SIZE);
   debugMessage(String("Averaged values Temp:") + averageTempF + "F, Humidity:" + averageHumidity + ", CO2:" + averageCO2,1);
 
-  batteryRead();
+  batteryRead(batteryReads);
 
   // Setup network connection specified in config.h
   if (aq_network.networkBegin())
@@ -479,7 +478,7 @@ void screenInfo(String messageText)
   screenHelperBatteryStatus((display.width()-xMargins-batteryBarWidth-3),(display.height()-yMargins-batteryBarHeight),batteryBarWidth,batteryBarHeight);
   
   // -70 moves it to the left of the battery display
-  screenHelperWiFiStatus((display.width() - xMargins - 70), (display.height() - yMargins),wifiBarWidth,wifiBarHeightMultiplier,wifiBarSpacingMultipler);
+  screenHelperWiFiStatus((display.width() - xMargins - 70), (display.height() - yMargins),wifiBarWidth,wifiBarHeightIncrement,wifiBarSpacing);
   
   // draws any status message in the lower left corner. -8 in the first parameter accounts for fixed font height
   screenHelperStatusMessage(xMargins,(display.height()-yMargins-8), messageText);
@@ -689,35 +688,75 @@ void screenHelperSparkLine(int initialX, int initialY, int xWidth, int yHeight)
   #endif
 }
 
-void batteryRead()
+void batteryRead(int reads)
 // stores battery voltage if available in hardware characteristics global
 {
-  // use LC709203 if available. Built-in on Adafruit ESP32S2 Feather (pt 5303)
-  if (lc.begin())
-  // Check battery monitoring status
-  {
-    debugMessage("Reading battery voltage from LC709203F",2);
-    lc.setPackAPA(BATTERY_APA);
-    hardwareData.batteryPercent = lc.cellPercent();
-    hardwareData.batteryVoltage = lc.cellVoltage();
-  } 
-  else
-  {
-  // use supported boards to read voltage
-    #if defined (ARDUINO_ADAFRUIT_FEATHER_ESP32_V2)
-      // see project supporting material for other ways to quantify battery %
-      pinMode(VBATPIN,INPUT);
+    // check to see if i2C monitor is available
+    if (lc.begin())
+        // Check battery monitoring status
+    {
+        debugMessage(String("Version: 0x") + lc.getICversion(), 2);
+        lc.setPackAPA(BATTERY_APA);
+        //lc.setThermistorB(3950);
 
-      // assumes default ESP32 analogReadResolution (4095)
-      // the 1.05 is a fudge factor original author used to align reading with multimeter
-      hardwareData.batteryVoltage = ((float)analogRead(VBATPIN) / 4095) * 3.3 * 2 * 1.05;
-      hardwareData.batteryPercent = (uint8_t)(((hardwareData.batteryVoltage - batteryMinVoltage) / (batteryMaxVoltage - batteryMinVoltage)) * 100);
-    #endif
-  }
-  if (hardwareData.batteryVoltage!=0) 
-  {
-    debugMessage(String("Battery voltage: ") + hardwareData.batteryVoltage + "v, percent: " + hardwareData.batteryPercent + "%",1);
-  }
+        hardwareData.batteryPercent = lc.cellPercent();
+        hardwareData.batteryVoltage = lc.cellVoltage();
+        //hardwareData.batteryTemperatureF = 32 + (1.8* lc.getCellTemperature());
+    }
+    else
+    {
+        // use supported boards to read voltage
+#if defined (ARDUINO_ADAFRUIT_FEATHER_ESP32_V2)
+  // modified from the Adafruit power management guide for Adafruit ESP32V2
+        float accumulatedVoltage = 0;
+        for (int loop = 0; loop < reads; loop++)
+        {
+            accumulatedVoltage += analogReadMilliVolts(VBATPIN);
+        }
+        hardwareData.batteryVoltage = accumulatedVoltage / reads; // we now have the average reading
+        // convert into volts  
+        hardwareData.batteryVoltage *= 2;    // we divided by 2, so multiply back
+        hardwareData.batteryVoltage /= 1000; // convert to volts!
+        hardwareData.batteryVoltage *= 2;     // we divided by 2, so multiply back
+        // ESP32 suggested algo
+        // hardwareData.batteryVoltage *= 3.3;   // Multiply by 3.3V, our reference voltage
+        // hardwareData.batteryVoltage *= 1.05;  // the 1.05 is a fudge factor original author used to align reading with multimeter
+        // hardwareData.batteryVoltage /= 4095;  // assumes default ESP32 analogReadResolution (4095)
+        hardwareData.batteryPercent = batteryGetChargeLevel(hardwareData.batteryVoltage);
+#endif
+    }
+    if (hardwareData.batteryVoltage != 0)
+    {
+        debugMessage(String("Battery voltage: ") + hardwareData.batteryVoltage + "v, percent: " + hardwareData.batteryPercent + "%", 1);
+    }
+}
+
+int batteryGetChargeLevel(float volts)
+{
+    int idx = 50;
+    int prev = 0;
+    int half = 0;
+    if (volts >= 4.2) {
+        return 100;
+    }
+    if (volts <= 3.2) {
+        return 0;
+    }
+    while (true) {
+        half = abs(idx - prev) / 2;
+        prev = idx;
+        if (volts >= voltageTable[idx]) {
+            idx = idx + half;
+        }
+        else {
+            idx = idx - half;
+        }
+        if (prev == idx) {
+            break;
+        }
+    }
+    debugMessage(String("Battery percentage as int is ") + idx + "%", 1);
+    return idx;
 }
 
 bool sensorInit()
