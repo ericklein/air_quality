@@ -1,8 +1,6 @@
 /*
-  Project Name:   air_quality
-  Description:    Regularly sample and log temperature, humidity, and if available, co2 levels
-
-  See README.md for target information and revision history
+  Project:      air_quality
+  Description:  Regularly sample and log temperature, humidity, and if sensor available, co2 levels
 */
 
 // hardware and internet configuration parameters
@@ -24,7 +22,7 @@ float averageHumidity;
 uint16_t averageCO2;
 
 // environment sensor data
-typedef struct
+typedef struct sensorData
 {
   float ambientTempF;
   float ambientHumidity;
@@ -148,19 +146,20 @@ Adafruit_LC709203F lc;
 #include "ArduinoJson.h"  // Needed by OWM retrieval routines
 
 #ifdef INFLUX
-  extern boolean post_influx(uint16_t co2, float tempF, float humidity, float batteryVoltage, int rssi);
+  extern boolean post_influx(uint16_t co2, float temperatureF, float humidity, float batteryVoltage, int rssi);
 #endif
 
 #ifdef DWEET
-  extern void post_dweet(uint16_t co2, float tempF, float humidity, float batteryVoltage, int rssi);
+  extern void post_dweet(uint16_t co2, float temperatureF, float humidity, float batteryVoltage, int rssi);
 #endif
 
 #ifdef MQTT
   extern bool mqttDeviceWiFiUpdate(int rssi);
   extern bool mqttDeviceBatteryUpdate(float batteryVoltage);
-  extern bool mqttSensorTempFUpdate(float tempF);
+  extern bool mqttSensorTemperatureFUpdate(float temperatureF);
   extern bool mqttSensorHumidityUpdate(float humidity);
   extern bool mqttSensorCO2Update(uint16_t co2);
+  extern void hassio_mqtt_publish(uint16_t co2,float temperatureF,float humidity,float batteryVoltage);
 #endif
 
 void setup()
@@ -257,9 +256,16 @@ void setup()
   if (hardwareData.rssi!=0)
   {
     #ifdef MQTT
-      if ((mqttSensorTempFUpdate(averageTempF)) && (mqttSensorHumidityUpdate(averageHumidity)) && (mqttSensorCO2Update(averageCO2)) && (mqttDeviceWiFiUpdate(hardwareData.rssi)) && (mqttDeviceBatteryUpdate(hardwareData.batteryVoltage)))
+      if ((mqttSensorTemperatureFUpdate(averageTempF)) && (mqttSensorHumidityUpdate(averageHumidity)) && (mqttSensorCO2Update(averageCO2)) && (mqttDeviceWiFiUpdate(hardwareData.rssi)) && (mqttDeviceBatteryUpdate(hardwareData.batteryVoltage)))
       {
         upd_flags += "M";
+        #ifdef HASSIO_MQTT
+          debugMessage("Establishing MQTT for Home Assistant",1);
+          // Either configure sensors in Home Assistant's configuration.yaml file
+          // directly or attempt to do it via MQTT auto-discovery
+          // hassio_mqtt_setup();  // Config for MQTT auto-discovery
+          hassio_mqtt_publish(sensorData.ambientCO2, sensorData.ambientTemperatureF, sensorData.ambientHumidity, hardwareData.batteryVoltage);
+        #endif
       }
     #endif
 
@@ -469,9 +475,9 @@ void screenInfo(String messageText)
 
   // borders
   // label
-  display.drawFastHLine(0,yStatus,display.width(),yStatus,EPD_BLACK);
+  display.drawFastHLine(0,yStatus,display.width(),EPD_BLACK);
   // splitting sensor vs. outside values
-  display.drawFastVLine((display.width()/2),0,(display.width()/2),yStatus,EPD_BLACK);
+  display.drawFastVLine((display.width()/2),0,yStatus,EPD_BLACK);
   
   // screen helper routines
   // draws battery in the lower right corner. -3 in first parameter accounts for battery nub
@@ -637,7 +643,6 @@ void screenHelperBatteryStatus(int initialX, int initialY, int barWidth, int bar
       }
     else
       debugMessage("No battery voltage for screenHelperBatteryStatus() to render",1);
-    }
   #endif
 }
 
@@ -868,7 +873,7 @@ int nvStorageRead()
   {
     // bad value, replace with current temp
     averageTempF = (sensorData.ambientTempF * storedCounter);
-    debugMessage("Unexpected tempF value in nv storage replaced with multiple of current temperature",2);
+    debugMessage("Unexpected temperatureF value in nv storage replaced with multiple of current temperature",2);
   }
 
   averageHumidity = nvStorage.getFloat("humidity", 0);
@@ -896,14 +901,14 @@ int nvStorageRead()
   return storedCounter;
 }
 
-void nvStorageWrite(int storedCounter, float tempF, float humidity, uint16_t co2)
-// tempF and humidity stored as running totals, CO2 stored in array for sparkline
+void nvStorageWrite(int storedCounter, float temperatureF, float humidity, uint16_t co2)
+// temperatureF and humidity stored as running totals, CO2 stored in array for sparkline
 {
   nvStorage.putInt("counter", storedCounter);
   debugMessage(String("Sample count TO nv storage is ") + storedCounter,2);
-  nvStorage.putFloat("temp", tempF);
+  nvStorage.putFloat("temp", temperatureF);
   nvStorage.putFloat("humidity", humidity);
-  debugMessage(String("Intermediate values TO nv storage: Temp: ") + tempF + "F, Humidity: " + humidity + "%",2);
+  debugMessage(String("Intermediate values TO nv storage: Temp: ") + temperatureF + "F, Humidity: " + humidity + "%",2);
   // only deal with CO2 if there is sensor data
   if ((sensorData.ambientCO2 != 10000) && (co2 != 0))
   {

@@ -15,9 +15,10 @@
 
 // Configuration Step 3: Set network data endpoints
 // these require a network transport from Step 2
-// #define MQTT 		// log sensor data to MQTT broker
-//#define DWEET // Post sensor readings to dweet.io
-//#define INFLUX 	// Log data to remote InfluxDB server
+ #define MQTT 		// log sensor data to MQTT broker
+// #define HASSIO_MQTT  // And, if MQTT enabled, with Home Assistant too?
+// #define DWEET // Post sensor readings to dweet.io
+#define INFLUX 	// Log data to remote InfluxDB server
 
 // Configuration Step 4: Select environment sensor and configure read intervals
 #define SCD40		// use SCD40 to read temperature, humidity, and CO2
@@ -107,21 +108,9 @@ const int   daylightOffset_sec = 3600; // US DT
 #endif
 
 #ifdef INFLUX  
-  // Name of Measurements expected/used in the Influx DB.
+	// Specify Measurement to use with InfluxDB for sensor and device info
   #define INFLUX_ENV_MEASUREMENT "weather"  // Used for environmental sensor data
   #define INFLUX_DEV_MEASUREMENT "device"   // Used for logging AQI device data (e.g. battery)
-  
-	// Standard set of tag values used for each sensor data point stored to InfluxDB.  Reuses
-  // CLIENT_ID as defined anove here in config.h as well as device location (e.g., room in 
-  // the house) and site (indoors vs. outdoors, typically).
-	// #define DEVICE_LOCATION "AQ-demo"
-	// #define DEVICE_LOCATION "kitchen"
-	#define DEVICE_LOCATION "AQ-dev"
-	// #define DEVICE_LOCATION "lab-office"
-	// #define DEVICE_LOCATION "master bedroom"
-
-	#define DEVICE_SITE "indoor"
-	#define DEVICE_TYPE "air quality"
 #endif
 
 #ifdef DWEET
