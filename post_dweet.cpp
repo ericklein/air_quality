@@ -7,8 +7,6 @@
 
 // hardware and internet configuration parameters
 #include "config.h"
-// Overall data and metadata naming scheme
-#include "data.h"
 // private credentials for network, MQTT, weather provider
 #include "secrets.h"
 

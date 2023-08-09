@@ -18,6 +18,11 @@
 extern void debugMessage(String messageText, int messageLevel);
 extern AQ_Network aq_network;
 
+#ifdef HASSIO_MQTT
+  extern void hassio_mqtt_setup();
+  extern void hassio_mqtt_publish(uint16_t co2, float temperatureF, float humidity, float batteryVoltage);
+#endif
+
 #ifdef MQTT
   // MQTT setup
   #include <Adafruit_MQTT.h>

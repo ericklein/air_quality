@@ -34,7 +34,6 @@
   #endif
 
   // Post data to Influx DB using the connection established during setup
-  // Operates over the network, so may take a while to execute
   boolean post_influx(uint16_t co2, float temperatureF, float humidity, float batteryVoltage, int rssi)
   {
     bool result = false;
