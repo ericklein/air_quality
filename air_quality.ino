@@ -22,7 +22,7 @@ float averageHumidity;
 uint16_t averageCO2;
 
 // environment sensor data
-typedef struct
+typedef struct sensorData
 {
   float ambientTempF;
   float ambientHumidity;
@@ -475,9 +475,9 @@ void screenInfo(String messageText)
 
   // borders
   // label
-  display.drawFastHLine(0,yStatus,display.width(),yStatus,EPD_BLACK);
+  display.drawFastHLine(0,yStatus,display.width(),EPD_BLACK);
   // splitting sensor vs. outside values
-  display.drawFastVLine((display.width()/2),0,(display.width()/2),yStatus,EPD_BLACK);
+  display.drawFastVLine((display.width()/2),0,yStatus,EPD_BLACK);
   
   // screen helper routines
   // draws battery in the lower right corner. -3 in first parameter accounts for battery nub
@@ -643,7 +643,6 @@ void screenHelperBatteryStatus(int initialX, int initialY, int barWidth, int bar
       }
     else
       debugMessage("No battery voltage for screenHelperBatteryStatus() to render",1);
-    }
   #endif
 }
 

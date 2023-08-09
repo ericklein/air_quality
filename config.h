@@ -15,10 +15,10 @@
 
 // Configuration Step 3: Set network data endpoints
 // these require a network transport from Step 2
-// #define MQTT 		// log sensor data to MQTT broker
+ #define MQTT 		// log sensor data to MQTT broker
 // #define HASSIO_MQTT  // And, if MQTT enabled, with Home Assistant too?
 // #define DWEET // Post sensor readings to dweet.io
-// #define INFLUX 	// Log data to remote InfluxDB server
+#define INFLUX 	// Log data to remote InfluxDB server
 
 // Configuration Step 4: Select environment sensor and configure read intervals
 #define SCD40		// use SCD40 to read temperature, humidity, and CO2
