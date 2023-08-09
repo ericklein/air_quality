@@ -36,7 +36,7 @@ envData sensorData; // global variable for environment sensor data
 uint16_t co2Samples[SAMPLE_SIZE];
 
 // hardware status data
-typedef struct
+typedef struct hdweData
 {
   float batteryPercent;
   float batteryVoltage;
@@ -45,7 +45,7 @@ typedef struct
 hdweData hardwareData;  // global variable for hardware characteristics          
 
 // OpenWeatherMap Current data
-typedef struct
+typedef struct OpenWeatherMapCurrentData
 {
   // float lon;              // "lon": 8.54
   // float lat;              // "lat": 47.37
@@ -72,7 +72,7 @@ typedef struct
 OpenWeatherMapCurrentData owmCurrentData; // global variable for OWM current data
 
 // OpenWeatherMap Air Quality data
-typedef struct
+typedef struct OpenWeatherMapAirQuality
 {
   // float lon;    // "lon": 8.54
   // float lat;    // "lat": 47.37
@@ -469,9 +469,9 @@ void screenInfo(String messageText)
 
   // borders
   // label
-  display.drawLine(0,yStatus,display.width(),yStatus,EPD_BLACK);
+  display.drawFastHLine(0,yStatus,display.width(),yStatus,EPD_BLACK);
   // splitting sensor vs. outside values
-  display.drawLine((display.width()/2),0,(display.width()/2),yStatus,EPD_BLACK);
+  display.drawFastVLine((display.width()/2),0,(display.width()/2),yStatus,EPD_BLACK);
   
   // screen helper routines
   // draws battery in the lower right corner. -3 in first parameter accounts for battery nub
@@ -626,14 +626,17 @@ void screenHelperBatteryStatus(int initialX, int initialY, int barWidth, int bar
   // IMPROVEMENT : Check for offscreen drawing based on passed parameters
   #ifdef SCREEN
     if (hardwareData.batteryVoltage>0) 
-    {
-      // battery nub; width = 3pix, height = 60% of barHeight
-      display.fillRect((initialX+barWidth),(initialY+(int(barHeight/5))),3,(int(barHeight*3/5)),EPD_BLACK);
-      // battery border
-      display.drawRect(initialX,initialY,barWidth,barHeight,EPD_BLACK);
-      //battery percentage as rectangle fill, 1 pixel inset from the battery border
-      display.fillRect((initialX + 2),(initialY + 2),int(0.5+(hardwareData.batteryPercent*((barWidth-4)/100))),(barHeight - 4),EPD_BLACK);
-      debugMessage(String("battery status drawn to screen as ") + hardwareData.batteryPercent + "%",2);
+      {
+        // battery nub; width = 3pix, height = 60% of barHeight
+        display.fillRect((initialX+barWidth), (initialY+(int(barHeight/5))), 3, (int(barHeight*3/5)), EPD_BLACK);
+        // battery border
+        display.drawRect(initialX, initialY, barWidth, barHeight, EPD_BLACK);
+        //battery percentage as rectangle fill, 1 pixel inset from the battery border
+        display.fillRect((initialX + 2), (initialY + 2), int(0.5+(hardwareData.batteryPercent*((barWidth-4)/100.0))), (barHeight - 4), EPD_BLACK);
+        debugMessage(String("battery percent visualized=") + hardwareData.batteryPercent + "%, " + int(0.5+(hardwareData.batteryPercent*((barWidth-4)/100.0))) + " pixels of " + (barWidth-4) + " max",1);
+      }
+    else
+      debugMessage("No battery voltage for screenHelperBatteryStatus() to render",1);
     }
   #endif
 }
