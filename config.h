@@ -93,19 +93,9 @@ const long  gmtOffset_sec = -28800; // PST
 const int   daylightOffset_sec = 3600; // US DT
 
 // Configuration Step 8: Set network data endpoint parameters, if applicable
-
 // set client ID; used by mqtt and wifi
-// structure is AQ_room-name; e.g. AQ_kitchen
-#define CLIENT_ID "AQ_dev"
-
-#ifdef MQTT
-	// structure is site/structure/room/device/data
-	#define MQTT_PUB_TEMPF			"7828/dev/aq/temperature"
-	#define MQTT_PUB_HUMIDITY	"7828/dev/aq/humidity"
-	#define MQTT_PUB_CO2				"7828/dev/aq/co2"
-	#define MQTT_PUB_BATTVOLT	"7828/dev/aq/battery-voltage"
-	#define MQTT_PUB_RSSI			"7828/dev/aq/rssi"
-#endif
+// structure is AQ_room-name; e.g. AQ_lab
+#define CLIENT_ID "AQ_lab"
 
 #ifdef INFLUX  
 	// Specify Measurement to use with InfluxDB for sensor and device info
