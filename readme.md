@@ -1,5 +1,5 @@
 ### Purpose
-Air Quality (aka AQ) samples local temperature, humidity, and if connected to the appropriate sensor, CO2 (carbon dioxide) levels. It can log this data to a number of network endpoints. It can also display the local outdoor weather to compliment local sensor readings.
+Air Quality (aka AQ) samples temperature, humidity, and if connected to the appropriate sensor, CO2 (carbon dioxide) levels. It can log this data to a number of network endpoints. It can also display the local outdoor weather to compliment local sensor readings.
 
 ### Features
 ![Screenshot](readme/ui_mar23.jpg)
