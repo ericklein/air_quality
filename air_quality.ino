@@ -122,10 +122,13 @@ Adafruit_LC709203F lc;
   // Special glyphs for the UI
   #include "Fonts/glyphs.h"
 
-  // 2.96" greyscale display with 196x128 pixels
-  // ThinkInk_290_Grayscale4_T5 display(EPD_DC, EPD_RESET, EPD_CS, SRAM_CS, EPD_BUSY);
-  // 2.96" tricolor display with 196x128 pixels
-  ThinkInk_290_Tricolor_Z10 display(EPD_DC, EPD_RESET, EPD_CS, SRAM_CS, EPD_BUSY);
+  #if defined (ARDUINO_ADAFRUIT_FEATHER_ESP32_V2)
+    // 2.96" tricolor display with 196x128 pixels
+    ThinkInk_290_Tricolor_Z10 display(EPD_DC, EPD_RESET, EPD_CS, SRAM_CS, EPD_BUSY);
+  #else
+    // Magtag is 2.96" greyscale display with 196x128 pixels
+    ThinkInk_290_Grayscale4_T5 display(EPD_DC, EPD_RESET, EPD_CS, SRAM_CS, EPD_BUSY);
+  #endif
 
   // screen layout assists
   const int xMargins = 5;
@@ -189,9 +192,15 @@ void setup()
 
   #ifdef SCREEN
     // there is no way to query screen for status
-    // changed from THINKINK_GRAYSCALE4 to eliminate black screen border, colors are EPD_WHITE, EPD_BLACK
-    display.begin(THINKINK_MONO);
-    debugMessage("Display ready",1);
+    // colors are EPD_WHITE, EPD_BLACK, EPD_RED
+    #if defined (ARDUINO_ADAFRUIT_FEATHER_ESP32_V2)
+      display.begin(THINKINK_TRICOLOR);
+      debugMessage("screen initialized as tricolor",1);
+    #else
+      // changed from THINKINK_GRAYSCALE4 to eliminate black screen border
+      display.begin(THINKINK_MONO);
+      debugMessage("screen initialized as mono",1);
+    #endif
   #endif
 
   // Initialize environmental sensor

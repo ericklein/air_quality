@@ -7,7 +7,7 @@
 
 // Configuration Step 1: Set debug message output
 // comment out to turn off; 1 = summary, 2 = verbose
-#define DEBUG 1
+// #define DEBUG 1
 
 // Configuration Step 2: Set network transport, if desired
 //#define RJ45  	// use Ethernet
@@ -15,10 +15,10 @@
 
 // Configuration Step 3: Set network data endpoints
 // these require a network transport from Step 2
- #define MQTT 		// log sensor data to MQTT broker
+//  #define MQTT 		// log sensor data to MQTT broker
 // #define HASSIO_MQTT  // And, if MQTT enabled, with Home Assistant too?
 // #define DWEET // Post sensor readings to dweet.io
-#define INFLUX 	// Log data to remote InfluxDB server
+// #define INFLUX 	// Log data to remote InfluxDB server
 
 // Configuration Step 4: Select environment sensor and configure read intervals
 #define SCD40		// use SCD40 to read temperature, humidity, and CO2
@@ -71,10 +71,10 @@
 // If LC709203F detected on i2c, define battery pack based on settings curve from datasheet
 // #define BATTERY_APA 0x08 // 100mAH
 // #define BATTERY_APA 0x0B // 200mAH
- #define BATTERY_APA 0x10 // 500mAH
+//  #define BATTERY_APA 0x10 // 500mAH
 // #define BATTERY_APA 0x19 // 1000mAH
 // #define BATTERY_APA 0x1D // 1200mAH
-//#define BATTERY_APA 0x2D // 2000mAH
+#define BATTERY_APA 0x2D // 2000mAH
 // #define BATTERY_APA 0x32 // 2500mAH
 // #define BATTERY_APA 0x36 // 3000mAH
 
