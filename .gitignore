@@ -7,3 +7,4 @@ __vm/
 supporting material/
 *.sublime-project
 *.sublime-workspace
+.DS_Store

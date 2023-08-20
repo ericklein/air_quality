@@ -24,8 +24,8 @@ uint16_t averageCO2;
 // environment sensor data
 typedef struct sensorData
 {
-  float ambientTempF;
-  float ambientHumidity;
+  float ambientHumidity;      // RH [%]
+  float ambientTemperatureF;
   uint16_t ambientCO2;
 } envData;
 envData sensorData; // global variable for environment sensor data
@@ -227,12 +227,12 @@ void setup()
   if (sampleCounter < SAMPLE_SIZE)
   // add to the accumulating, intermediate sensor values and sleep device
   {
-    nvStorageWrite(sampleCounter, sensorData.ambientTempF+averageTempF, sensorData.ambientHumidity+averageHumidity, sensorData.ambientCO2);
+    nvStorageWrite(sampleCounter, sensorData.ambientTemperatureF+averageTempF, sensorData.ambientHumidity+averageHumidity, sensorData.ambientCO2);
     powerDisable(SAMPLE_INTERVAL);
   } 
   
   // sampleCounter == SAMPLE_SIZE, so average values for reporting
-  averageTempF = ((sensorData.ambientTempF + averageTempF) / SAMPLE_SIZE);
+  averageTempF = ((sensorData.ambientTemperatureF + averageTempF) / SAMPLE_SIZE);
   averageHumidity = ((sensorData.ambientHumidity + averageHumidity) / SAMPLE_SIZE);
   for(int i=0;i<SAMPLE_SIZE;i++)
   {
@@ -526,7 +526,7 @@ void screenInfo(String messageText)
   // Indoor temp
   display.setFont(&FreeSans12pt7b);
   display.setCursor(xMargins,yTemperature);
-  display.print(String((int)(sensorData.ambientTempF + .5)));
+  display.print(String((int)(sensorData.ambientTemperatureF + .5)));
   display.setFont(&meteocons12pt7b);
   display.print("+");
 
@@ -837,7 +837,7 @@ bool sensorRead()
       // minimum time between SCD40 reads
       delay(5000);
       // read and store data if successful
-      uint16_t error = envSensor.readMeasurement(sensorData.ambientCO2, sensorData.ambientTempF, sensorData.ambientHumidity);
+      uint16_t error = envSensor.readMeasurement(sensorData.ambientCO2, sensorData.ambientTemperatureF, sensorData.ambientHumidity);
       // handle SCD40 errors
       if (error) {
         errorToString(error, errorMessage, 256);
@@ -850,10 +850,10 @@ bool sensorRead()
         return false;
       }
       //convert C to F for temp
-      sensorData.ambientTempF = (sensorData.ambientTempF * 1.8) + 32;
-      debugMessage(String("SCD40 read ") + loop + " of " + READS_PER_SAMPLE + ": " + sensorData.ambientTempF + "F, " + sensorData.ambientHumidity + "%, " + sensorData.ambientCO2 + " ppm",2);
+      sensorData.ambientTemperatureF = (sensorData.ambientTemperatureF * 1.8) + 32;
+      debugMessage(String("SCD40 read ") + loop + " of " + READS_PER_SAMPLE + ": " + sensorData.ambientTemperatureF + "F, " + sensorData.ambientHumidity + "%, " + sensorData.ambientCO2 + " ppm",2);
     }
-    debugMessage(String("Final SCD40 measurement ") + sensorData.ambientTempF + "F, " + sensorData.ambientHumidity + "%, " + sensorData.ambientCO2 + " ppm",1);
+    debugMessage(String("Final SCD40 measurement ") + sensorData.ambientTemperatureF + "F, " + sensorData.ambientHumidity + "%, " + sensorData.ambientCO2 + " ppm",1);
     return true;
   #else
     // AHTX0, BME280
@@ -861,10 +861,10 @@ bool sensorRead()
     sensors_event_t humidityEvent, tempEvent;
     envSensorTemp->getEvent(&tempEvent);
     envSensorHumidity->getEvent(&humidityEvent);
-    sensorData.ambientTempF = (tempEvent.temperature * 1.8) +32;
+    sensorData.ambientTemperatureF = (tempEvent.temperature * 1.8) +32;
     sensorData.ambientHumidity = humidityEvent.relative_humidity;
     sensorData.ambientCO2 = 10000;
-    debugMessage(String("Environment sensor measurement ") + sensorData.ambientTempF + "F, " + sensorData.ambientHumidity + "%, " + sensorData.ambientCO2 + " ppm",1);
+    debugMessage(String("Environment sensor measurement ") + sensorData.ambientTemperatureF + "F, " + sensorData.ambientHumidity + "%, " + sensorData.ambientCO2 + " ppm",1);
     return true;
   #endif
 }
@@ -883,7 +883,7 @@ int nvStorageRead()
   if (isnan(averageTempF))
   {
     // bad value, replace with current temp
-    averageTempF = (sensorData.ambientTempF * storedCounter);
+    averageTempF = (sensorData.ambientTemperatureF * storedCounter);
     debugMessage("Unexpected temperatureF value in nv storage replaced with multiple of current temperature",2);
   }
 

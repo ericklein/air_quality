@@ -18,7 +18,7 @@
 //  #define MQTT 		// log sensor data to MQTT broker
 // #define HASSIO_MQTT  // And, if MQTT enabled, with Home Assistant too?
 // #define DWEET // Post sensor readings to dweet.io
-// #define INFLUX 	// Log data to remote InfluxDB server
+#define INFLUX 	// Log data to remote InfluxDB server
 
 // Configuration Step 4: Select environment sensor and configure read intervals
 #define SCD40		// use SCD40 to read temperature, humidity, and CO2
@@ -36,7 +36,7 @@
 #else
 	#ifdef SCD40 
 		// SCD40 needs >= 5 samples to get to a reliable reading from a cold start
-		#define READS_PER_SAMPLE	5
+		#define READS_PER_SAMPLE	3
 	#else
 		#define READS_PER_SAMPLE	1
 	#endif
@@ -95,7 +95,7 @@ const int   daylightOffset_sec = 3600; // US DT
 // Configuration Step 8: Set network data endpoint parameters, if applicable
 // set client ID; used by mqtt and wifi
 // structure is AQ_room-name; e.g. AQ_lab
-#define CLIENT_ID "AQ_lab"
+#define CLIENT_ID "AQ_master_bedroom"
 
 #ifdef INFLUX  
 	// Specify Measurement to use with InfluxDB for sensor and device info
