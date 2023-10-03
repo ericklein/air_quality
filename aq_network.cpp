@@ -49,7 +49,7 @@ extern void debugMessage(String messageText, int messageLevel);
   // MQTT setup
   #include <Adafruit_MQTT.h>
   #include <Adafruit_MQTT_Client.h>
-  Adafruit_MQTT_Client aq_mqtt(&client, MQTT_BROKER, MQTT_PORT, CLIENT_ID, MQTT_USER, MQTT_PASS);
+  Adafruit_MQTT_Client aq_mqtt(&client, MQTT_BROKER, MQTT_PORT, DEVICE_ID, MQTT_USER, MQTT_PASS);
 #endif
 
 //****************************************************************************************************
@@ -65,7 +65,7 @@ bool AQ_Network::networkBegin() {
 
   #ifdef WIFI
     // set hostname has to come before WiFi.begin
-    WiFi.hostname(CLIENT_ID);
+    WiFi.hostname(DEVICE_ID);
 
     WiFi.begin(WIFI_SSID, WIFI_PASS);
 
@@ -110,16 +110,6 @@ bool AQ_Network::networkBegin() {
     }
   #endif
   return (result);
-}
-
-void AQ_Network::setTime(long timeZoneOffset, long daylightOffset) 
-{
-  // Only use if there is a network and a screen to display data...
-  #if (defined(WIFI) || defined(RJ45)) && (defined(SCREEN))
-    // Get time from NTP
-    configTime(timeZoneOffset, daylightOffset, ntpServer);
-    debugMessage("Time zone adjusted local time : " + dateTimeString(),1);
-  #endif
 }
 
 String AQ_Network::httpGETRequest(const char* serverName) {
@@ -233,77 +223,77 @@ bool AQ_Network::isConnected() {
 #endif
 }
 
+bool AQ_Network::getTime(String timezone) 
+{
+  // Only use if there is a network and a screen to display data...
+  #if (defined(WIFI) || defined(RJ45)) && (defined(SCREEN))
+    https://randomnerdtutorials.com/esp32-ntp-timezones-daylight-saving/
+
+    struct tm timeinfo;
+
+    // connect to NTP server with 0 TZ offset
+    configTime(0, 0, ntpServer);
+    if(!getLocalTime(&timeinfo))
+    {
+      debugMessage("Failed to obtain time from NTP Server",1);
+      return false;
+    }
+    // set local timezone
+    setTimeZone(timezone);
+    return true;
+  #endif
+}
+
+void AQ_Network::setTimeZone(String timezone)
+{
+  debugMessage(String("setting Timezone to ") + timezone.c_str(),2);
+  setenv("TZ",timezone.c_str(),1);
+  tzset();
+  debugMessage(String("Local time is: ") + dateTimeString("short"),1);
+}
+
 // Converts system time into human readable strings. Use NTP service
-String AQ_Network::dateTimeString() {
+String AQ_Network::dateTimeString(String formatType)
+{
+  // https://cplusplus.com/reference/ctime/tm/
+
   String dateTime;
 
-#if defined(WIFI) || defined(RJ45)
-  struct tm timeInfo;
-  if (getLocalTime(&timeInfo)) {
-    int day = timeInfo.tm_wday;
-    // int month = timeInfo.tm_mon;
-    // int year = timeInfo.tm_year + 1900;
-    int hour = timeInfo.tm_hour;
-    int minutes = timeInfo.tm_min;
-    // int seconds = timeinfo.tm_sec;
-
-    // short human readable format
-    dateTime = weekDays[day];
-    dateTime += " at ";
-    if (hour < 10) dateTime += "0";
-    dateTime += hour;
-    dateTime += ":";
-    if (minutes < 10) dateTime += "0";
-    dateTime += minutes;
-
-    // long human readable
-    // dateTime = weekDays[day];
-    // dateTime += ", ";
-
-    // if (month<10) dateTime += "0";
-    // dateTime += month;
-    // dateTime += "-";
-    // if (day<10) dateTime += "0";
-    // dateTime += day;
-    // dateTime += " at ";
-    // if (hour<10) dateTime += "0";
-    // dateTime += hour;
-    // dateTime += ":";
-    // if (minutes<10) dateTime += "0";
-    // dateTime += minutes;
-
-    // zulu format
-    // dateTime = year + "-";
-    // if (month()<10) dateTime += "0";
-    // dateTime += month;
-    // dateTime += "-";
-    // if (day()<10) dateTime += "0";
-    // dateTime += day;
-    // dateTime += "T";
-    // if (hour<10) dateTime += "0";
-    // dateTime += hour;
-    // dateTime += ":";
-    // if (minutes<10) dateTime += "0";
-    // dateTime += minutes;
-    // dateTime += ":";
-    // if (seconds<10) dateTime += "0";
-    // dateTime += seconds;
-    // switch (gmtOffset_sec)
-    // {
-    //   case 0:
-    //     dateTime += "Z";
-    //     break;
-    //   case -28800:
-    //     dateTime += "PDT";
-    //     break;
-    // }
-  } else {
-    dateTime = "Can't reach time service";
-  }
-#else
-  // If no network defined
-  dateTime = "No network to set time";
-#endif
-
+  #if defined(WIFI) || defined(RJ45)
+    struct tm timeInfo;
+    
+    if (getLocalTime(&timeInfo)) 
+    {
+      if (formatType == "short")
+      {
+        // short human readable format
+        dateTime = weekDays[timeInfo.tm_wday];
+        dateTime += " at ";
+        if (timeInfo.tm_hour < 10) dateTime += "0";
+        dateTime += timeInfo.tm_hour;
+        dateTime += ":";
+        if (timeInfo.tm_min < 10) dateTime += "0";
+        dateTime += timeInfo.tm_min;
+      }
+      else if (formatType == "long")
+      {
+        // long human readable
+        dateTime = weekDays[timeInfo.tm_wday];
+        dateTime += ", ";
+        if (timeInfo.tm_mon<10) dateTime += "0";
+        dateTime += timeInfo.tm_mon;
+        dateTime += "-";
+        if (timeInfo.tm_wday<10) dateTime += "0";
+        dateTime += timeInfo.tm_wday;
+        dateTime += " at ";
+        if (timeInfo.tm_hour<10) dateTime += "0";
+        dateTime += timeInfo.tm_hour;
+        dateTime += ":";
+        if (timeInfo.tm_min<10) dateTime += "0";
+        dateTime += timeInfo.tm_min;
+      }
+    }
+    else dateTime = "Can't reach time service";
+  #endif
   return dateTime;
 }

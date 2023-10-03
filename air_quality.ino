@@ -178,6 +178,7 @@ void setup()
   #endif
 
   debugMessage("Air Quality started",1);
+  debugMessage("Device ID: " + String(DEVICE_ID),1);
   debugMessage(String("Sample interval is ") + SAMPLE_INTERVAL + " seconds",2);
   debugMessage(String("Number of samples before reporting is ") + SAMPLE_SIZE,2);
   debugMessage(String("Internet service reconnect delay is ") + CONNECT_ATTEMPT_INTERVAL + " seconds",2);
@@ -252,11 +253,8 @@ void setup()
   {
     owmCurrentData.temp = 10000;
     owmCurrentData.humidity = 10000;
-    // SECONDARY: Set UTC time offset based on config.h time zone
-    aq_network.setTime(gmtOffset_sec, daylightOffset_sec);
   }
-  // PRIMARY: Set UTC time offset based on OWM local time zone
-  aq_network.setTime(owmCurrentData.timezone, 0);
+  aq_network.getTime(timeZoneString);
 
   if (!OWMAirPollutionRead())
   {
@@ -295,12 +293,12 @@ void setup()
     if (upd_flags == "") 
     {
       // External data services not updated but we have network time
-      screenInfo(aq_network.dateTimeString());
+      screenInfo(aq_network.dateTimeString("short"));
     } 
     else 
     {
       // External data services not updated and we have network time
-      screenInfo("[+" + upd_flags + "] " + aq_network.dateTimeString());
+      screenInfo("[+" + upd_flags + "] " + aq_network.dateTimeString("short"));
     }
   }
   else

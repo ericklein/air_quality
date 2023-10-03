@@ -7,8 +7,9 @@ class AQ_Network {
   public:
     bool networkBegin();
     void networkStop();
-    void setTime(long timeZoneOffset, long daylightOffset);
-    String dateTimeString();
+    bool getTime(String timezone);
+    void setTimeZone(String timezone);
+    String dateTimeString(String formatType);
     String httpGETRequest(const char* serverName);
     int httpPOSTRequest(String serverurl, String contenttype, String payload);
     String getLocalIPString();
