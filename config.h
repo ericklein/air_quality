@@ -7,7 +7,7 @@
 
 // Configuration Step 1: Set debug message output
 // comment out to turn off; 1 = summary, 2 = verbose
-// #define DEBUG 1
+#define DEBUG 1
 
 // Configuration Step 2: Set network transport, if desired
 //#define RJ45  	// use Ethernet
@@ -86,16 +86,7 @@ const int   batteryReads = 5;
 // Configuration Step 7: Set parameters for NTP time configuration
 // this will only be used if network transport is defined in Step 2
 #define ntpServer "pool.ntp.org"
-// const long  gmtOffset_sec = 0; // UTC
-// const long  gmtOffset_sec = 3600; // Ireland
-const long  gmtOffset_sec = -28800; // PST
-// const int   daylightOffset_sec = 0;
-const int   daylightOffset_sec = 3600; // US DT
-
-// Configuration Step 8: Set network data endpoint parameters, if applicable
-// set client ID; used by mqtt and wifi
-// structure is AQ_room-name; e.g. AQ_lab
-#define CLIENT_ID "AQ_master_bedroom"
+#define timeZoneString "PST8PDT,M3.2.0,M11.1.0" // America/Los_Angeles
 
 #ifdef INFLUX  
 	// Specify Measurement to use with InfluxDB for sensor and device info
