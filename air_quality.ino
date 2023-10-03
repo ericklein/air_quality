@@ -65,7 +65,7 @@ typedef struct OpenWeatherMapCurrentData
   // time_t sunrise;         // "sunrise": 1526960448, in UTC
   // time_t sunset;          // "sunset": 1527015901, in UTC
   String cityName;        // "name": "Zurich"
-  time_t timezone;        // shift in seconds from UTC
+  // time_t timezone;        // shift in seconds from UTC
 } OpenWeatherMapCurrentData;
 OpenWeatherMapCurrentData owmCurrentData; // global variable for OWM current data
 
@@ -177,8 +177,7 @@ void setup()
     while (!Serial);
   #endif
 
-  debugMessage("Air Quality started",1);
-  debugMessage("Device ID: " + String(DEVICE_ID),1);
+  debugMessage("Air Quality Device ID: " + String(DEVICE_ID),1);
   debugMessage(String("Sample interval is ") + SAMPLE_INTERVAL + " seconds",2);
   debugMessage(String("Number of samples before reporting is ") + SAMPLE_SIZE,2);
   debugMessage(String("Internet service reconnect delay is ") + CONNECT_ATTEMPT_INTERVAL + " seconds",2);
@@ -233,14 +232,21 @@ void setup()
   } 
   
   // sampleCounter == SAMPLE_SIZE, so average values for reporting
-  averageTempF = ((sensorData.ambientTemperatureF + averageTempF) / SAMPLE_SIZE);
-  averageHumidity = ((sensorData.ambientHumidity + averageHumidity) / SAMPLE_SIZE);
+
+  // add in most recent sample then average
+  averageTempF = ((sensorData.ambientTemperatureF + averageTempF) / (SAMPLE_SIZE+1));
+  averageHumidity = ((sensorData.ambientHumidity + averageHumidity) / (SAMPLE_SIZE+1));
+
+  // aggregate stored, rolling CO2 values
   for(int i=0;i<SAMPLE_SIZE;i++)
   {
     averageCO2 = averageCO2 + co2Samples[i];
   }
-  averageCO2 = uint16_t(averageCO2/SAMPLE_SIZE);
-  debugMessage(String("Averaged values Temp:") + averageTempF + "F, Humidity:" + averageHumidity + ", CO2:" + averageCO2,1);
+
+  // add in most recent sample then average
+  averageCO2 = uint16_t((sensorData.ambientCO2+averageCO2)/(SAMPLE_SIZE+1));
+
+  debugMessage(String("Averaged values Temp:") + averageTempF + "F, Humidity:" + averageHumidity + ", CO2:" + averageCO2,2);
 
   batteryRead(batteryReads);
 
@@ -378,7 +384,7 @@ bool OWMCurrentWeatherDataRead()
       
       owmCurrentData.cityName = (const char*) doc["name"];
       // owmCurrentData.visibility = (uint16_t) doc["visibility"];
-      owmCurrentData.timezone = (time_t) doc["timezone"];
+      // owmCurrentData.timezone = (time_t) doc["timezone"];
       
       // owmCurrentData.country = (const char*) doc["sys"]["country"];
       // owmCurrentData.observationTime = (time_t) doc["dt"];
@@ -441,7 +447,6 @@ bool OWMAirPollutionRead()
         // owmAirQuality.o3 = (float) list_0_components["o3"];
         // owmAirQuality.so2 = (float) list_0_components["so2"];
         owmAirQuality.pm25 = (float) list_0_components["pm2_5"];
-        debugMessage(String("OWM current PM2.5 is ") + owmAirQuality.pm25 + " in μg/m3",1);      
         // owmAirQuality.pm10 = (float) list_0_components["pm10"];
         // owmAirQuality.nh3 = (float) list_0_components["nh3"];
         return true;
@@ -832,7 +837,7 @@ bool sensorRead()
 
     for (int loop=1; loop<=READS_PER_SAMPLE; loop++)
     {
-      // minimum time between SCD40 reads
+      // delay is non-blocking; minimum time between SCD40 reads
       delay(5000);
       // read and store data if successful
       uint16_t error = envSensor.readMeasurement(sensorData.ambientCO2, sensorData.ambientTemperatureF, sensorData.ambientHumidity);
@@ -893,7 +898,7 @@ int nvStorageRead()
     debugMessage("Unexpected humidity value in nv storage replaced with multiple of current humidity",2);
   }
 
-  debugMessage(String("Intermediate values FROM nv storage: Temp:") + averageTempF + "F, Humidity:" + averageHumidity + "%",2);
+  debugMessage(String("Intermediate values FROM nv storage: Temp:") + averageTempF + ", Humidity:" + averageHumidity,2);
 
   // only deal with CO2 if you are getting data from sensor
   if (sensorData.ambientCO2 != 10000)
@@ -917,7 +922,7 @@ void nvStorageWrite(int storedCounter, float temperatureF, float humidity, uint1
   debugMessage(String("Sample count TO nv storage is ") + storedCounter,2);
   nvStorage.putFloat("temp", temperatureF);
   nvStorage.putFloat("humidity", humidity);
-  debugMessage(String("Intermediate values TO nv storage: Temp: ") + temperatureF + "F, Humidity: " + humidity + "%",2);
+  debugMessage(String("Intermediate values TO nv storage: Temp: ") + temperatureF + ", Humidity: " + humidity,2);
   // only deal with CO2 if there is sensor data
   if ((sensorData.ambientCO2 != 10000) && (co2 != 0))
   {
@@ -961,7 +966,7 @@ void powerEnable()
     // if you need to turn the neopixel on
     // pinMode(NEOPIXEL_POWER, OUTPUT);
     // digitalWrite(NEOPIXEL_POWER, HIGH);
-    debugMessage("enabled Adafruit Feather ESP32S2 I2C power",1);
+    debugMessage("Adafruit Feather ESP32S2 I2C power enabled",1);
   #endif
 
   #if defined(ARDUINO_ADAFRUIT_FEATHER_ESP32S2_TFT)
@@ -977,7 +982,7 @@ void powerEnable()
     // Turn on neopixel
     // pinMode(NEOPIXEL_POWER, OUTPUT);
     // digitalWrite(NEOPIXEL_POWER, HIGH);
-    debugMessage("enabled Adafruit Feather ESP32 V2 I2C power",1);
+    debugMessage("Adafruit Feather ESP32 V2 I2C power enabled",1);
   #endif
 }
 
@@ -1015,7 +1020,7 @@ void powerDisable(int deepSleepTime)
     // if you need to turn the neopixel off
     // pinMode(NEOPIXEL_POWER, OUTPUT);
     // digitalWrite(NEOPIXEL_POWER, LOW);
-    debugMessage("disabled Adafruit Feather ESP32 V2 I2C power",1);
+    debugMessage("Adafruit Feather ESP32 V2 I2C power disabled",1);
   #endif
 
   #if defined(ARDUINO_ADAFRUIT_FEATHER_ESP32S2)
@@ -1026,7 +1031,7 @@ void powerDisable(int deepSleepTime)
     // if you need to turn the neopixel off
     // pinMode(NEOPIXEL_POWER, OUTPUT);
     // digitalWrite(NEOPIXEL_POWER, LOW);
-    debugMessage("disabled Adafruit Feather ESP32S2 I2C power",1);
+    debugMessage("Adafruit Feather ESP32S2 I2C power disabled",1);
   #endif
 
   esp_sleep_enable_timer_wakeup(deepSleepTime*1000000); // ESP microsecond modifier
