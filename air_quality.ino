@@ -494,7 +494,7 @@ void screenInfo(String messageText)
   display.drawFastVLine((display.width()/2),0,yStatus,EPD_BLACK);
   
   // screen helper routines
-  // draws battery in the lower right corner. -3 in first parameter accounts for battery nub
+  // draws battery in the lower right corner, -3 in first parameter accounts for battery nub
   screenHelperBatteryStatus((display.width()-xMargins-batteryBarWidth-3),(display.height()-yMargins-batteryBarHeight),batteryBarWidth,batteryBarHeight);
   
   // -70 moves it to the left of the battery display
