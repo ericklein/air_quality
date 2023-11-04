@@ -188,7 +188,7 @@ void setup()
   hardwareData.batteryVoltage = 0;  // 0 = no battery attached
   hardwareData.rssi = 0;            // 0 = no WiFi 
 
-  powerEnable();
+  powerI2CEnable();
 
   #ifdef SCREEN
     // there is no way to query screen for status
@@ -856,7 +856,7 @@ bool sensorRead()
       sensorData.ambientTemperatureF = (sensorData.ambientTemperatureF * 1.8) + 32;
       debugMessage(String("SCD40 read ") + loop + " of " + READS_PER_SAMPLE + ": " + sensorData.ambientTemperatureF + "F, " + sensorData.ambientHumidity + "%, " + sensorData.ambientCO2 + " ppm",2);
     }
-    debugMessage(String("Final SCD40 measurement ") + sensorData.ambientTemperatureF + "F, " + sensorData.ambientHumidity + "%, " + sensorData.ambientCO2 + " ppm",1);
+    debugMessage(String("Final SCD40 measurement: ") + sensorData.ambientTemperatureF + "F, " + sensorData.ambientHumidity + "%, " + sensorData.ambientCO2 + " ppm",1);
     return true;
   #else
     // AHTX0, BME280
@@ -939,17 +939,17 @@ void nvStorageWrite(int storedCounter, float temperatureF, float humidity, uint1
       debugMessage(String(nvStoreBaseName) + " stored in nv storage as " + co2,2);
     }
   }
-}
 
-void powerEnable()
-// enable appropriate hardware
+void powerI2CEnable()
+// enables I2C across multiple Adafruit ESP32 variants
 {
-  // Handle two ESP32 I2C ports
+  debugMessage("powerEnable started",1);
+
+  // enable I2C on devices with two ports
   #if defined(ARDUINO_ADAFRUIT_QTPY_ESP32S2) || defined(ARDUINO_ADAFRUIT_QTPY_ESP32S3_NOPSRAM) || defined(ARDUINO_ADAFRUIT_QTPY_ESP32S3) || defined(ARDUINO_ADAFRUIT_QTPY_ESP32_PICO)
-    // ESP32 is kinda odd in that secondary ports must be manually
-    // assigned their pins with setPins()!
+    // ESP32 is kinda odd in that secondary ports must be manually assigned their pins with setPins()!
     Wire1.setPins(SDA1, SCL1);
-    debugMessage("enabled ESP32 hardware with two I2C ports",2);
+    debugMessage("power on: ESP32 variant with two I2C ports",2);
   #endif
 
   // Adafruit ESP32 I2C power management
@@ -962,11 +962,7 @@ void powerEnable()
     bool polarity = digitalRead(PIN_I2C_POWER);
     pinMode(PIN_I2C_POWER, OUTPUT);
     digitalWrite(PIN_I2C_POWER, !polarity);
-
-    // if you need to turn the neopixel on
-    // pinMode(NEOPIXEL_POWER, OUTPUT);
-    // digitalWrite(NEOPIXEL_POWER, HIGH);
-    debugMessage("Adafruit Feather ESP32S2 I2C power enabled",1);
+    debugMessage("power on: Feather ESP32S2 I2C",1);
   #endif
 
   #if defined(ARDUINO_ADAFRUIT_FEATHER_ESP32S2_TFT)
@@ -978,64 +974,52 @@ void powerEnable()
     // Turn on the I2C power
     pinMode(NEOPIXEL_I2C_POWER, OUTPUT);
     digitalWrite(NEOPIXEL_I2C_POWER, HIGH);
-
-    // Turn on neopixel
-    // pinMode(NEOPIXEL_POWER, OUTPUT);
-    // digitalWrite(NEOPIXEL_POWER, HIGH);
-    debugMessage("Adafruit Feather ESP32 V2 I2C power enabled",1);
+    debugMessage("power on: Feather ESP32V2 I2C",1);
   #endif
 }
 
 void powerDisable(int deepSleepTime)
 // Powers down hardware activated via powerEnable() then deep sleep MCU
 {
-  debugMessage("Starting power down activities",1);
+  debugMessage("powerDisable started",1);
 
   // power down epd
   #ifdef SCREEN
     display.powerDown();
     digitalWrite(EPD_RESET, LOW);  // hardware power down mode
-    debugMessage("powered down epd",1);
+    debugMessage("power off: epd",1);
   #endif
 
   aq_network.networkStop();
 
   // power down SCD40 by stopping potentially started measurement then power down SCD40
   #ifdef SCD40
-    char errorMessage[256];
     uint16_t error = envSensor.stopPeriodicMeasurement();
     if (error) {
+      char errorMessage[256];
       errorToString(error, errorMessage, 256);
       debugMessage(String(errorMessage) + " executing SCD40 stopPeriodicMeasurement()",1);
     }
     envSensor.powerDown();
-    debugMessage("SCD40 powered down",1);
+    debugMessage("power off: SCD40",1);
   #endif
 
   #if defined(ARDUINO_ADAFRUIT_FEATHER_ESP32_V2)
     // Turn off the I2C power
     pinMode(NEOPIXEL_I2C_POWER, OUTPUT);
     digitalWrite(NEOPIXEL_I2C_POWER, LOW);
-
-    // if you need to turn the neopixel off
-    // pinMode(NEOPIXEL_POWER, OUTPUT);
-    // digitalWrite(NEOPIXEL_POWER, LOW);
-    debugMessage("Adafruit Feather ESP32 V2 I2C power disabled",1);
+    debugMessage("power off: ESP32V2 I2C",1);
   #endif
 
   #if defined(ARDUINO_ADAFRUIT_FEATHER_ESP32S2)
     // Rev B board is LOW to enable
     // Rev C board is HIGH to enable
     digitalWrite(PIN_I2C_POWER, LOW);
-
-    // if you need to turn the neopixel off
-    // pinMode(NEOPIXEL_POWER, OUTPUT);
-    // digitalWrite(NEOPIXEL_POWER, LOW);
-    debugMessage("Adafruit Feather ESP32S2 I2C power disabled",1);
+    debugMessage("power off: ESP32S2 I2C",1);
   #endif
 
   esp_sleep_enable_timer_wakeup(deepSleepTime*1000000); // ESP microsecond modifier
-  debugMessage(String("Going to sleep for ") + deepSleepTime + " seconds",1);
+  debugMessage(String("powerDisable complete: ESP32 deep sleep for ") + (deepSleepTime) + " seconds",1);
   esp_deep_sleep_start();
 }
 

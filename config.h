@@ -7,7 +7,7 @@
 
 // Configuration Step 1: Set debug message output
 // comment out to turn off; 1 = summary, 2 = verbose
-#define DEBUG 1
+// #define DEBUG 1
 
 // Configuration Step 2: Set network transport, if desired
 //#define RJ45  	// use Ethernet
@@ -18,7 +18,7 @@
 //  #define MQTT 		// log sensor data to MQTT broker
 // #define HASSIO_MQTT  // And, if MQTT enabled, with Home Assistant too?
 // #define DWEET // Post sensor readings to dweet.io
-// #define INFLUX 	// Log data to remote InfluxDB server
+#define INFLUX 	// Log data to remote InfluxDB server
 
 // Configuration Step 4: Select environment sensor and configure read intervals
 #define SCD40		// use SCD40 to read temperature, humidity, and CO2
