@@ -7,11 +7,11 @@
 
 // Configuration Step 1: Set debug message output
 // comment out to turn off; 1 = summary, 2 = verbose
-// #define DEBUG 1
+#define DEBUG 1
 
 // Configuration Step 2: Set network transport, if desired
-//#define RJ45  	// use Ethernet
-#define WIFI    	// use WiFi
+#define RJ45  	// use Ethernet
+// #define WIFI    	// use WiFi
 
 // Configuration Step 3: Set network data endpoints
 // these require a network transport from Step 2
@@ -21,9 +21,9 @@
 #define INFLUX 	// Log data to remote InfluxDB server
 
 // Configuration Step 4: Select environment sensor and configure read intervals
-#define SCD40		// use SCD40 to read temperature, humidity, and CO2
+// #define SCD40		// use SCD40 to read temperature, humidity, and CO2
 // #define BME280	// use BME280 to read temperature and humidity
-// #define AHTXX		// use AHT series device to read temperature and humidity
+#define AHTXX		// use AHT series device to read temperature and humidity
 
 // environment sensor sample timing
 #ifdef DEBUG
@@ -45,7 +45,7 @@
 #endif
 
 // Configuration Step 5: Set screen parameters, if desired
-#define	SCREEN		// use screen as output
+// #define	SCREEN		// use screen as output
 
 // Pin config for e-paper display
 #ifdef SCREEN

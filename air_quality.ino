@@ -201,12 +201,13 @@ void setup()
       display.begin(THINKINK_MONO);
       debugMessage("screen initialized as mono",1);
     #endif
+    display.setTextWrap(false);
   #endif
 
   // Initialize environmental sensor
   if (!sensorInit()) 
   {
-    screenAlert(xMargins, display.height()/2, "Env sensor not detected");
+    screenAlert("Env sensor not detected");
     // This error often occurs after a firmware flash and then resetting the board
     // Hardware deep sleep typically resolves it, so quickly cycle the hardware
     powerDisable(HARDWARE_ERROR_INTERVAL);
@@ -218,7 +219,7 @@ void setup()
   {
     // hard coded for SCD40 as there is no way to read error condition on other sensors
     debugMessage("SCD40 returned no/bad data",1);
-    screenAlert(xMargins,display.height()/2,"SCD40 read issue");
+    screenAlert("SCD40 read issue");
     powerDisable(HARDWARE_ERROR_INTERVAL);
   }
   sampleCounter = nvStorageRead();
@@ -455,23 +456,30 @@ bool OWMAirPollutionRead()
   return false;
 }
 
-void screenAlert(int initialX, int initialY, String messageText)
-// Display critical error message on screen
+void screenAlert(String messageText)
+// Display error message centered on screen
 {
-#ifdef SCREEN
+  #ifdef SCREEN
+    debugMessage("screenAlert start",1);
 
-  debugMessage("Starting screenAlert refresh",1);
+    int16_t x1, y1;
+    uint16_t width,height;
 
-  display.clearBuffer();
-  display.setTextColor(EPD_BLACK);
-  display.setFont(&FreeSans12pt7b);
-  display.setCursor(initialX,initialY);
-  display.print(messageText);
+    display.clearBuffer();
+    display.getTextBounds(messageText.c_str(), 0, 0, &x1, &y1, &width, &height);
+    display.setTextColor(EPD_BLACK);
+    display.setFont(&FreeSans12pt7b);
 
-  //update display
-  display.display();
-  debugMessage("screenAlert refresh complete",1);
-#endif
+    if (width >= display.width())
+    {
+      debugMessage("ERROR: screenAlert message text too long", 1);
+    }
+    display.setCursor(display.width()/2-width/2,display.height()/2+height/2);
+    display.print(messageText);
+    //update display
+    display.display();
+    debugMessage("screenAlert end",1);
+  #endif
 }
 
 void screenInfo(String messageText)
@@ -727,9 +735,9 @@ void batteryRead(int reads)
     }
     else
     {
-        // use supported boards to read voltage
-#if defined (ARDUINO_ADAFRUIT_FEATHER_ESP32_V2)
-  // modified from the Adafruit power management guide for Adafruit ESP32V2
+      // use supported boards to read voltage
+      #if defined (ARDUINO_ADAFRUIT_FEATHER_ESP32_V2)
+      // modified from the Adafruit power management guide for Adafruit ESP32V2
         float accumulatedVoltage = 0;
         for (int loop = 0; loop < reads; loop++)
         {
@@ -745,7 +753,7 @@ void batteryRead(int reads)
         // hardwareData.batteryVoltage *= 1.05;  // the 1.05 is a fudge factor original author used to align reading with multimeter
         // hardwareData.batteryVoltage /= 4095;  // assumes default ESP32 analogReadResolution (4095)
         hardwareData.batteryPercent = batteryGetChargeLevel(hardwareData.batteryVoltage);
-#endif
+      #endif
     }
     if (hardwareData.batteryVoltage != 0)
     {
@@ -939,6 +947,7 @@ void nvStorageWrite(int storedCounter, float temperatureF, float humidity, uint1
       debugMessage(String(nvStoreBaseName) + " stored in nv storage as " + co2,2);
     }
   }
+}
 
 void powerI2CEnable()
 // enables I2C across multiple Adafruit ESP32 variants
