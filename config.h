@@ -7,23 +7,19 @@
 
 // Configuration Step 1: Set debug message output
 // comment out to turn off; 1 = summary, 2 = verbose
-#define DEBUG 1
+// #define DEBUG 1
 
-// Configuration Step 2: Set network transport, if desired
-#define RJ45  	// use Ethernet
-// #define WIFI    	// use WiFi
-
-// Configuration Step 3: Set network data endpoints
+// Configuration Step 2: Set network data endpoints
 // these require a network transport from Step 2
-//  #define MQTT 		// log sensor data to MQTT broker
+ #define MQTT 		// log sensor data to MQTT broker
 // #define HASSIO_MQTT  // And, if MQTT enabled, with Home Assistant too?
 // #define DWEET // Post sensor readings to dweet.io
 #define INFLUX 	// Log data to remote InfluxDB server
 
-// Configuration Step 4: Select environment sensor and configure read intervals
-// #define SCD40		// use SCD40 to read temperature, humidity, and CO2
+// Configuration Step 3: Select environment sensor and configure read intervals
+#define SCD40		// use SCD40 to read temperature, humidity, and CO2
 // #define BME280	// use BME280 to read temperature and humidity
-#define AHTXX		// use AHT series device to read temperature and humidity
+// #define AHTXX		// use AHT series device to read temperature and humidity
 
 // environment sensor sample timing
 #ifdef DEBUG
@@ -44,8 +40,8 @@
   #define SAMPLE_SIZE 			6
 #endif
 
-// Configuration Step 5: Set screen parameters, if desired
-// #define	SCREEN		// use screen as output
+// Configuration Step 4: Set screen parameters, if desired
+#define	SCREEN		// use screen as output
 
 // Pin config for e-paper display
 #ifdef SCREEN
@@ -67,7 +63,7 @@
   #endif
 #endif
 
-// Configuration Step 6: Set battery size, if applicable
+// Configuration Step 5: Set battery size, if applicable
 // If LC709203F detected on i2c, define battery pack based on settings curve from datasheet
 // #define BATTERY_APA 0x08 // 100mAH
 // #define BATTERY_APA 0x0B // 200mAH
@@ -83,7 +79,7 @@
 #define VBATPIN A13
 const int   batteryReads = 5;
 
-// Configuration Step 7: Set parameters for NTP time configuration
+// Configuration Step 6: Set parameters for NTP time configuration
 // this will only be used if network transport is defined in Step 2
 #define ntpServer "pool.ntp.org"
 #define timeZoneString "PST8PDT,M3.2.0,M11.1.0" // America/Los_Angeles

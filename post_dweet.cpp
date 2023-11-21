@@ -10,18 +10,11 @@
 // private credentials for network, MQTT, weather provider
 #include "secrets.h"
 
-#include "aq_network.h"
-extern AQ_Network aq_network;
-
 #ifdef DWEET
-  #include <HTTPClient.h> 
-
   // Shared helper function
   extern void debugMessage(String messageText, int messageLevel);
-  // extern int httpPOSTRequest(String serverurl, String contenttype, String payload);
 
-  // Post a dweet to report the various sensor reading.  This routine blocks while
-  // talking to the network, so may take a while to execute.
+  // Post a dweet to report the various sensor reading
   void post_dweet(uint16_t co2, float temperatureF, float humidity, float batteryVoltage, int rssi)
   {
 

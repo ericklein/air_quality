@@ -11,12 +11,9 @@
 #include "data.h"
 // private credentials for network, MQTT, weather provider
 #include "secrets.h"
-// network functionality
-#include "aq_network.h"
 
 // required external functions and data structures
 extern void debugMessage(String messageText, int messageLevel);
-extern AQ_Network aq_network;
 
 #ifdef HASSIO_MQTT
   extern void hassio_mqtt_setup();
