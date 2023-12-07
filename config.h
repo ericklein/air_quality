@@ -7,7 +7,7 @@
 
 // Configuration Step 1: Set debug message output
 // comment out to turn off; 1 = summary, 2 = verbose
-// #define DEBUG 1
+#define DEBUG 1
 
 // Configuration Step 2: Set network data endpoints
  #define MQTT 		// log sensor data to MQTT broker

@@ -101,41 +101,36 @@ Adafruit_LC709203F lc;
 
 // screen support
 #ifdef SCREEN
-#include <Adafruit_ThinkInk.h>
+  #include <Adafruit_ThinkInk.h>
 
-#include "Fonts/meteocons20pt7b.h"
-#include "Fonts/meteocons16pt7b.h"
-#include "Fonts/meteocons12pt7b.h"
+  #include "Fonts/meteocons20pt7b.h"
+  #include "Fonts/meteocons16pt7b.h"
+  #include "Fonts/meteocons12pt7b.h"
 
-#include <Fonts/FreeSans9pt7b.h>
-#include <Fonts/FreeSans12pt7b.h>
-#include <Fonts/FreeSans18pt7b.h>
+  #include <Fonts/FreeSans9pt7b.h>
+  #include <Fonts/FreeSans12pt7b.h>
+  #include <Fonts/FreeSans18pt7b.h>
 
-// Special glyphs for the UI
-#include "Fonts/glyphs.h"
+  // Special glyphs for the UI
+  #include "Fonts/glyphs.h"
 
-#if defined(ARDUINO_ADAFRUIT_FEATHER_ESP32_V2)
-// 2.96" tricolor display with 196x128 pixels
-ThinkInk_290_Tricolor_Z10 display(EPD_DC, EPD_RESET, EPD_CS, SRAM_CS, EPD_BUSY);
-#else
-// Magtag is 2.96" greyscale display with 196x128 pixels
-ThinkInk_290_Grayscale4_T5 display(EPD_DC, EPD_RESET, EPD_CS, SRAM_CS, EPD_BUSY);
-#endif
+  // 2.96" greyscale display with 196x128 pixels
+  ThinkInk_290_Grayscale4_T5 display(EPD_DC, EPD_RESET, EPD_CS, SRAM_CS, EPD_BUSY);
 
-// screen layout assists
-const int xMargins = 5;
-const int xOutdoorMargin = ((display.width() / 2) + xMargins);
-const int yMargins = 2;
-const int yCO2 = 20;
-const int ySparkline = 40;
-const int yTemperature = 100;
-const int yStatus = (display.height() * 7 / 8);
-const int sparklineHeight = 40;
-const int batteryBarWidth = 28;
-const int batteryBarHeight = 10;
-const int wifiBarWidth = 3;
-const int wifiBarHeightIncrement = 2;
-const int wifiBarSpacing = 5;
+  // screen layout assists
+  const int xMargins = 5;
+  const int xOutdoorMargin = ((display.width() / 2) + xMargins);
+  const int yMargins = 2;
+  const int yCO2 = 20;
+  const int ySparkline = 40;
+  const int yTemperature = 100;
+  const int yStatus = (display.height() * 7 / 8);
+  const int sparklineHeight = 40;
+  const int batteryBarWidth = 28;
+  const int batteryBarHeight = 10;
+  const int wifiBarWidth = 3;
+  const int wifiBarHeightIncrement = 2;
+  const int wifiBarSpacing = 5;
 #endif
 
 // activate only if using network data endpoints
@@ -211,15 +206,10 @@ powerI2CEnable();
 
 #ifdef SCREEN
   // there is no way to query screen for status
-  // colors are EPD_WHITE, EPD_BLACK, EPD_RED
-  #if defined(ARDUINO_ADAFRUIT_FEATHER_ESP32_V2)
-    display.begin(THINKINK_TRICOLOR);
-    debugMessage("screen initialized as tricolor", 1);
-  #else
-    // changed from THINKINK_GRAYSCALE4 to eliminate black screen border
-    display.begin(THINKINK_MONO);
-    debugMessage("screen initialized as mono", 1);
-  #endif
+  // colors are EPD_WHITE, EPD_BLACK
+  // changed from THINKINK_GRAYSCALE4 to eliminate black screen border
+  display.begin(THINKINK_MONO);
+  debugMessage("screen initialized as mono", 1);
   display.setTextWrap(false);
 #endif
 
