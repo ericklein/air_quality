@@ -138,15 +138,27 @@ const int wifiBarHeightIncrement = 2;
 const int wifiBarSpacing = 5;
 #endif
 
-#include "ArduinoJson.h"  // Needed by OWM retrieval routines
+// activate only if using network data endpoints
+#if defined(MQTT) || defined(INFLUX) || defined(HASSIO_MQTT)
+  #if defined(ESP8266)
+    #include <ESP8266WiFi.h>
+  #elif defined(ESP32)
+    #include <WiFi.h>
+  #elif
+    #include <WiFiNINA.h> // PyPortal
+  #endif
+#endif
 
-// activate WiFi if using network data endpoints
+// activate WiFi and associated services if using network data endpoints
   #if defined(MQTT) || defined(INFLUX) || defined(HASSIO_MQTT) || defined(DWEET)
-  #include <WiFiManager.h> // https://github.com/tzapu/WiFiManager
+  WiFiClient client;
   // NTP setup
   #include "time.h"
-  // Generalized access to HTTP services atop WiFi connection
-  #include <HTTPClient.h>
+  #ifdef SCREEN
+    // Libraries needed to access Open Weather Map
+    #include <HTTPClient.h>
+    #include "ArduinoJson.h"  // Needed by OWM retrieval routines
+  #endif
 #endif
 
 #ifdef INFLUX
@@ -158,9 +170,6 @@ extern void post_dweet(uint16_t co2, float temperatureF, float humidity, float b
 #endif
 
 #ifdef MQTT
-  // MQTT uses WiFiClient class to create TCP connections
-  WiFiClient client;
-
   #include <Adafruit_MQTT.h>
   #include <Adafruit_MQTT_Client.h>
   // Adafruit_MQTT_Client aq_mqtt(&client, MQTT_BROKER, MQTT_PORT, DEVICE_ID, MQTT_USER, MQTT_PASS);
@@ -1087,43 +1096,44 @@ void testSparkLineValues(int sampleSetSize)
   }
 }
 
-bool networkConnect()
+bool networkConnect() 
 {
+  #ifdef SIMULATE_SENSOR
+    // IMPROVEMENT : Could simulate IP address
+    // testing range is 30 to 90 (no signal)
+    hardwareData.rssi  = random(30, 90);
+    return true;
+  #endif
+
   // Run only if using network data endpoints
-  #if defined(MQTT) || defined(INFLUX) || defined(HASSIO_MQTT) || defined(DWEET)
+  #if defined(MQTT) || defined(INFLUX) || defined(HASSIO_MQTT)
+
+    // reconnect to WiFi only if needed
+    if (WiFi.status() == WL_CONNECTED) 
+    {
+      debugMessage("Already connected to WiFi",2);
+      return true;
+    }
     // set hostname has to come before WiFi.begin
     WiFi.hostname(DEVICE_ID);
 
-    WiFiManager wm;
+    WiFi.begin(WIFI_SSID, WIFI_PASS);
 
-    // reset settings - wipe stored credentials for testing
-    // these are stored by the esp library
-    // wm.resetSettings();
-
-    // Automatically connect using saved credentials,
-    // if connection fails, it starts an access point with the specified name ( "AutoConnectAP"),
-    // if empty will auto generate SSID, if password is blank it will be anonymous AP (wm.autoConnect())
-    // then goes into a blocking loop awaiting configuration and will return success result
-
-    // result = wm.autoConnect(); // auto generated AP name from chipid
-    // result = wm.autoConnect("AutoConnectAP"); // anonymous ap
-    bool result = wm.autoConnect("RCO2_setup","rco2"); // password protected ap
-
-    if(!result)
+    for (int tries = 1; tries <= CONNECT_ATTEMPT_LIMIT; tries++)
+    // Attempts WiFi connection, and if unsuccessful, re-attempts after CONNECT_ATTEMPT_INTERVAL second delay for CONNECT_ATTEMPT_LIMIT times
     {
-        debugMessage("WiFi failed to connect",1);
-        return false;
-    } 
-    else 
-    {
-      hardwareData.rssi = abs(WiFi.RSSI());
-      debugMessage("power on: WiFi",1);
-      debugMessage(String("WiFi IP address: ") + WiFi.localIP().toString(),1);
-      //debugMessage(String("WiFi IP address from ") + WIFI_SSID + ": " + WiFi.localIP().toString(),1);
-      debugMessage(String("WiFi RSSI: ") + hardwareData.rssi + " dBm",1);
-      return true;
-    } 
+      if (WiFi.status() == WL_CONNECTED) {
+        hardwareData.rssi = abs(WiFi.RSSI());
+        debugMessage(String("WiFi IP address lease from ") + WIFI_SSID + " is " + WiFi.localIP().toString(), 1);
+        debugMessage(String("WiFi RSSI is: ") + hardwareData.rssi + " dBm", 1);
+        return true;
+      }
+      debugMessage(String("Connection attempt ") + tries + " of " + CONNECT_ATTEMPT_LIMIT + " to " + WIFI_SSID + " failed", 1);
+      // use of delay() OK as this is initialization code
+      delay(CONNECT_ATTEMPT_INTERVAL * 1000);  // converted into milliseconds
+    }
   #endif
+  return false;
 }
 
 void networkDisconnect()

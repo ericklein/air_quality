@@ -10,7 +10,6 @@
 // #define DEBUG 1
 
 // Configuration Step 2: Set network data endpoints
-// these require a network transport from Step 2
  #define MQTT 		// log sensor data to MQTT broker
 // #define HASSIO_MQTT  // And, if MQTT enabled, with Home Assistant too?
 // #define DWEET // Post sensor readings to dweet.io
