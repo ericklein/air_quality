@@ -13,7 +13,7 @@
 #include "secrets.h"
 
 // required external functions and data structures
-extern void debugMessage(String messageText, int messageLevel);
+extern void debugMessage(String messageText, uint8_t messageLevel);
 
 #ifdef HASSIO_MQTT
   extern void hassio_mqtt_setup();
@@ -38,7 +38,7 @@ extern void debugMessage(String messageText, int messageLevel);
 
     int8_t mqttErr;
 
-    for(int tries = 1; tries <= CONNECT_ATTEMPT_LIMIT; tries++)
+    for(int tries = 1; tries <= networkConnectAttemptLimit; tries++)
     {
       if ((mqttErr = aq_mqtt.connect()) == 0)
       {
@@ -46,8 +46,8 @@ extern void debugMessage(String messageText, int messageLevel);
         return;
       }
       aq_mqtt.disconnect();
-      debugMessage(String("MQTT connection attempt ") + tries + " of " + CONNECT_ATTEMPT_LIMIT + " failed with error msg: " + aq_mqtt.connectErrorString(mqttErr),1);
-      delay(CONNECT_ATTEMPT_INTERVAL*1000);
+      debugMessage(String("MQTT connection attempt ") + tries + " of " + networkConnectAttemptLimit + " failed with error msg: " + aq_mqtt.connectErrorString(mqttErr),1);
+      delay(networkConnectAttemptInterval*1000);
     }
   }
 
@@ -88,7 +88,7 @@ extern void debugMessage(String messageText, int messageLevel);
     return(result);
   }
 
-  bool mqttDeviceWiFiUpdate(int rssi)
+  bool mqttDeviceWiFiUpdate(uint8_t rssi)
   {
     bool result = false;
     if (rssi!=0)
