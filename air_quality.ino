@@ -26,7 +26,7 @@ typedef struct {
 envData sensorData;  // global variable for environment sensor data
 
 // stores CO2 sample values for sparkline
-uint16_t co2Samples[SAMPLE_SIZE];
+uint16_t co2Samples[sensorSampleSize];
 
 // hardware status data
 typedef struct {
@@ -66,7 +66,7 @@ OpenWeatherMapCurrentData owmCurrentData;  // global variable for OWM current da
 typedef struct {
   // float lon;    // "lon": 8.54
   // float lat;    // "lat": 47.37
-  uint8_t aqi;  // "aqi": 2  [European standards body value]
+  uint16_t aqi;  // "aqi": 2  [European standards body value]
   // float co;     // "co": 453.95, in μg/m3
   // float no;     // "no": 0.47, in μg/m3
   // float no2;    // "no2": 52.09, in μg/m3
@@ -194,8 +194,8 @@ void setup()
 #endif
 
 debugMessage("Air Quality Device ID: " + String(DEVICE_ID), 1);
-debugMessage(String("Sample interval is ") + SAMPLE_INTERVAL + " seconds", 2);
-debugMessage(String("Number of samples before reporting is ") + SAMPLE_SIZE, 2);
+debugMessage(String("Sample interval is ") + sensorSampleInterval + " seconds", 2);
+debugMessage(String("Number of samples before reporting is ") + sensorSampleSize, 2);
 debugMessage(String("Internet service reconnect delay is ") + networkConnectAttemptInterval + " seconds", 2);
 #ifdef DWEET
   debugMessage("Dweet device: " + String(DWEET_DEVICE), 2);
@@ -234,26 +234,26 @@ powerI2CEnable();
   sampleCounter = nvStorageRead();
   sampleCounter++;
 
-  if (sampleCounter < SAMPLE_SIZE)
+  if (sampleCounter < sensorSampleSize)
   // add to the accumulating, intermediate sensor values and sleep device
   {
     nvStorageWrite(sampleCounter, sensorData.ambientTemperatureF + averageTempF, sensorData.ambientHumidity + averageHumidity, sensorData.ambientCO2);
-    powerDisable(SAMPLE_INTERVAL);
+    powerDisable(sensorSampleInterval);
   }
 
-  // sampleCounter == SAMPLE_SIZE, so average values for reporting
+  // sampleCounter == sensorSampleSize, so average values for reporting
 
   // add in most recent sample then average
-  averageTempF = ((sensorData.ambientTemperatureF + averageTempF) / (SAMPLE_SIZE + 1));
-  averageHumidity = ((sensorData.ambientHumidity + averageHumidity) / (SAMPLE_SIZE + 1));
+  averageTempF = ((sensorData.ambientTemperatureF + averageTempF) / (sensorSampleSize + 1));
+  averageHumidity = ((sensorData.ambientHumidity + averageHumidity) / (sensorSampleSize + 1));
 
   // aggregate stored, rolling CO2 values
-  for (uint8_t loop = 0; loop < SAMPLE_SIZE; loop++) {
+  for (uint8_t loop = 0; loop < sensorSampleSize; loop++) {
     averageCO2 = averageCO2 + co2Samples[loop];
   }
 
   // add in most recent sample then average
-  averageCO2 = uint16_t((sensorData.ambientCO2 + averageCO2) / (SAMPLE_SIZE + 1));
+  averageCO2 = uint16_t((sensorData.ambientCO2 + averageCO2) / (sensorSampleSize + 1));
 
   debugMessage(String("Averaged values Temp:") + averageTempF + "F, Humidity:" + averageHumidity + ", CO2:" + averageCO2, 2);
 
@@ -268,7 +268,7 @@ powerI2CEnable();
     owmCurrentData.temp = 10000;
     owmCurrentData.humidity = 10000;
   }
-  networkGetTime(timeZoneString);
+  networkGetTime(networkTimeZone);
 
   if (!OWMAirPollutionRead()) {
     owmAirQuality.aqi = 10000;
@@ -320,7 +320,7 @@ powerI2CEnable();
   nvStorageWrite(-1, 0, 0, 0);
   debugMessage("nvStorage values reset", 2);
 
-  powerDisable(SAMPLE_INTERVAL);
+  powerDisable(sensorSampleInterval);
 }
 
 void loop() {}
@@ -656,23 +656,23 @@ void screenHelperBatteryStatus(uint16_t initialX, uint16_t initialY, uint8_t bar
 void screenHelperSparkLine(uint16_t initialX, uint16_t initialY, uint16_t xWidth, uint16_t yHeight) {
 #ifdef SCREEN
   // TEST ONLY: load test CO2 values
-  // testSparkLineValues(SAMPLE_SIZE);
+  // testSparkLineValues(sensorSampleSize);
 
   uint16_t co2Min = co2Samples[0];
   uint16_t co2Max = co2Samples[0];
   // # of pixels between each samples x and y coordinates
   uint8_t xPixelStep, yPixelStep;
 
-  uint16_t sparkLineX[SAMPLE_SIZE], sparkLineY[SAMPLE_SIZE];
+  uint16_t sparkLineX[sensorSampleSize], sparkLineY[sensorSampleSize];
 
   // horizontal distance (pixels) between each displayed co2 value
-  xPixelStep = (xWidth / (SAMPLE_SIZE - 1));
+  xPixelStep = (xWidth / (sensorSampleSize - 1));
 
   // determine min/max of CO2 samples
-  // could use recursive function but SAMPLE_SIZE should always be relatively small
-  for (uint8_t loop = 0; loop < SAMPLE_SIZE; loop++) {
-    if (co2Samples[loop] > co2Max) co2Max = co2Samples[i];
-    if (co2Samples[loop] < co2Min) co2Min = co2Samples[i];
+  // could use recursive function but sensorSampleSize should always be relatively small
+  for (uint8_t loop = 0; loop < sensorSampleSize; loop++) {
+    if (co2Samples[loop] > co2Max) co2Max = co2Samples[loop];
+    if (co2Samples[loop] < co2Min) co2Min = co2Samples[loop];
   }
   debugMessage(String("Max CO2 in stored sample range is ") + co2Max + ", min is " + co2Min, 2);
 
@@ -685,14 +685,14 @@ void screenHelperSparkLine(uint16_t initialX, uint16_t initialY, uint16_t xWidth
   // display.drawRect(initialX,initialY, xWidth,yHeight, EPD_BLACK);
 
   // determine sparkline x,y values
-  for (uint8_t loop = 0; loop < SAMPLE_SIZE; loop++) {
+  for (uint8_t loop = 0; loop < sensorSampleSize; loop++) {
     sparkLineX[loop] = (initialX + (loop * xPixelStep));
     sparkLineY[loop] = ((initialY + yHeight) - (uint8_t)((co2Samples[loop] - co2Min) / yPixelStep));
     // draw/extend sparkline after first value is generated
     if (loop != 0)
       display.drawLine(sparkLineX[loop - 1], sparkLineY[loop - 1], sparkLineX[loop], sparkLineY[loop], EPD_BLACK);
   }
-  for (uint8_t loop = 0; loop < SAMPLE_SIZE; loop++) {
+  for (uint8_t loop = 0; loop < sensorSampleSize; loop++) {
     debugMessage(String("X,Y coordinates for CO2 sample ") + loop + " is " + sparkLineX[loop] + "," + sparkLineY[loop], 2);
   }
   debugMessage("sparkline drawn to screen", 1);
@@ -785,9 +785,11 @@ bool sensorInit()
       envSensor.begin(Wire);
     #endif
 
+    // IMPROVEMENT success on wakeup means we were in sleep mode
     envSensor.wakeUp();
     envSensor.setSensorAltitude(SITE_ALTITUDE);  // optimizes CO2 reading
 
+    // IMPROVEMENT measureSingleShot means we dont need this?
     uint16_t error = envSensor.startPeriodicMeasurement();
     if (error) {
       // Failed to initialize SCD40
@@ -842,10 +844,11 @@ bool sensorRead()
     #ifdef SCD40
       char errorMessage[256];
 
-      for (uint8_t loop = 1; loop <= READS_PER_SAMPLE; loop++) {
+      for (uint8_t loop = 1; loop <= sensorReadsPerSample; loop++) {
         // delay is non-blocking; minimum time between SCD40 reads
         delay(5000);
         // read and store data if successful
+        // IMPROVEMENT measureSingleShot
         uint16_t error = envSensor.readMeasurement(sensorData.ambientCO2, sensorData.ambientTemperatureF, sensorData.ambientHumidity);
         // handle SCD40 errors
         if (error) {
@@ -859,7 +862,7 @@ bool sensorRead()
         }
         //convert C to F for temp
         sensorData.ambientTemperatureF = (sensorData.ambientTemperatureF * 1.8) + 32;
-        debugMessage(String("SCD40 read ") + loop + " of " + READS_PER_SAMPLE + ": " + sensorData.ambientTemperatureF + "F, " + sensorData.ambientHumidity + "%, " + sensorData.ambientCO2 + " ppm", 2);
+        debugMessage(String("SCD40 read ") + loop + " of " + sensorReadsPerSample + ": " + sensorData.ambientTemperatureF + "F, " + sensorData.ambientHumidity + "%, " + sensorData.ambientCO2 + " ppm", 2);
       }
     #else
       // AHTX0, BME280
@@ -878,7 +881,7 @@ bool sensorRead()
 
 uint8_t nvStorageRead()
 // reads data from non-volatile storage and stores in appropriate global variables
-// FIX: CO2 values only need to be read for sparkline generation when counter == SAMPLE_SIZE, not every sample
+// FIX: CO2 values only need to be read for sparkline generation when counter == sensorSampleSize, not every sample
 {
   nvStorage.begin("air-quality", false);
   uint8_t storedCounter = nvStorage.getInt("counter", -1);  // counter tracks a 0 based array
@@ -906,9 +909,9 @@ uint8_t nvStorageRead()
   if (sensorData.ambientCO2 != 10000) {
     // Read CO2 array. If they don't exist, create them as 400 (CO2 floor)
     String nvStoreBaseName;
-    for (uint8_t loop = 0; loop < SAMPLE_SIZE; loop++) {
+    for (uint8_t loop = 0; loop < sensorSampleSize; loop++) {
       nvStoreBaseName = "co2Sample" + String(loop);
-      co2Samples[i] = nvStorage.getLong(nvStoreBaseName.c_str(), 400);
+      co2Samples[loop] = nvStorage.getLong(nvStoreBaseName.c_str(), 400);
       debugMessage(String(nvStoreBaseName) + " retrieved from nv storage is " + co2Samples[loop], 2);
     }
   }
@@ -931,7 +934,7 @@ void nvStorageWrite(uint8_t storedCounter, float temperatureF, float humidity, u
   }
   if (co2 == 0)  // reset all the values
   {
-    for (uint8_t loop = 0; loop < SAMPLE_SIZE; loop++) {
+    for (uint8_t loop = 0; loop < sensorSampleSize; loop++) {
       String nvStoreBaseName = "co2Sample" + String(loop);
       nvStorage.putLong(nvStoreBaseName.c_str(), co2);
       debugMessage(String(nvStoreBaseName) + " stored in nv storage as " + co2, 2);
@@ -1175,7 +1178,7 @@ bool networkGetTime(String timezone)
   struct tm timeinfo;
 
   // connect to NTP server with 0 TZ offset
-  configTime(0, 0, networkNTPAddress);
+  configTime(0, 0, networkNTPAddress.c_str());
   if(!getLocalTime(&timeinfo))
   {
     debugMessage("Failed to obtain time from NTP Server",1);

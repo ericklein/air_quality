@@ -55,16 +55,15 @@ const uint8_t networkConnectAttemptInterval = 10;
 
 // Time
 // NTP time parameters
-// const char* networkNTPAddress = "pool.ntp.org";
-#define networkNTPAddress "pool.ntp.org"
+const String networkNTPAddress = "pool.ntp.org";
 const String networkTimeZone = "PST8PDT,M3.2.0,M11.1.0"; // America/Los_Angeles
 const String weekDays[7] = { "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday" };
 
 // Data endpoints
 #ifdef INFLUX  
 	// Specify Measurement to use with InfluxDB for sensor and device info
-  #define INFLUX_ENV_MEASUREMENT "weather"  // Used for environmental sensor data
-  #define INFLUX_DEV_MEASUREMENT "device"   // Used for logging AQI device data (e.g. battery)
+	const String influxEnvMeasurement = "weather";  // Used for environmental sensor data
+	const String influxDevMeasurement =  "device";   // Used for logging AQI device data (e.g. battery)
 #endif
 
 #ifdef DWEET
@@ -98,22 +97,23 @@ const String weekDays[7] = { "Sunday", "Monday", "Tuesday", "Wednesday", "Thursd
 
 // sensor
 // sample timing
-#ifdef DEBUG
-	// number of times sensor is read, last read is the sample value
-	#define READS_PER_SAMPLE	1
-	// time between samples in seconds
-	#define SAMPLE_INTERVAL		60
-	// number of samples to average. this is also the # of uint_16 CO2 samples saved to nvStorage, so limit this
-  #define SAMPLE_SIZE				2
-#else
-	#ifdef SCD40 
-		// SCD40 needs >= 5 samples to get to a reliable reading from a cold start
-		#define READS_PER_SAMPLE	5
+#ifdef SCD40
+	#ifdef DEBUG
+		const uint8_t sensorReadsPerSample =	1;
 	#else
-		#define READS_PER_SAMPLE	1
+		// SCD40 needs >= 5 samples to get to a reliable reading from a cold start
+		// Question : does measureSingleShot change this need to read x times?
+		const uint8_t sensorReadsPerSample =	5;
 	#endif
-	#define SAMPLE_INTERVAL 	300
-  #define SAMPLE_SIZE 			6
+#endif
+#ifdef DEBUG
+	// time between samples in seconds
+	const uint8_t sensorSampleInterval = 60;
+	// number of samples to average. this is also the # of uint_16 CO2 samples saved to nvStorage, so limit this
+  const uint8_t sensorSampleSize = 2;
+#else
+	const uint8_t sensorSampleInterval = 300;
+  const uint8_t sensorSampleSize = 6;
 #endif
 const String co2Labels[5]={"Good", "OK", "So-So", "Poor", "Bad"};
 // if using OWM aqi value, these are the European standards-body conversions from numeric valeu

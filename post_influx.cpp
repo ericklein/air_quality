@@ -39,8 +39,8 @@
     bool result = false;
 
     // InfluxDB Data point, binds to InfluxDB 'measurement' to use for data. See config.h for value used
-    Point dbenvdata(INFLUX_ENV_MEASUREMENT);
-    Point dbdevdata(INFLUX_DEV_MEASUREMENT);
+    Point dbenvdata(influxEnvMeasurement);
+    Point dbdevdata(influxDevMeasurement);
     
     #ifdef INFLUX_V1
       // Set InfluxDB v1.X authentication params using values defined in secrets.h.  Not needed as such
