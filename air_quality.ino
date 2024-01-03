@@ -78,8 +78,8 @@ typedef struct {
 } OpenWeatherMapAirQuality;
 OpenWeatherMapAirQuality owmAirQuality;  // global variable for OWM current data
 
-// initialize environment sensor
 #ifndef SIMULATE_SENSOR
+  // initialize environment sensor
   #ifdef SCD40
     // SCD40; temp, humidity, CO2
     #include <SensirionI2CScd4x.h>
@@ -95,11 +95,11 @@ OpenWeatherMapAirQuality owmAirQuality;  // global variable for OWM current data
     Adafruit_Sensor *envSensorTemp = envSensor.getTemperatureSensor();
     Adafruit_Sensor *envSensorHumidity = envSensor.getHumiditySensor();
   #endif
-#endif
 
-// Battery voltage sensor
-#include <Adafruit_LC709203F.h>
-Adafruit_LC709203F lc;
+  // Battery voltage sensor
+  #include <Adafruit_LC709203F.h>
+  Adafruit_LC709203F lc;
+#endif
 
 // screen support
 #ifdef SCREEN
@@ -220,7 +220,7 @@ powerI2CEnable();
     screenAlert("Env sensor not detected");
     // This error often occurs after a firmware flash and then resetting the board
     // Hardware deep sleep typically resolves it, so quickly cycle the hardware
-    powerDisable(HARDWARE_ERROR_INTERVAL);
+    powerDisable(hardwareRebootInterval);
   }
 
   // Environmental sensor available, so fetch values
@@ -229,7 +229,7 @@ powerI2CEnable();
     // hard coded for SCD40 as there is no way to read error condition on other sensors
     debugMessage("SCD40 returned no/bad data", 1);
     screenAlert("SCD40 read issue");
-    powerDisable(HARDWARE_ERROR_INTERVAL);
+    powerDisable(hardwareRebootInterval);
   }
   sampleCounter = nvStorageRead();
   sampleCounter++;
@@ -699,43 +699,59 @@ void screenHelperSparkLine(uint16_t initialX, uint16_t initialY, uint16_t xWidth
 #endif
 }
 
-void batteryRead(uint8_t reads)
-// stores battery voltage if available in hardware characteristics global
+void batterySimulate()
 {
-  // check to see if i2C monitor is available
-  if (lc.begin())
-  // Check battery monitoring status
-  {
-    debugMessage(String("Version: 0x") + lc.getICversion(), 2);
-    lc.setPackAPA(BATTERY_APA);
-    //lc.setThermistorB(3950);
-
-    hardwareData.batteryPercent = lc.cellPercent();
-    hardwareData.batteryVoltage = lc.cellVoltage();
-    //hardwareData.batteryTemperatureF = 32 + (1.8* lc.getCellTemperature());
-  } else {
-// use supported boards to read voltage
-#if defined(ARDUINO_ADAFRUIT_FEATHER_ESP32_V2)
-    // modified from the Adafruit power management guide for Adafruit ESP32V2
-    float accumulatedVoltage = 0;
-    for (uint8_t loop = 0; loop < reads; loop++) {
-      accumulatedVoltage += analogReadMilliVolts(VBATPIN);
-    }
-    hardwareData.batteryVoltage = accumulatedVoltage / reads;  // we now have the average reading
-    // convert into volts
-    hardwareData.batteryVoltage *= 2;     // we divided by 2, so multiply back
-    hardwareData.batteryVoltage /= 1000;  // convert to volts!
-    hardwareData.batteryVoltage *= 2;     // we divided by 2, so multiply back
-    // ESP32 suggested algo
-    // hardwareData.batteryVoltage *= 3.3;   // Multiply by 3.3V, our reference voltage
-    // hardwareData.batteryVoltage *= 1.05;  // the 1.05 is a fudge factor original author used to align reading with multimeter
-    // hardwareData.batteryVoltage /= 4095;  // assumes default ESP32 analogReadResolution (4095)
+  // IMPROVEMENT: Simulate battery below SCD40 required level
+  #ifdef SENSOR_SIMULATE
+    hardwareData.batteryVoltage = random(batterySimVoltageMin, batterySimVoltageMax) / 100.00;
     hardwareData.batteryPercent = batteryGetChargeLevel(hardwareData.batteryVoltage);
-#endif
-  }
-  if (hardwareData.batteryVoltage != 0) {
-    debugMessage(String("Battery voltage: ") + hardwareData.batteryVoltage + "v, percent: " + hardwareData.batteryPercent + "%", 1);
-  }
+  #endif
+}
+
+void batteryRead(uint8_t reads)
+// sets global battery values from i2c battery monitor or analog pin value on supported boards
+{
+  #ifdef SENSOR_SIMULATE
+    batterySimulate();
+    debugMessage(String("SIMULATED Battery voltage: ") + hardwareData.batteryVoltage + "v, percent: " + hardwareData.batteryPercent + "%",1);
+  #else
+    // check to see if i2C monitor is available
+    if (lc.begin())
+    // Check battery monitoring status
+    {
+      debugMessage(String("Version: 0x") + lc.getICversion(), 2);
+      lc.setPackAPA(BATTERY_APA);
+      //lc.setThermistorB(3950);
+
+      hardwareData.batteryPercent = lc.cellPercent();
+      hardwareData.batteryVoltage = lc.cellVoltage();
+      //hardwareData.batteryTemperatureF = 32 + (1.8* lc.getCellTemperature());
+    }
+    else 
+    {
+      // use supported boards to read voltage
+      #if defined(ARDUINO_ADAFRUIT_FEATHER_ESP32_V2)
+        // modified from the Adafruit power management guide for Adafruit ESP32V2
+        float accumulatedVoltage = 0;
+        for (uint8_t loop = 0; loop < reads; loop++) {
+          accumulatedVoltage += analogReadMilliVolts(VBATPIN);
+        }
+        hardwareData.batteryVoltage = accumulatedVoltage / reads;  // we now have the average reading
+        // convert into volts
+        hardwareData.batteryVoltage *= 2;     // we divided by 2, so multiply back
+        hardwareData.batteryVoltage /= 1000;  // convert to volts!
+        hardwareData.batteryVoltage *= 2;     // we divided by 2, so multiply back
+        // ESP32 suggested algo
+        // hardwareData.batteryVoltage *= 3.3;   // Multiply by 3.3V, our reference voltage
+        // hardwareData.batteryVoltage *= 1.05;  // the 1.05 is a fudge factor original author used to align reading with multimeter
+        // hardwareData.batteryVoltage /= 4095;  // assumes default ESP32 analogReadResolution (4095)
+        hardwareData.batteryPercent = batteryGetChargeLevel(hardwareData.batteryVoltage);
+      #endif
+    }
+    if (hardwareData.batteryVoltage != 0) {
+      debugMessage(String("Battery voltage: ") + hardwareData.batteryVoltage + "v, percent: " + hardwareData.batteryPercent + "%", 1);
+    }
+  #endif
 }
 
 uint8_t batteryGetChargeLevel(float volts) {
@@ -814,19 +830,16 @@ bool sensorInit()
 
 void sensorSimulate()
 // Simulate data from the sensor
+// Improvement - implement stable, rapid rise and fall 
 {
   #ifdef SENSOR_SIMULATE
     // Temperature
     // keep this value in C, as it is converted to F in sensorRead
-    // testing range is 15 to 25
     sensorData.ambientTemperatureF = random(sensorTempMin,sensorTempMax) / 100.0;
     // Humidity
-    // testing range is 5% to 95%
     sensorData.ambientHumidity = random(sensorHumidityMin,sensorHumidityMax) / 100.0;
     #ifdef SCD40
       // CO2
-      // Improvement: Simulate rapid rise and rapid fall
-      // testing range is 800 to 900
       sensorData.ambientCO2 = random(sensorCO2Min, sensorCO2Max);
     #else
       // AHTX0, BME280
@@ -845,8 +858,9 @@ bool sensorRead()
       char errorMessage[256];
 
       for (uint8_t loop = 1; loop <= sensorReadsPerSample; loop++) {
-        // delay is non-blocking; minimum time between SCD40 reads
-        delay(5000);
+        // SCD40 datasheet suggests 5 second delay between SCD40 reads
+        // assume sensorSampleInterval will create needed delay for loop == 1 
+        if (loop > 1) delay(5000);
         // read and store data if successful
         // IMPROVEMENT measureSingleShot
         uint16_t error = envSensor.readMeasurement(sensorData.ambientCO2, sensorData.ambientTemperatureF, sensorData.ambientHumidity);

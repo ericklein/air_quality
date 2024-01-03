@@ -12,12 +12,18 @@
 // simulate SCD40 sensor operations, returning random but plausible values
 // comment out to turn off
 // #define SENSOR_SIMULATE
-const uint16_t sensorTempMin =      1500; // will be divided by 100.0 to give floats
-const uint16_t sensorTempMax =      2500;
-const uint16_t sensorHumidityMin =  500; // will be divided by 100.0 to give floats
-const uint16_t sensorHumidityMax =  9500;
-const uint16_t sensorCO2Min =       400;
-const uint16_t sensorCO2Max =       3000;
+
+#ifdef SENSOR_SIMULATE
+	const uint16_t sensorTempMin =      1500; // will be divided by 100.0 to give floats
+	const uint16_t sensorTempMax =      2500;
+	const uint16_t sensorHumidityMin =  500; // will be divided by 100.0 to give floats
+	const uint16_t sensorHumidityMax =  9500;
+	const uint16_t sensorCO2Min =       400;
+	const uint16_t sensorCO2Max =       3000;
+
+  const uint16_t batterySimVoltageMin = 370; // will be divided by 100.0 to give floats
+  const uint16_t batterySimVoltageMax = 410;
+#endif
 
 // Configuration Step 3: Set network data endpoints
  // #define MQTT 		// log sensor data to MQTT broker
@@ -153,4 +159,4 @@ const float batteryVoltageTable[101] = {
 
 // Hardware
 // Sleep time in seconds if hardware error occurs
-#define HARDWARE_ERROR_INTERVAL 10
+const uint8_t hardwareRebootInterval = 10;
