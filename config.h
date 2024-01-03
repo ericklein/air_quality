@@ -1,47 +1,86 @@
 /*
   Project Name:   air_quality
-  Description:    Regularly sample and log temperature, humidity, and if available, co2 levels
+  Description:    public (non-secret) configuration data
+*/	
 
-  See README.md for target information and revision history
-*/
+// Configuration Step 1: Create and/or configure secrets.h. Use secrets_template.h as guide to create secrets.h
 
-// Configuration Step 1: Set debug message output
+// Configuration Step 2: Set debug parameters
 // comment out to turn off; 1 = summary, 2 = verbose
 #define DEBUG 1
 
-// Configuration Step 2: Set network data endpoints
- #define MQTT 		// log sensor data to MQTT broker
+// simulate SCD40 sensor operations, returning random but plausible values
+// comment out to turn off
+// #define SENSOR_SIMULATE
+
+#ifdef SENSOR_SIMULATE
+	const uint16_t sensorTempMin =      1500; // will be divided by 100.0 to give floats
+	const uint16_t sensorTempMax =      2500;
+	const uint16_t sensorHumidityMin =  500; // will be divided by 100.0 to give floats
+	const uint16_t sensorHumidityMax =  9500;
+	const uint16_t sensorCO2Min =       400;
+	const uint16_t sensorCO2Max =       3000;
+
+  const uint16_t batterySimVoltageMin = 370; // will be divided by 100.0 to give floats
+  const uint16_t batterySimVoltageMax = 410;
+#endif
+
+// Configuration Step 3: Set network data endpoints
+ // #define MQTT 		// log sensor data to MQTT broker
 // #define HASSIO_MQTT  // And, if MQTT enabled, with Home Assistant too?
 // #define DWEET // Post sensor readings to dweet.io
 #define INFLUX 	// Log data to remote InfluxDB server
 
-// Configuration Step 3: Select environment sensor and configure read intervals
+// Configuration Step 4: Select environment sensor and configure read intervals
 #define SCD40		// use SCD40 to read temperature, humidity, and CO2
 // #define BME280	// use BME280 to read temperature and humidity
 // #define AHTXX		// use AHT series device to read temperature and humidity
 
-// environment sensor sample timing
-#ifdef DEBUG
-	// number of times sensor is read, last read is the sample value
-	#define READS_PER_SAMPLE	1
-	// time between samples in seconds
-	#define SAMPLE_INTERVAL		60
-	// number of samples to average. this is also the # of uint_16 CO2 samples saved to nvStorage, so limit this
-  #define SAMPLE_SIZE				2
-#else
-	#ifdef SCD40 
-		// SCD40 needs >= 5 samples to get to a reliable reading from a cold start
-		#define READS_PER_SAMPLE	5
-	#else
-		#define READS_PER_SAMPLE	1
-	#endif
-	#define SAMPLE_INTERVAL 	300
-  #define SAMPLE_SIZE 			6
-#endif
-
-// Configuration Step 4: Set screen parameters, if desired
+// Configuration Step 5: enable screen if desired
+// comment out to turn off
 #define	SCREEN		// use screen as output
 
+// Configuration Step 6: Set battery size, if applicable
+// If LC709203F detected on i2c, define battery pack based on settings curve from datasheet
+// #define BATTERY_APA 0x08 // 100mAH
+// #define BATTERY_APA 0x0B // 200mAH
+//  #define BATTERY_APA 0x10 // 500mAH
+// #define BATTERY_APA 0x19 // 1000mAH
+// #define BATTERY_APA 0x1D // 1200mAH
+#define BATTERY_APA 0x2D // 2000mAH
+// #define BATTERY_APA 0x32 // 2500mAH
+// #define BATTERY_APA 0x36 // 3000mAH
+
+// Configuration variables that change rarely
+
+// Network
+// max connection attempts to network services
+const uint8_t networkConnectAttemptLimit = 3;
+// seconds between network service connect attempts
+const uint8_t networkConnectAttemptInterval = 10;
+
+// Time
+// NTP time parameters
+const String networkNTPAddress = "pool.ntp.org";
+const String networkTimeZone = "PST8PDT,M3.2.0,M11.1.0"; // America/Los_Angeles
+const String weekDays[7] = { "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday" };
+
+// Data endpoints
+#ifdef INFLUX  
+	// Specify Measurement to use with InfluxDB for sensor and device info
+	const String influxEnvMeasurement = "weather";  // Used for environmental sensor data
+	const String influxDevMeasurement =  "device";   // Used for logging AQI device data (e.g. battery)
+#endif
+
+#ifdef DWEET
+	// Post data to the internet via dweet.io.  Set DWEET_DEVICE to be a
+	// unique name you want associated with this reporting device, allowing
+	// data to be easily retrieved through the web or Dweet's REST API.
+	#define DWEET_HOST "dweet.io"   // Typically dweet.io
+	#define DWEET_DEVICE "makerhour-airquality"  // Must be unique across all of dweet.io
+#endif
+
+// display
 // Pin config for e-paper display
 #ifdef SCREEN
 	#if defined (ARDUINO_ADAFRUIT_FEATHER_ESP32_V2)
@@ -62,67 +101,44 @@
   #endif
 #endif
 
-// Configuration Step 5: Set battery size, if applicable
-// If LC709203F detected on i2c, define battery pack based on settings curve from datasheet
-// #define BATTERY_APA 0x08 // 100mAH
-// #define BATTERY_APA 0x0B // 200mAH
-//  #define BATTERY_APA 0x10 // 500mAH
-// #define BATTERY_APA 0x19 // 1000mAH
-// #define BATTERY_APA 0x1D // 1200mAH
-#define BATTERY_APA 0x2D // 2000mAH
-// #define BATTERY_APA 0x32 // 2500mAH
-// #define BATTERY_APA 0x36 // 3000mAH
-
-// battery pin for Adafruit ESP32V2 used for reading battery voltage
-// used for reading battery voltage from analog PIN on applicable devices
-#define VBATPIN A13
-const int   batteryReads = 5;
-
-// Configuration Step 6: Set parameters for NTP time configuration
-// this will only be used if network transport is defined in Step 2
-#define ntpServer "pool.ntp.org"
-#define timeZoneString "PST8PDT,M3.2.0,M11.1.0" // America/Los_Angeles
-
-#ifdef INFLUX  
-	// Specify Measurement to use with InfluxDB for sensor and device info
-  #define INFLUX_ENV_MEASUREMENT "weather"  // Used for environmental sensor data
-  #define INFLUX_DEV_MEASUREMENT "device"   // Used for logging AQI device data (e.g. battery)
+// sensor
+// sample timing
+#ifdef SCD40
+	#ifdef DEBUG
+		const uint8_t sensorReadsPerSample =	1;
+	#else
+		// SCD40 needs >= 5 samples to get to a reliable reading from a cold start
+		// Question : does measureSingleShot change this need to read x times?
+		const uint8_t sensorReadsPerSample =	5;
+	#endif
 #endif
-
-#ifdef DWEET
-	// Post data to the internet via dweet.io.  Set DWEET_DEVICE to be a
-	// unique name you want associated with this reporting device, allowing
-	// data to be easily retrieved through the web or Dweet's REST API.
-	#define DWEET_HOST "dweet.io"   // Typically dweet.io
-	#define DWEET_DEVICE "makerhour-airquality"  // Must be unique across all of dweet.io
+#ifdef DEBUG
+	// time between samples in seconds
+	const uint8_t sensorSampleInterval = 60;
+	// number of samples to average. this is also the # of uint_16 CO2 samples saved to nvStorage, so limit this
+  const uint8_t sensorSampleSize = 2;
+#else
+	const uint8_t sensorSampleInterval = 300;
+  const uint8_t sensorSampleSize = 6;
 #endif
-
-// Configuration variables that are less likely to require changes
-
-// Sleep time if hardware error occurs in seconds
-#define HARDWARE_ERROR_INTERVAL 10
-
-#define CONNECT_ATTEMPT_LIMIT	3 // max connection attempts to internet services
-#define CONNECT_ATTEMPT_INTERVAL 5 // seconds between internet service connect attempts
-
 const String co2Labels[5]={"Good", "OK", "So-So", "Poor", "Bad"};
-
 // if using OWM aqi value, these are the European standards-body conversions from numeric valeu
 // const String aqiEuropeanLabels[5] = { "Good", "Fair", "Moderate", "Poor", "Very Poor" };
-
 // US standards-body conversions from numeric value
 const String aqiUSALabels[6] = {"Good", "Moderate", "Unhealthy (SG)", "Unhealthy", "Very Unhealthy", "Hazardous"};
-
-// used in aq_network.cpp
-const String weekDays[7] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
 
 // Open Weather Map parameters
 #define OWM_SERVER			"http://api.openweathermap.org/data/2.5/"
 #define OWM_WEATHER_PATH	"weather?"
 #define OWM_AQM_PATH		"air_pollution?"
 
+//Battery 
+// analog pin used to reading battery voltage
+#define VBATPIN A13
+// number of analog pin reads sampled to average battery voltage
+const uint8_t   batteryReadsPerSample = 5;
 // battery charge level lookup table
-const float voltageTable[101] = {
+const float batteryVoltageTable[101] = {
   3.200,  3.250,  3.300,  3.350,  3.400,  3.450,
   3.500,  3.550,  3.600,  3.650,  3.700,  3.703,
   3.706,  3.710,  3.713,  3.716,  3.719,  3.723,
@@ -140,3 +156,7 @@ const float voltageTable[101] = {
   4.046,  4.054,  4.062,  4.069,  4.077,  4.085,
   4.092,  4.100,  4.111,  4.122,  4.133,  4.144,
   4.156,  4.167,  4.178,  4.189,  4.200 };
+
+// Hardware
+// Sleep time in seconds if hardware error occurs
+const uint8_t hardwareRebootInterval = 10;
