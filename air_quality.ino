@@ -103,7 +103,8 @@ OpenWeatherMapAirQuality owmAirQuality;  // global variable for OWM current data
 
 // screen support
 #ifdef SCREEN
-  #include <Adafruit_ThinkInk.h>
+  #include <GxEPD2_BW.h>
+  GxEPD2_BW<GxEPD2_290_T5D, GxEPD2_290_T5D::HEIGHT> display(GxEPD2_290_T5D(EPD_CS, EPD_DC, EPD_RESET, EPD_BUSY)); // GDEW029T5D 128x296, UC8151D
 
   #include "Fonts/meteocons20pt7b.h"
   #include "Fonts/meteocons16pt7b.h"
@@ -115,9 +116,6 @@ OpenWeatherMapAirQuality owmAirQuality;  // global variable for OWM current data
 
   // Special glyphs for the UI
   #include "Fonts/glyphs.h"
-
-  // 2.96" greyscale display with 196x128 pixels
-  ThinkInk_290_Grayscale4_T5 display(EPD_DC, EPD_RESET, EPD_CS, SRAM_CS, EPD_BUSY);
 
   // screen layout assists
   const uint16_t xMargins = 5;
@@ -150,7 +148,7 @@ OpenWeatherMapAirQuality owmAirQuality;  // global variable for OWM current data
   #if defined(MQTT) || defined(INFLUX) || defined(HASSIO_MQTT) || defined(DWEET)
   WiFiClient client;
   // NTP setup
-  #include "time.h"
+  #include <time.h>
   #ifdef SCREEN
     // Libraries needed to access Open Weather Map
     #include <HTTPClient.h>
@@ -208,9 +206,7 @@ powerI2CEnable();
 
 #ifdef SCREEN
   // there is no way to query screen for status
-  // colors are EPD_WHITE, EPD_BLACK
-  // changed from THINKINK_GRAYSCALE4 to eliminate black screen border
-  display.begin(THINKINK_MONO);
+  display.init(115200);
   debugMessage("screen initialized as mono", 1);
   display.setTextWrap(false);
 #endif
@@ -453,7 +449,7 @@ void screenAlert(String messageText)
 // Display error message centered on screen
 {
 #ifdef SCREEN
-  debugMessage("screenAlert start", 1);
+  debugMessage("screenAlert refresh start", 1);
 
   int16_t x1, y1;
   uint16_t width, height;
