@@ -14,6 +14,7 @@
 // #define SENSOR_SIMULATE
 
 #ifdef SENSOR_SIMULATE
+	// Question : Are we getting three digit values for UI test?
 	const uint16_t sensorTempMin =      1500; // will be divided by 100.0 to give floats
 	const uint16_t sensorTempMax =      2500;
 	const uint16_t sensorHumidityMin =  500; // will be divided by 100.0 to give floats
@@ -23,6 +24,8 @@
 
   const uint16_t batterySimVoltageMin = 370; // will be divided by 100.0 to give floats
   const uint16_t batterySimVoltageMax = 410;
+
+
 #endif
 
 // Configuration Step 3: Set network data endpoints
