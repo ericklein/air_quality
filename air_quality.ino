@@ -147,7 +147,7 @@ OpenWeatherMapAirQuality owmAirQuality;  // global variable for OWM current data
 // activate WiFi and associated services if using network data endpoints
   #if defined(MQTT) || defined(INFLUX) || defined(HASSIO_MQTT) || defined(DWEET)
   WiFiClient client;
-  // NTP setup
+  // NTP setup using Esperiff library
   #include <time.h>
   #ifdef SCREEN
     // Libraries needed to access Open Weather Map
@@ -332,13 +332,8 @@ void debugMessage(String messageText, uint8_t messageLevel)
 #endif
 }
 
-void networkSimulate()
-{
-    hardwareData.rssi = random(47;
-}
-
 void OWMCurrentWeatherDataSimulate()
-// Test data to drive screenInfo() when not connected to Internet
+// Simulates Open Weather Map (OWM) Current Weather data
 {
   // Improvement - variable length names
   owmCurrentData.cityName = "Pleasantville";
@@ -351,18 +346,18 @@ void OWMCurrentWeatherDataSimulate()
 }
 
 void OWMAirPollutionSimulate()
+// Simulates Open Weather Map (OWM) Air Pollution data
 {
-  // aqi values
-  owmAirQuality.aqi = 3;  // overrides error code value
-  owmAirQuality.pm25 = 248.04;
+  owmAirQuality.aqi = random(OWMAQIMin, OWMAQIMax);  // overrides error code value
+  owmAirQuality.pm25 = random(OWMPM25Min, OWMPM25Max) / 100.0;
 }
 
 bool OWMCurrentWeatherDataRead()
-// stores local current weather info from Open Weather Map in environment global
+// Gets Open Weather Map Current Weather data
 {
   // compile only if screen available
   #ifdef SCREEN
-    #ifdef SENSOR_SIMULATE
+    #ifdef HARDWARE_SIMULATE
       OWMAirPollutionSimulate();
       return true;
     #else
@@ -432,7 +427,7 @@ bool OWMAirPollutionRead()
 {
   // compile only if screen available
   #ifdef SCREEN
-    #ifdef SENSOR_SIMULATE
+    #ifdef HARDWARE_SIMULATE
       OWMAirPollutionSimulate();
       return true;
     #else
@@ -733,9 +728,10 @@ void screenHelperSparkLine(uint16_t initialX, uint16_t initialY, uint16_t xWidth
 }
 
 void batterySimulate()
+// Simulate battery data
 {
   // IMPROVEMENT: Simulate battery below SCD40 required level
-  #ifdef SENSOR_SIMULATE
+  #ifdef HARDWARE_SIMULATE
     hardwareData.batteryVoltage = random(batterySimVoltageMin, batterySimVoltageMax) / 100.00;
     hardwareData.batteryPercent = batteryGetChargeLevel(hardwareData.batteryVoltage);
   #endif
@@ -744,7 +740,7 @@ void batterySimulate()
 void batteryRead(uint8_t reads)
 // sets global battery values from i2c battery monitor or analog pin value on supported boards
 {
-  #ifdef SENSOR_SIMULATE
+  #ifdef HARDWARE_SIMULATE
     batterySimulate();
     debugMessage(String("SIMULATED Battery voltage: ") + hardwareData.batteryVoltage + "v, percent: " + hardwareData.batteryPercent + "%",1);
   #else
@@ -765,19 +761,15 @@ void batteryRead(uint8_t reads)
       // use supported boards to read voltage
       #if defined(ARDUINO_ADAFRUIT_FEATHER_ESP32_V2)
         // modified from the Adafruit power management guide for Adafruit ESP32V2
-        float accumulatedVoltage = 0;
-        for (uint8_t loop = 0; loop < reads; loop++) {
-          accumulatedVoltage += analogReadMilliVolts(VBATPIN);
+        float accumulatedVoltage = 0.0;
+        for (uint8_t loop = 0; loop < reads; loop++)
+        {
+          accumulatedVoltage += analogReadMilliVolts(BATTERY_VOLTAGE_PIN);
         }
-        hardwareData.batteryVoltage = accumulatedVoltage / reads;  // we now have the average reading
-        // convert into volts
-        hardwareData.batteryVoltage *= 2;     // we divided by 2, so multiply back
-        hardwareData.batteryVoltage /= 1000;  // convert to volts!
-        hardwareData.batteryVoltage *= 2;     // we divided by 2, so multiply back
-        // ESP32 suggested algo
-        // hardwareData.batteryVoltage *= 3.3;   // Multiply by 3.3V, our reference voltage
-        // hardwareData.batteryVoltage *= 1.05;  // the 1.05 is a fudge factor original author used to align reading with multimeter
-        // hardwareData.batteryVoltage /= 4095;  // assumes default ESP32 analogReadResolution (4095)
+        hardwareData.batteryVoltage = accumulatedVoltage/reads; // we now have the average reading
+        // convert into volts  
+        hardwareData.batteryVoltage *= 2;    // we divided by 2, so multiply back
+        hardwareData.batteryVoltage /= 1000; // convert to volts!
         hardwareData.batteryPercent = batteryGetChargeLevel(hardwareData.batteryVoltage);
       #endif
     }
@@ -817,7 +809,7 @@ bool sensorInit()
 // initializes environment sensor if available. Supports SCD40, ATHX0, BME280 sensors
 {
 
-  #ifdef SENSOR_SIMULATE
+  #ifdef HARDWARE_SIMULATE
     return true;
   #endif
 
@@ -862,10 +854,10 @@ bool sensorInit()
 }
 
 void sensorSimulate()
-// Simulate data from the sensor
+// Simulate environment sensor data
 // Improvement - implement stable, rapid rise and fall 
 {
-  #ifdef SENSOR_SIMULATE
+  #ifdef HARDWARE_SIMULATE
     // Temperature
     // keep this value in C, as it is converted to F in sensorRead
     sensorData.ambientTemperatureF = random(sensorTempMin,sensorTempMax) / 100.0;
@@ -884,7 +876,7 @@ void sensorSimulate()
 bool sensorRead()
 // stores environment sensor to environment global
 {
-  #ifdef SENSOR_SIMULATE
+  #ifdef HARDWARE_SIMULATE
     sensorSimulate();
   #else
     #ifdef SCD40
@@ -1154,12 +1146,18 @@ void testSparkLineValues(uint8_t sampleSetSize)
   }
 }
 
+void networkSimulate()
+// Simulates successful WiFi connection data
+{
+  // IMPROVEMENT : simulate IP address?
+  hardwareData.rssi = random(networkRSSIMin, networkRSSIMax);
+}
+
 bool networkConnect() 
+// Connect to WiFi network specified in secrets.h
 {
   #ifdef SIMULATE_SENSOR
-    // IMPROVEMENT : Could simulate IP address
-    // testing range is 30 to 90 (no signal)
-    hardwareData.rssi  = random(30, 90);
+    networkSimulate();
     return true;
   #endif
 
@@ -1195,6 +1193,7 @@ bool networkConnect()
 }
 
 void networkDisconnect()
+// Disconnect from WiFi network
 {
   #if defined(MQTT) || defined(INFLUX) || defined(HASSIO_MQTT) || defined(DWEET)
   {
@@ -1206,6 +1205,7 @@ void networkDisconnect()
 }
 
 bool networkGetTime(String timezone)
+// Set local time from NTP server specified in config.h
 {
   // https://randomnerdtutorials.com/esp32-ntp-timezones-daylight-saving/
 
@@ -1247,6 +1247,7 @@ String networkHTTPGETRequest(const char* serverName) {
 }
 
 void setTimeZone(String timezone)
+// Set local time based on timezone set in config.h
 {
   debugMessage(String("setting Timezone to ") + timezone.c_str(),2);
   setenv("TZ",networkTimeZone.c_str(),1);
@@ -1254,8 +1255,8 @@ void setTimeZone(String timezone)
   debugMessage(String("Local time: ") + dateTimeString("short"),1);
 }
 
-// Converts time into human readable strings
 String dateTimeString(String formatType)
+// Converts time into human readable string
 {
   // https://cplusplus.com/reference/ctime/tm/
 

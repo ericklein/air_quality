@@ -9,11 +9,11 @@
 // comment out to turn off; 1 = summary, 2 = verbose
 #define DEBUG 1
 
-// simulate SCD40 sensor operations, returning random but plausible values
+// simulate hardware, returning random but plausible values
 // comment out to turn off
-// #define SENSOR_SIMULATE
+// #define HARDWARE_SIMULATE
 
-#ifdef SENSOR_SIMULATE
+#ifdef HARDWARE_SIMULATE
 	// Question : Are we getting three digit values for UI test?
 	const uint16_t sensorTempMin =      1500; // will be divided by 100.0 to give floats
 	const uint16_t sensorTempMax =      2500;
@@ -22,10 +22,18 @@
 	const uint16_t sensorCO2Min =       400;
 	const uint16_t sensorCO2Max =       3000;
 
+	// IMPROVEMENT: SWAG on values, check docs
+	// Question : is owmAirQuality.aqi uint8_t or uint16_t?
+	const uint8_t OWMAQIMin = 0; 
+	const	uint8_t OWMAQIMax = 10;
+	const uint16_t OWMPM25Min = 0;  // will be divided by 100.0 to give floats
+	const	uint16_t OWMPM25Max = 250000;
+
   const uint16_t batterySimVoltageMin = 370; // will be divided by 100.0 to give floats
   const uint16_t batterySimVoltageMax = 410;
 
-
+  const uint8_t networkRSSIMin = 30;
+  const uint8_t networkRSSIMax = 90;
 #endif
 
 // Configuration Step 3: Set network data endpoints
@@ -137,7 +145,7 @@ const String aqiUSALabels[6] = {"Good", "Moderate", "Unhealthy (SG)", "Unhealthy
 
 //Battery 
 // analog pin used to reading battery voltage
-#define VBATPIN A13
+#define BATTERY_VOLTAGE_PIN A13
 // number of analog pin reads sampled to average battery voltage
 const uint8_t   batteryReadsPerSample = 5;
 // battery charge level lookup table
