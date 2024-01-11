@@ -116,21 +116,6 @@ OpenWeatherMapAirQuality owmAirQuality;  // global variable for OWM current data
 
   // Special glyphs for the UI
   #include "Fonts/glyphs.h"
-
-  // screen layout assists
-  const uint16_t xMargins = 5;
-  const uint16_t xOutdoorMargin = ((display.width() / 2) + xMargins);
-  const uint16_t yMargins = 2;
-  const uint16_t yCO2 = 20;
-  const uint16_t ySparkline = 40;
-  const uint16_t yTemperature = 100;
-  const uint16_t yStatus = (display.height() * 7 / 8);
-  const uint16_t sparklineHeight = 40;
-  const uint16_t batteryBarWidth = 28;
-  const uint16_t batteryBarHeight = 10;
-  const uint16_t wifiBarWidth = 3;
-  const uint16_t wifiBarHeightIncrement = 2;
-  const uint16_t wifiBarSpacing = 5;
 #endif
 
 // activate only if using network data endpoints
@@ -207,13 +192,14 @@ powerI2CEnable();
 #ifdef SCREEN
   // there is no way to query screen for status
   display.init(115200);
-  debugMessage("screen initialized as mono", 1);
+  debugMessage("epd initialized", 1);
   display.setTextWrap(false);
+  display.setRotation(displayRotation);
 #endif
 
   // Initialize environmental sensor
   if (!sensorInit()) {
-    screenAlert("Env sensor not detected");
+    screenAlert("Env sensor?");
     // This error often occurs after a firmware flash and then resetting the board
     // Hardware deep sleep typically resolves it, so quickly cycle the hardware
     powerDisable(hardwareRebootInterval);
@@ -335,21 +321,25 @@ void debugMessage(String messageText, uint8_t messageLevel)
 void OWMCurrentWeatherDataSimulate()
 // Simulates Open Weather Map (OWM) Current Weather data
 {
-  // Improvement - variable length names
-  owmCurrentData.cityName = "Pleasantville";
-  // Temperature
-  owmCurrentData.tempF = ((random(sensorTempMin,sensorTempMax) / 100.0) * 1.8) + 32;
-  // Humidity
-  owmCurrentData.humidity = random(sensorHumidityMin,sensorHumidityMax) / 100.0;
-  // IMPROVEMENT - variable icons
-  owmCurrentData.icon = "09d";
+  #ifdef HARDWARE_SIMULATE
+    // Improvement - variable length names
+    owmCurrentData.cityName = "Pleasantville";
+    // Temperature
+    owmCurrentData.tempF = ((random(sensorTempMin,sensorTempMax) / 100.0) * 1.8) + 32;
+    // Humidity
+    owmCurrentData.humidity = random(sensorHumidityMin,sensorHumidityMax) / 100.0;
+    // IMPROVEMENT - variable icons
+    owmCurrentData.icon = "09d";
+  #endif
 }
 
 void OWMAirPollutionSimulate()
 // Simulates Open Weather Map (OWM) Air Pollution data
 {
-  owmAirQuality.aqi = random(OWMAQIMin, OWMAQIMax);  // overrides error code value
-  owmAirQuality.pm25 = random(OWMPM25Min, OWMPM25Max) / 100.0;
+  #ifdef HARDWARE_SIMULATE 
+    owmAirQuality.aqi = random(OWMAQIMin, OWMAQIMax);  // overrides error code value
+    owmAirQuality.pm25 = random(OWMPM25Min, OWMPM25Max) / 100.0;
+  #endif
 }
 
 bool OWMCurrentWeatherDataRead()
@@ -508,8 +498,22 @@ void screenInfo(String messageText)
 // Display environmental information on screen
 {
   #ifdef SCREEN
-    debugMessage("Starting screenInfo refresh", 1);
+    // screen layout assists
+    const uint16_t xMargins = 5;
+    const uint16_t xOutdoorMargin = ((display.width() / 2) + xMargins);
+    const uint16_t yMargins = 2;
+    const uint16_t yCO2 = 20;
+    const uint16_t ySparkline = 40;
+    const uint16_t yTemperature = 100;
+    const uint16_t yStatus = (display.height() * 7 / 8);
+    const uint16_t sparklineHeight = 40;
+    const uint16_t batteryBarWidth = 28;
+    const uint16_t batteryBarHeight = 10;
+    const uint16_t wifiBarWidth = 3;
+    const uint16_t wifiBarHeightIncrement = 2;
+    const uint16_t wifiBarSpacing = 5;
 
+    debugMessage("Starting screenInfo refresh", 1);
     display.setTextColor(GxEPD_BLACK);
     display.setFullWindow();
     display.firstPage();
@@ -883,9 +887,8 @@ bool sensorRead()
       char errorMessage[256];
 
       for (uint8_t loop = 1; loop <= sensorReadsPerSample; loop++) {
-        // SCD40 datasheet suggests 5 second delay between SCD40 reads
-        // assume sensorSampleInterval will create needed delay for loop == 1 
-        if (loop > 1) delay(5000);
+        // SCD40 datasheet suggests 5 second delay before SCD40 read
+        delay(5000);
         // read and store data if successful
         // IMPROVEMENT measureSingleShot
         uint16_t error = envSensor.readMeasurement(sensorData.ambientCO2, sensorData.ambientTemperatureF, sensorData.ambientHumidity);
@@ -1026,7 +1029,7 @@ void powerDisable(uint16_t deepSleepTime)
 
 // power down epd
 #ifdef SCREEN
-  display.powerDown();
+  display.powerOff();
   digitalWrite(EPD_RESET, LOW);  // hardware power down mode
   debugMessage("power off: epd", 1);
 #endif
@@ -1149,8 +1152,10 @@ void testSparkLineValues(uint8_t sampleSetSize)
 void networkSimulate()
 // Simulates successful WiFi connection data
 {
-  // IMPROVEMENT : simulate IP address?
-  hardwareData.rssi = random(networkRSSIMin, networkRSSIMax);
+  #ifdef HARDWARE_SIMULATE
+    // IMPROVEMENT : simulate IP address?
+    hardwareData.rssi = random(networkRSSIMin, networkRSSIMax);
+  #endif
 }
 
 bool networkConnect() 
