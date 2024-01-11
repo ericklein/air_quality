@@ -9,11 +9,12 @@
 // comment out to turn off; 1 = summary, 2 = verbose
 #define DEBUG 1
 
-// simulate SCD40 sensor operations, returning random but plausible values
+// simulate hardware, returning random but plausible values
 // comment out to turn off
-// #define SENSOR_SIMULATE
+// #define HARDWARE_SIMULATE
 
-#ifdef SENSOR_SIMULATE
+#ifdef HARDWARE_SIMULATE
+	// Question : Are we getting three digit values for UI test?
 	const uint16_t sensorTempMin =      1500; // will be divided by 100.0 to give floats
 	const uint16_t sensorTempMax =      2500;
 	const uint16_t sensorHumidityMin =  500; // will be divided by 100.0 to give floats
@@ -21,8 +22,18 @@
 	const uint16_t sensorCO2Min =       400;
 	const uint16_t sensorCO2Max =       3000;
 
+	// IMPROVEMENT: SWAG on values, check docs
+	// Question : is owmAirQuality.aqi uint8_t or uint16_t?
+	const uint8_t OWMAQIMin = 0; 
+	const	uint8_t OWMAQIMax = 10;
+	const uint16_t OWMPM25Min = 0;  // will be divided by 100.0 to give floats
+	const	uint16_t OWMPM25Max = 250000;
+
   const uint16_t batterySimVoltageMin = 370; // will be divided by 100.0 to give floats
   const uint16_t batterySimVoltageMax = 410;
+
+  const uint8_t networkRSSIMin = 30;
+  const uint8_t networkRSSIMax = 90;
 #endif
 
 // Configuration Step 3: Set network data endpoints
@@ -80,25 +91,42 @@ const String weekDays[7] = { "Sunday", "Monday", "Tuesday", "Wednesday", "Thursd
 	#define DWEET_DEVICE "makerhour-airquality"  // Must be unique across all of dweet.io
 #endif
 
+// buttons
+// MagTag BUTTON_A = 15, BUTTON_B = 14, BUTTON_C = 12, BUTTON_D = 11 (all RTC pins)
+#if defined (ARDUINO_ADAFRUIT_FEATHER_ESP32_V2)
+	#define BUTTON_A 34; // A2, input only
+	#define BUTTON_B 39; // A3, input only
+	#define BUTTON_C 36; // A4, input only
+#endif
+
+// ext1 wakeup (multiple buttons via bitmask)
+//#define BUTTON_PIN_BITMASK 0xD800 // All buttons; 2^15+2^14+2^12+2^11 in hex
+// #define BUTTON_PIN_BITMASK 0xC000 // Buttons A,B; 2^15+2^14 in hex
+// #define BUTTON_PIN_BITMASK 0x9800 // Buttons A,C,D; 2^15+2^12+2^11 in hex
+// #define BUTTON_PIN_BITMASK 0x8800 // Buttons A,D; 2^15+2^11 in hex
+// #define BUTTON_PIN_BITMASK 0x1800 // Buttons C,D; 2^12+2^11 in hex
+// #define BUTTON_PIN_BITMASK 0x8000 // Button A; 2^15 in hex
+
 // display
 // Pin config for e-paper display
 #ifdef SCREEN
 	#if defined (ARDUINO_ADAFRUIT_FEATHER_ESP32_V2)
 		// new primary development hardware
-		#define EPD_CS      12
-    #define EPD_DC      27     
-    #define SRAM_CS     14  // can set to -1 to not use a pin, which uses a lot of RAM
-    #define EPD_RESET   15  // can set to -1 and share with MCU Reset, can't deep sleep
-    #define EPD_BUSY    32  // can set to -1 to not use a pin and wait a fixed delay
-  #else
-	// Adafruit MagTag, some values come from board definition package
+		#define EPD_CS      33 
+		#define EPD_DC      27     
+		#define SRAM_CS     26  // can set to -1 to not use a pin, which uses a lot of RAM
+		#define EPD_RESET   25  // can set to -1 and share with MCU Reset, can't deep sleep
+		#define EPD_BUSY    32  // can set to -1 to not use a pin and wait a fixed delay
+	#else
+		// Adafruit MagTag, some values come from board definition package
 		// primary production build target, being replaced with ESP32V2 and epd friend plus screen
-	#define EPD_CS      8   
-	#define EPD_DC      7   
-	#define SRAM_CS     -1  // can set to -1 to not use a pin, which uses a lot of RAM
-	// #define EPD_RESET   6   // can set to -1 and share with MCU Reset, can't deep sleep
-	#define EPD_BUSY    5   // can set to -1 to not use a pin and wait a fixed delay
-  #endif
+		#define EPD_CS      8   
+		#define EPD_DC      7   
+		#define SRAM_CS     -1  // can set to -1 to not use a pin, which uses a lot of RAM
+		// #define EPD_RESET   6   // can set to -1 and share with MCU Reset, can't deep sleep
+		#define EPD_BUSY    5   // can set to -1 to not use a pin and wait a fixed delay
+	#endif
+	const uint8_t displayRotation = 1; // rotation 1 = 0,0 is away from flex cable, right aligned with flex cable label
 #endif
 
 // sensor
@@ -134,7 +162,7 @@ const String aqiUSALabels[6] = {"Good", "Moderate", "Unhealthy (SG)", "Unhealthy
 
 //Battery 
 // analog pin used to reading battery voltage
-#define VBATPIN A13
+#define BATTERY_VOLTAGE_PIN A13
 // number of analog pin reads sampled to average battery voltage
 const uint8_t   batteryReadsPerSample = 5;
 // battery charge level lookup table
