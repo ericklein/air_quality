@@ -61,6 +61,13 @@ AQ has a number of sibling projects that share common hardware and code attribut
 ### Buttons/Switches
 - [Adafruit MagTag](https://www.adafruit.com/product/4800)
 	- on/off switch
+### Pinouts
+- SCD40
+    - Stemma QT cable between MCU board and SCD40 board
+        - or connect 3.3v/5v, GND, SDA, SCL on both sides
+- LC709203F
+    - Stemma QT cable between MCU board and SCD40 board
+        - or connect 3.3v/5v, GND, SDA, SCL on both sides
 ## Supported network endpoints
 ### MQTT
 - uncomment #define MQTT in config.h
@@ -69,7 +76,7 @@ AQ has a number of sibling projects that share common hardware and code attribut
 		- https://hackaday.com/2017/10/31/review-iot-data-logging-services-with-mqtt/
 ### Hassio MQTT
 - AI: ADD DOCUMENTATION
-### Influx
+### InfluxDB
 - AI: ADD DOCUMENTATION
 ### DWEET
 - AI: ADD DOCUMENTATION
