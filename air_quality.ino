@@ -78,7 +78,7 @@ typedef struct {
 } OpenWeatherMapAirQuality;
 OpenWeatherMapAirQuality owmAirQuality;  // global variable for OWM current data
 
-#ifndef SIMULATE_SENSOR
+#ifndef HARDWARE_SIMULATE
   // initialize environment sensor
   #ifdef SCD40
     // SCD40; temp, humidity, CO2
@@ -96,9 +96,19 @@ OpenWeatherMapAirQuality owmAirQuality;  // global variable for OWM current data
     Adafruit_Sensor *envSensorHumidity = envSensor.getHumiditySensor();
   #endif
 
-  // Battery voltage sensor
+  // battery voltage sensor
   #include <Adafruit_LC709203F.h>
   Adafruit_LC709203F lc;
+
+  // WiFi support
+  #if defined(ESP8266)
+    #include <ESP8266WiFi.h>
+  #elif defined(ESP32)
+    #include <WiFi.h>
+    #include <HTTPClient.h>
+  #else
+    #include <WiFiNINA.h> // PyPortal
+  #endif
 #endif
 
 // screen support
@@ -116,29 +126,17 @@ OpenWeatherMapAirQuality owmAirQuality;  // global variable for OWM current data
 
   // Special glyphs for the UI
   #include "Fonts/glyphs.h"
+
+  // Libraries needed to access Open Weather Map
+  #include <HTTPClient.h>
+  #include "ArduinoJson.h"  // Needed by OWM retrieval routines
 #endif
 
-// activate only if using network data endpoints
-#if defined(MQTT) || defined(INFLUX) || defined(HASSIO_MQTT)
-  #if defined(ESP8266)
-    #include <ESP8266WiFi.h>
-  #elif defined(ESP32)
-    #include <WiFi.h>
-  #elif
-    #include <WiFiNINA.h> // PyPortal
-  #endif
-#endif
-
-// activate WiFi and associated services if using network data endpoints
+// internet services if using network data endpoints
   #if defined(MQTT) || defined(INFLUX) || defined(HASSIO_MQTT) || defined(DWEET)
   WiFiClient client;
   // NTP setup using Esperiff library
   #include <time.h>
-  #ifdef SCREEN
-    // Libraries needed to access Open Weather Map
-    #include <HTTPClient.h>
-    #include "ArduinoJson.h"  // Needed by OWM retrieval routines
-  #endif
 #endif
 
 #ifdef INFLUX
@@ -1161,7 +1159,7 @@ void networkSimulate()
 bool networkConnect() 
 // Connect to WiFi network specified in secrets.h
 {
-  #ifdef SIMULATE_SENSOR
+  #ifdef HARDWARE_SIMULATE
     networkSimulate();
     return true;
   #endif
