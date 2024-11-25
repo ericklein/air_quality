@@ -84,12 +84,12 @@
         dbenvdata.addField(VALUE_KEY_CO2, co2);
       // Write point via connection to InfluxDB host
       if (!dbclient.writePoint(dbenvdata)) {
-        debugMessage("InfluxDB write failed: " + dbclient.getLastErrorMessage(),1);
+        debugMessage("InfluxDB write failed: " + dbclient.getLastErrorMessage(),2);
         result = false;
       }
       else
       {
-        debugMessage(String("InfluxDB write success: ") + dbclient.pointToLineProtocol(dbenvdata),1);
+        debugMessage(String("InfluxDB write success: ") + dbclient.pointToLineProtocol(dbenvdata),2);
       }
 
       // Now store device information 
@@ -103,12 +103,12 @@
       {
         if (!dbclient.writePoint(dbdevdata))
         {
-          debugMessage("InfluxDB write failed: " + dbclient.getLastErrorMessage(),1);
+          debugMessage("InfluxDB write failed: " + dbclient.getLastErrorMessage(),2);
           result = false;
         }
         else
         {
-          debugMessage(String("InfluxDB write success: ") + dbclient.pointToLineProtocol(dbdevdata),1);
+          debugMessage(String("InfluxDB write success: ") + dbclient.pointToLineProtocol(dbdevdata),2);
         }
       }
       dbclient.flushBuffer();  // Clear pending writes (before going to sleep)
