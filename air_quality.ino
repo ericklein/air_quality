@@ -13,9 +13,9 @@
 Preferences nvStorage;
 
 // accumulating sensor readings
-float averageTempF;
-float averageHumidity;
-uint16_t averageCO2;
+// IMPROVEMENT: nvStorageRead() should return these locally
+float accumulatingTempF;
+float accumulatingHumidity;
 
 // environment sensor data
 typedef struct {
@@ -32,6 +32,7 @@ uint16_t co2Samples[sensorSampleSize];
 typedef struct {
   float batteryPercent;
   float batteryVoltage;
+  // float batteryTemperatureF;
   uint8_t rssi;
 } hdweData;
 hdweData hardwareData; 
@@ -190,30 +191,33 @@ if (!sensorCO2Init()) {
     screenAlert("SCD40 read issue");
     powerDisable(hardwareRebootInterval);
   }
-  int8_t sampleCounter = nvStorageRead();
+  uint8_t sampleCounter = nvStorageRead();
   sampleCounter++;
-  debugMessage(String("Sample count: ") + (sampleCounter+1) + " of " + sensorSampleSize,1);
+  debugMessage(String("Sample count: ") + (sampleCounter) + " of " + sensorSampleSize,1);
 
-  if (sampleCounter < sensorSampleSize-1)
+  accumulatingTempF += sensorData.ambientTemperatureF;
+  accumulatingHumidity += sensorData.ambientHumidity;
+
+  if (sampleCounter < sensorSampleSize)
   // add to the accumulating, intermediate sensor values and sleep device
   {
-    nvStorageWrite(sampleCounter, sensorData.ambientTemperatureF + averageTempF, sensorData.ambientHumidity + averageHumidity, sensorData.ambientCO2);
+    nvStorageWrite(sampleCounter, accumulatingTempF, accumulatingHumidity, sensorData.ambientCO2);
     powerDisable(sensorSampleInterval);
   }
 
   // this code only executes if sampleCounter == sensorSampleSize
   // average values, send to network endpoint if possible, display values, reset values, then sleep device
 
-  // add in most recent sample then average
-  averageTempF = ((sensorData.ambientTemperatureF + averageTempF) / sensorSampleSize);
-  averageHumidity = ((sensorData.ambientHumidity + averageHumidity) / sensorSampleSize);
+  float averageTempF = accumulatingTempF / sampleCounter;
+  float averageHumidity = accumulatingHumidity / sampleCounter;
 
   // aggregate stored, rolling CO2 values
+  uint16_t accumulatingCO2 = 0;
   for (uint8_t loop = 0; loop < sensorSampleSize; loop++) {
-    averageCO2 = averageCO2 + co2Samples[loop];
+    accumulatingCO2 += co2Samples[loop];
   }
   // add in most CO2 recent sample then average
-  averageCO2 = uint16_t((sensorData.ambientCO2 + averageCO2) / sensorSampleSize);
+  uint16_t averageCO2 = (accumulatingCO2 + sensorData.ambientCO2) / sampleCounter;
   debugMessage(String("Averaged values Temp:") + averageTempF + "F, Humidity:" + averageHumidity + ", CO2:" + averageCO2, 1);
 
   if (!batteryRead(batteryReadsPerSample))
@@ -283,7 +287,7 @@ if (!sensorCO2Init()) {
     #endif
   }
   //reset nvStorage values for next recording period
-  nvStorageWrite(-1, 0, 0, 0);
+  nvStorageWrite(0, 0, 0, 0);
   powerDisable(sensorSampleInterval);
 }
 
@@ -592,11 +596,11 @@ void screenHelperWiFiStatus(uint16_t initialX, uint16_t initialY, uint8_t barWid
       for (uint8_t loop = 1; loop <= barCount; loop++) {
         display.fillRect((initialX + (loop * barSpacing)), (initialY - (loop * barHeightIncrement)), barWidth, loop * barHeightIncrement, GxEPD_BLACK);
       }
-      debugMessage(String("WiFi signal strength on screen as ") + barCount + " bars", 2);
+      debugMessage(String("screenHelperWiFiStatus() complete: WiFi signal strength displayed:") + barCount + " bars", 2);
     } 
     else {
       // you could do a visual representation of no WiFi strength here
-      debugMessage("RSSI too low, not displayed on screen", 1);
+      debugMessage("screenHelperWiFiStatus() complete: RSSI too low to display", 1);
     }
   }
 }
@@ -613,9 +617,9 @@ void screenHelperBatteryStatus(uint16_t initialX, uint16_t initialY, uint8_t bar
     display.drawRect(initialX, initialY, barWidth, barHeight, GxEPD_BLACK);
     //battery percentage as rectangle fill, 1 pixel inset from the battery border
     display.fillRect((initialX + 2), (initialY + 2), uint8_t(0.5 + (hardwareData.batteryPercent * ((barWidth - 4) / 100.0))), (barHeight - 4), GxEPD_BLACK);
-    debugMessage(String("battery percent visualized=") + hardwareData.batteryPercent + "%, " + uint8_t(0.5 + (hardwareData.batteryPercent * ((barWidth - 4) / 100.0))) + " pixels of " + (barWidth - 4) + " max", 1);
+    debugMessage(String("screenHelperBatteryStatus() complete: battery percent displayed:") + hardwareData.batteryPercent + "%, " + uint8_t(0.5 + (hardwareData.batteryPercent * ((barWidth - 4) / 100.0))) + " pixels of " + (barWidth - 4) + " max", 1);
   } else
-    debugMessage("No battery voltage for screenHelperBatteryStatus() to render", 1);
+    debugMessage("screenHelperBatteryStatus() complete: No battery voltage to render", 1);
 }
 
 void screenHelperSparkLine(uint16_t initialX, uint16_t initialY, uint16_t xWidth, uint16_t yHeight) {
@@ -659,7 +663,7 @@ void screenHelperSparkLine(uint16_t initialX, uint16_t initialY, uint16_t xWidth
   for (uint8_t loop = 0; loop < sensorSampleSize; loop++) {
     debugMessage(String("X,Y coordinates for CO2 sample ") + loop + " is " + sparkLineX[loop] + "," + sparkLineY[loop], 2);
   }
-  debugMessage("sparkline drawn to screen", 1);
+  debugMessage("screenHelperSparkLine() complete", 1);
 }
 
 // Hardware simulation routines
@@ -912,30 +916,30 @@ uint8_t nvStorageRead()
 // FIX: CO2 values only need to be read for sparkline generation when counter == sensorSampleSize, not every sample
 {
   nvStorage.begin("air-quality", false);
-  int8_t storedCounter = nvStorage.getInt("counter", -1);  // counter tracks a 0 based array
+  uint8_t storedCounter = nvStorage.getInt("counter", 0);  // counter tracks a 0 based array
   debugMessage(String("Sample count FROM nv storage is ") + storedCounter, 2);
 
   // read value or insert current sensor reading if this is the first read from nv storage
-  averageTempF = nvStorage.getFloat("temp", 0);
+  accumulatingTempF = nvStorage.getFloat("temp", 0);
   // BME280 often issues nan when not configured properly
-  if (isnan(averageTempF)) {
+  if (isnan(accumulatingTempF)) {
     // bad value, replace with current temp
-    averageTempF = (sensorData.ambientTemperatureF * storedCounter);
+    accumulatingTempF = (sensorData.ambientTemperatureF * storedCounter);
     debugMessage("Unexpected temperatureF value in nv storage replaced with multiple of current temperature", 2);
   }
 
-  averageHumidity = nvStorage.getFloat("humidity", 0);
-  if (isnan(averageHumidity)) {
+  accumulatingHumidity = nvStorage.getFloat("humidity", 0);
+  if (isnan(accumulatingHumidity)) {
     // bad value, replace with current temp
-    averageHumidity = (sensorData.ambientHumidity * storedCounter);
+    accumulatingHumidity = (sensorData.ambientHumidity * storedCounter);
     debugMessage("Unexpected humidity value in nv storage replaced with multiple of current humidity", 2);
   }
 
-  debugMessage(String("Intermediate values FROM nv storage: Temp:") + averageTempF + ", Humidity:" + averageHumidity, 2);
+  debugMessage(String("Intermediate values FROM nv storage: Temp:") + accumulatingTempF + ", Humidity:" + accumulatingHumidity, 2);
 
   // Read CO2 array. If they don't exist, create them as sensorCO2Min
   String nvStoreBaseName;
-  for (uint8_t loop = 0; loop < sensorSampleSize; loop++) {
+  for (uint8_t loop = 1; loop < sensorSampleSize; loop++) {
     nvStoreBaseName = "co2Sample" + String(loop);
     co2Samples[loop] = nvStorage.getLong(nvStoreBaseName.c_str(), sensorCO2Min);
     debugMessage(String(nvStoreBaseName) + " retrieved from nv storage is " + co2Samples[loop], 2);
@@ -943,7 +947,7 @@ uint8_t nvStorageRead()
   return storedCounter;
 }
 
-void nvStorageWrite(int8_t counter, float accumulatedTempF, float accumulatedHumidity, uint16_t co2)
+void nvStorageWrite(uint8_t counter, float accumulatedTempF, float accumulatedHumidity, uint16_t co2)
 // temperatureF and humidity stored as running totals, CO2 stored in array for sparkline
 {
   nvStorage.putInt("counter", counter);
@@ -951,16 +955,21 @@ void nvStorageWrite(int8_t counter, float accumulatedTempF, float accumulatedHum
   nvStorage.putFloat("temp", accumulatedTempF);
   nvStorage.putFloat("humidity", accumulatedHumidity);
   debugMessage(String("running totals TO nv storage: TempF: ") + accumulatedTempF + ", Humidity: " + accumulatedHumidity, 2);
-  String nvStoreBaseName = "co2Sample" + String(counter);
-  nvStorage.putLong(nvStoreBaseName.c_str(), co2);
-  debugMessage(String(nvStoreBaseName) + " stored in nv storage as " + co2, 2);
-  if (co2 == 0)  // reset all the values
+  if (co2 != 0){
+    // write current sample
+    String nvStoreBaseName = "co2Sample" + String(counter);
+    nvStorage.putLong(nvStoreBaseName.c_str(), co2);
+    debugMessage(String(nvStoreBaseName) + " stored in nv storage as " + co2, 2);
+  }
+  else
   {
-    for (uint8_t loop = 0; loop < sensorSampleSize; loop++) {
+    // reset all c02 values
+    for (uint8_t loop = 1; loop < sensorSampleSize; loop++) {
       String nvStoreBaseName = "co2Sample" + String(loop);
       nvStorage.putLong(nvStoreBaseName.c_str(), co2);
       debugMessage(String(nvStoreBaseName) + " stored in nv storage as " + co2, 2);
     }
+  debugMessage("co2 values in nv storage zeroed",1);
   }
 }
 

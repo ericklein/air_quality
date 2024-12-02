@@ -7,7 +7,7 @@
 
 // Configuration Step 2: Set debug message output
 // comment out to turn off; 1 = summary, 2 = verbose
-#define DEBUG 1
+#define DEBUG 2
 
 // Configuration Step 3: simulate WiFi and sensor hardware,
 // returning random but plausible values
@@ -15,7 +15,7 @@
 // #define HARDWARE_SIMULATE
 
 // Configuration Step 4: Set network data endpoints
- #define MQTT 		// log sensor data to MQTT broker
+ // #define MQTT 		// log sensor data to MQTT broker
 // #define HASSIO_MQTT  // And, if MQTT enabled, with Home Assistant too?
 // #define DWEET // Post sensor readings to dweet.io
 // #define INFLUX 	// Log data to remote InfluxDB server
@@ -24,10 +24,10 @@
 // If LC709203F detected on i2c, define battery pack based on settings curve from datasheet
 // #define BATTERY_APA 0x08 // 100mAH
 // #define BATTERY_APA 0x0B // 200mAH
-//  #define BATTERY_APA 0x10 // 500mAH
+ #define BATTERY_APA 0x10 // 500mAH
 // #define BATTERY_APA 0x19 // 1000mAH
 // #define BATTERY_APA 0x1D // 1200mAH
-#define BATTERY_APA 0x2D // 2000mAH
+// #define BATTERY_APA 0x2D // 2000mAH
 // #define BATTERY_APA 0x32 // 2500mAH
 // #define BATTERY_APA 0x36 // 3000mAH
 
@@ -63,23 +63,23 @@ const String OWMAQILabels[5] = {"Good", "Fair", "Moderate", "Poor", "Very Poor"}
 // Sample and reporting intervals
 #ifdef DEBUG
 	// time between samples in seconds
-	const uint8_t sensorSampleInterval = 60;
+	const uint16_t sensorSampleInterval = 60;
 	// number of samples to average. this is also the # of uint_16 CO2 samples saved to nvStorage, so limit this
-  const uint8_t sensorSampleSize = 2;
+  const uint8_t sensorSampleSize = 4;
 #else
-	const uint8_t sensorSampleInterval = 300;
+	const uint16_t sensorSampleInterval = 300;
   const uint8_t sensorSampleSize = 6;
 #endif
 
 // warnings
 const String warningLabels[4]={"Good", "Fair", "Poor", "Bad"};
 // Subjective color scheme using 16 bit ('565') RGB colors
-const uint16_t warningColor[4] = {
-  0x07E0, // Green = "Good"
-  0xFFE0, // Yellow = "Fair"
-  0xFD20, // Orange = "Poor"
-  0xF800  // Red = "Bad"
-  };
+// const uint16_t warningColor[4] = {
+//   0x07E0, // Green = "Good"
+//   0xFFE0, // Yellow = "Fair"
+//   0xFD20, // Orange = "Poor"
+//   0xF800  // Red = "Bad"
+//   };
 
 // Hardware
 
