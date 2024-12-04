@@ -24,10 +24,10 @@
 // If LC709203F detected on i2c, define battery pack based on settings curve from datasheet
 // #define BATTERY_APA 0x08 // 100mAH
 // #define BATTERY_APA 0x0B // 200mAH
- #define BATTERY_APA 0x10 // 500mAH
+ // #define BATTERY_APA 0x10 // 500mAH
 // #define BATTERY_APA 0x19 // 1000mAH
 // #define BATTERY_APA 0x1D // 1200mAH
-// #define BATTERY_APA 0x2D // 2000mAH
+#define BATTERY_APA 0x2D // 2000mAH
 // #define BATTERY_APA 0x32 // 2500mAH
 // #define BATTERY_APA 0x36 // 3000mAH
 
@@ -156,6 +156,7 @@ const float batteryVoltageTable[101] = {
 	#define SRAM_CS     26  // can set to -1 to not use a pin, which uses a lot of RAM
 	#define EPD_RESET   25  // can set to -1 and share with MCU Reset, can't deep sleep
 	#define EPD_BUSY    32  // can set to -1 to not use a pin and wait a fixed delay
+  const uint8_t displayRotation = 1; // rotation 1 means x0,y0 is away from flex cable, right aligned with flex cable label
 #else
 	// Adafruit MagTag, some values come from board definition package
 	// primary production build target, being replaced with ESP32V2 and epd friend plus screen
@@ -164,8 +165,9 @@ const float batteryVoltageTable[101] = {
 	#define SRAM_CS     -1  // can set to -1 to not use a pin, which uses a lot of RAM
 	// #define EPD_RESET   6   // can set to -1 and share with MCU Reset, can't deep sleep
 	#define EPD_BUSY    5   // can set to -1 to not use a pin and wait a fixed delay
+  const uint8_t displayRotation = 3; // MagTag screen
 #endif
-const uint8_t displayRotation = 1; // rotation 1 = 0,0 is away from flex cable, right aligned with flex cable label
+
 
 // buttons
 // MagTag BUTTON_A = 15, BUTTON_B = 14, BUTTON_C = 12, BUTTON_D = 11 (all RTC pins)

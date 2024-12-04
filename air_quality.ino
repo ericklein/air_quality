@@ -153,8 +153,8 @@ void setup()
   Serial.begin(115200);
   // wait for serial port connection
   while (!Serial);
-  debugMessage("Air Quality Device ID: " + String(DEVICE_ID), 1);
-  debugMessage(String("Sample interval is ") + sensorSampleInterval + " seconds", 1);
+  debugMessage("starting Air Quality, Device ID: " + String(DEVICE_ID), 1);
+  debugMessage(String("SCD4x sample interval is ") + sensorSampleInterval + " seconds", 1);
   #if defined(MQTT) || defined(INFLUX) || defined(HASSIO_MQTT)
     debugMessage(String("Number of samples before reporting is ") + sensorSampleSize, 1);
   #endif
@@ -177,7 +177,6 @@ display.setRotation(displayRotation);
 
 // Initialize SCD4X
 if (!sensorCO2Init()) {
-  debugMessage("SCD4X initialization failure",1);
   screenAlert("No SCD4X");
   // This error often occurs right after a firmware flash and reset.
   // Hardware deep sleep typically resolves it, so quickly cycle the hardware
@@ -237,7 +236,7 @@ if (!sensorCO2Init()) {
     owmAirQuality.aqi = 10000;
   }
 
-  String upd_flags = "";  // To indicate whether services succeeded
+  String upd_flags = "";  // indicates whether network endpoint publish(es) succeeded
   if (hardwareData.rssi != 0) {
     #ifdef MQTT
         if ((mqttSensorTemperatureFUpdate(averageTempF)) && (mqttSensorHumidityUpdate(averageHumidity)) && (mqttSensorCO2Update(averageCO2)) && (mqttDeviceWiFiUpdate(hardwareData.rssi)) && (mqttDeviceBatteryUpdate(hardwareData.batteryVoltage))) {
@@ -271,10 +270,11 @@ if (!sensorCO2Init()) {
     #endif
 
     if (upd_flags == "") {
-      // External data services not updated but we have network time
+      // network endpoints not updated but we have network time
       screenInfo(dateTimeString("short"));
-    } else {
-      // External data services updated and we have network time
+    } 
+    else {
+      // network endpoints updated and we have network time
       screenInfo("[+" + upd_flags + "] " + dateTimeString("short"));
     }
   } 
@@ -388,7 +388,7 @@ bool OWMAirPollutionRead()
       String serverPath = String(OWM_SERVER) + OWM_AQM_PATH + OWM_LAT_LONG + "&APPID=" + OWM_KEY;
 
       jsonBuffer = networkHTTPGETRequest(serverPath.c_str());
-      debugMessage("Raw JSON from OWM AQI feed", 2);
+      debugMessage("Raw JSON from OWM Air Pollution feed", 2);
       debugMessage(jsonBuffer, 2);
       if (jsonBuffer == "HTTP GET error") {
         return false;
@@ -415,6 +415,7 @@ bool OWMAirPollutionRead()
       owmAirQuality.pm25 = (float)list_0_components["pm2_5"];
       // owmAirQuality.pm10 = (float) list_0_components["pm10"];
       // owmAirQuality.nh3 = (float) list_0_components["nh3"];
+      debugMessage(String("OWM Air Pollution: ") + owmAirQuality.aqi + " AQI, " + owmAirQuality.pm25 + "ppm PM2.5", 1);
       return true;
     }
     return false;
@@ -424,7 +425,7 @@ bool OWMAirPollutionRead()
 void screenAlert(String messageText)
 // Display error message centered on screen
 {
-  debugMessage("screenAlert refresh start", 1);
+  debugMessage(String("screenAlert '") + messageText + "' start",1);
 
   int16_t x1, y1;
   uint16_t width, height;
@@ -446,7 +447,7 @@ void screenAlert(String messageText)
   }
   while (display.nextPage());
 
-  debugMessage("screenAlert end", 1);
+  debugMessage("screenAlert() end", 1);
 }
 
 void screenInfo(String messageText)
@@ -560,12 +561,12 @@ void screenInfo(String messageText)
       // main line
       display.setFont(&FreeSans9pt7b);
       display.setCursor(xOutdoorMargin, ySparkline - 5);
-      display.print(OWMAQILabels[(owmAirQuality.aqi)]);
+      display.print(OWMAQILabels[(owmAirQuality.aqi-1)]);
       display.print(" AQI");
       // value line
       display.setFont();
       display.setCursor((xOutdoorMargin + 20), (ySparkline + 3));
-      display.print("(" + String(owmAirQuality.pm25) + ")");
+      display.print(String(uint16_t(owmAirQuality.pm25+.5)) + " pm25");
     }
   }
   while (display.nextPage());
@@ -581,6 +582,7 @@ void screenHelperStatusMessage(uint16_t initialX, uint16_t initialY, String mess
   display.setFont();  // resets to system default monospace font (6x8 pixels)
   display.setCursor(initialX, initialY);
   display.print(messageText);
+  debugMessage(String("screenHelperStatusMessage() displayed: ") + messageText + " at X:" + initialX + ",Y:" + initialY, 2);
 }
 
 void screenHelperWiFiStatus(uint16_t initialX, uint16_t initialY, uint8_t barWidth, uint8_t barHeightIncrement, uint8_t barSpacing)
@@ -728,7 +730,6 @@ bool batteryRead(uint8_t reads)
     // is LC709203F on i2c available?
     if (lc.begin())
     {
-      debugMessage(String("Version: 0x") + lc.getICversion(), 2);
       lc.setPackAPA(BATTERY_APA);
       //lc.setThermistorB(3950);
 
@@ -797,21 +798,17 @@ bool sensorCO2Init()
     char errorMessage[256];
     uint16_t error;
 
-    #if defined(ARDUINO_ADAFRUIT_QTPY_ESP32S2) || defined(ARDUINO_ADAFRUIT_QTPY_ESP32S3_NOPSRAM) || defined(ARDUINO_ADAFRUIT_QTPY_ESP32S3) || defined(ARDUINO_ADAFRUIT_QTPY_ESP32_PICO)
-      // these boards have two I2C ports so we have to initialize the appropriate port
-      Wire1.begin();
-      co2Sensor.begin(Wire1);
-    #else
-      // only one I2C port
-      Wire.begin();
-      co2Sensor.begin(Wire);
-    #endif;
+    Wire.begin();
+    co2Sensor.begin(Wire);
+
+    // Question : needed for MagTag version, but not ESP32V2?!
+    co2Sensor.wakeUp();
 
     // stop potentially previously started measurement.
     error = co2Sensor.stopPeriodicMeasurement();
     if (error) {
       errorToString(error, errorMessage, 256);
-      debugMessage(String(errorMessage) + " executing SCD4X stopPeriodicMeasurement()",1);
+      debugMessage(String("Error: SCD4X stopPeriodicMeasurement() returned: ") + errorMessage,1);
       return false;
     }
 
@@ -835,7 +832,7 @@ bool sensorCO2Init()
     // Start Measurement.  For high power mode, with a fixed update interval of 5 seconds
     // (the typical usage mode), use startPeriodicMeasurement().  For low power mode, with
     // a longer fixed sample interval of 30 seconds, use startLowPowerPeriodicMeasurement()
-    // uint16_t error = co2Sensor.startPeriodicMeasurement();
+    // error = co2Sensor.startPeriodicMeasurement();
     error = co2Sensor.startLowPowerPeriodicMeasurement();
     if (error) {
       errorToString(error, errorMessage, 256);
@@ -976,27 +973,7 @@ void nvStorageWrite(uint8_t counter, float accumulatedTempF, float accumulatedHu
 void powerI2CEnable()
 // enables I2C across multiple Adafruit ESP32 variants
 {
-  debugMessage("powerEnable() start", 2);
-
-  // enable I2C on devices with two ports
-  #if defined(ARDUINO_ADAFRUIT_QTPY_ESP32S2) || defined(ARDUINO_ADAFRUIT_QTPY_ESP32S3_NOPSRAM) || defined(ARDUINO_ADAFRUIT_QTPY_ESP32S3) || defined(ARDUINO_ADAFRUIT_QTPY_ESP32_PICO)
-    // ESP32 is kinda odd in that secondary ports must be manually assigned their pins with setPins()!
-    Wire1.setPins(SDA1, SCL1);
-    debugMessage("power on: ESP32 variant with two I2C ports", 2);
-  #endif
-
-  // Adafruit ESP32 I2C power management
-  #if defined(ARDUINO_ADAFRUIT_FEATHER_ESP32S2)
-    // turn on the I2C power by setting pin to opposite of 'rest state'
-    // Rev B board is LOW to enable
-    // Rev C board is HIGH to enable
-    pinMode(PIN_I2C_POWER, INPUT);
-    delay(1);
-    bool polarity = digitalRead(PIN_I2C_POWER);
-    pinMode(PIN_I2C_POWER, OUTPUT);
-    digitalWrite(PIN_I2C_POWER, !polarity);
-    debugMessage("power on: Feather ESP32S2 I2C", 2);
-  #endif
+  debugMessage("powerI2CEnable() start", 2);
 
   #if defined(ARDUINO_ADAFRUIT_FEATHER_ESP32_V2)
     // Turn on the I2C power
@@ -1005,7 +982,7 @@ void powerI2CEnable()
     debugMessage("power on: Feather ESP32V2 I2C", 2);
   #endif
 
-  debugMessage("powerEnable() complete", 1);
+  debugMessage("powerI2CEnable() complete", 1);
 }
 
 void powerDisable(uint16_t deepSleepTime)
@@ -1026,7 +1003,7 @@ void powerDisable(uint16_t deepSleepTime)
     if (error) {
       char errorMessage[256];
       errorToString(error, errorMessage, 256);
-      debugMessage(String(errorMessage) + " executing SCD4X stopPeriodicMeasurement()",1);
+      debugMessage(String("Error: SCD4X stopPeriodicMeasurement() returned: ") + errorMessage,1);
     }
     co2Sensor.powerDown();
     debugMessage("power off: SCD4X",2);
@@ -1039,15 +1016,8 @@ void powerDisable(uint16_t deepSleepTime)
     debugMessage("power off: ESP32V2 I2C", 2);
   #endif
 
-  #if defined(ARDUINO_ADAFRUIT_FEATHER_ESP32S2)
-    // Rev B board is LOW to enable
-    // Rev C board is HIGH to enable
-    digitalWrite(PIN_I2C_POWER, LOW);
-    debugMessage("power off: ESP32S2 I2C", 2);
-  #endif
-
   esp_sleep_enable_timer_wakeup(deepSleepTime * 1000000);  // ESP microsecond modifier
-  debugMessage(String("powerDisable complete: ESP32 deep sleep for ") + (deepSleepTime) + " seconds", 1);
+  debugMessage(String("powerDisable() complete: ESP32 deep sleep for ") + (deepSleepTime) + " seconds", 1);
   esp_deep_sleep_start();
 }
 
