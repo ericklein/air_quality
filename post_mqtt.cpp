@@ -77,12 +77,12 @@ extern void debugMessage(String messageText, uint8_t messageLevel);
       // publish battery voltage
       if (batteryVoltagePub.publish(batteryVoltage))
       {
-        debugMessage("MQTT publish: Battery Voltage succeeded",1);
+        debugMessage("MQTT publish: Battery Voltage succeeded",2);
         result = true;
       }
       else
       {
-        debugMessage("MQTT publish: Battery Voltage failed",1);
+        debugMessage("MQTT publish: Battery Voltage failed",2);
       }
     }
     return(result);
@@ -102,12 +102,12 @@ extern void debugMessage(String messageText, uint8_t messageLevel);
 
       if (rssiLevelPub.publish(rssi))
       {
-        debugMessage("MQTT publish: WiFi RSSI succeeded",1);
+        debugMessage("MQTT publish: WiFi RSSI succeeded",2);
         result = true;
       }
       else
       {
-        debugMessage("MQTT publish: WiFi RSSI failed",1);
+        debugMessage("MQTT publish: WiFi RSSI failed",2);
       }
     }
     return(result);
@@ -127,11 +127,11 @@ extern void debugMessage(String messageText, uint8_t messageLevel);
     // Attempt to publish sensor data
     if(tempPub.publish(temperatureF))
     {
-      debugMessage("MQTT publish: Temperature succeeded",1);
+      debugMessage("MQTT publish: Temperature succeeded",2);
       result = true;
     }
     else {
-      debugMessage("MQTT publish: Temperature failed",1);
+      debugMessage("MQTT publish: Temperature failed",2);
     }
     return(result);
   }
@@ -150,11 +150,11 @@ extern void debugMessage(String messageText, uint8_t messageLevel);
     // Attempt to publish sensor data
     if(humidityPub.publish(humidity))
     {
-      debugMessage("MQTT publish: Humidity succeeded",1);
+      debugMessage("MQTT publish: Humidity succeeded",2);
       result = true;
     }
     else {
-      debugMessage("MQTT publish: Humidity failed",1);
+      debugMessage("MQTT publish: Humidity failed",2);
     }
     return(result);
   }
@@ -175,12 +175,12 @@ extern void debugMessage(String messageText, uint8_t messageLevel);
     {
       if(co2Pub.publish(co2))
       {
-        debugMessage("MQTT publish: CO2 succeeded",1);
+        debugMessage("MQTT publish: CO2 succeeded",2);
         result = true;
       }
       else
       {
-        debugMessage("MQTT publish: CO2 failed",1);
+        debugMessage("MQTT publish: CO2 failed",2);
       }
     }
     return(result);
